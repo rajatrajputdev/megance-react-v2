@@ -1,0 +1,83 @@
+/* --------------- Awards --------------- */
+
+.hero-ms{
+
+    .main-text{
+        position: relative;
+
+        .img1{
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            position: absolute;
+            top: 50px;
+            left: -20px;
+        }
+
+        .img2{
+            width: 180px;
+            height: 80px;
+            border-radius: 10px;
+            position: absolute;
+            bottom: 40px;
+            right: -70px;
+        }
+
+        h2{
+            position: relative;
+            z-index: 2;
+        }
+    }
+
+    .qoutes{
+
+        .text{
+
+            .img{
+                border-radius: 50%;
+            }
+
+            .info{
+
+                h6{
+                    font-size: 20px;
+                    text-transform: uppercase;
+                }
+
+                span{
+                    font-size: 14px;
+                    font-weight: 300;
+                    color: #7B7878;
+                }
+            }
+        }
+    }
+
+    .exp{
+        position: relative;
+        padding: 100px 0;
+
+        h2{
+            font-size: 280px;
+        }
+
+        &:after{
+            content: '';
+            width: 50vw;
+            height: 50vw;
+            background: $bg-color;
+            border-radius: 50%;
+            position: absolute;
+            right: -50%;
+            top: 70%;
+            transform: translateY(-50%);
+            z-index: -1;
+        }
+
+        .icon{
+            position: absolute;
+            top: 70%;
+            left: -50px;
+        }
+    }
+}

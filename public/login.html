@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Astro - Login</title>
+  <style>
+    * {margin:0;padding:0;box-sizing:border-box;font-family:"Segoe UI",sans-serif;}
+  
+    .container{display:flex;height:100vh;width:100%;}
+    
+    /* Left side */
+    .left{
+      flex:1;
+      background:url("https://i.ibb.co/RHYbY2p/astronaut.jpg") no-repeat center/cover;
+      color:#fff;
+      display:flex;
+      align-items:flex-end;
+      padding:40px;
+    }
+    .left h1{
+      font-size:28px;
+      line-height:1.4;
+      font-weight:600;
+      max-width:320px;
+    }
+
+    /* Right side */
+    .right{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      padding:60px;
+    }
+    .right h2{
+      margin-bottom:20px;
+      font-size:28px;
+      color:#333;
+    }
+
+    /* Social Buttons */
+    .social-buttons{display:flex;gap:15px;margin-bottom:20px;}
+    .social-btn{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding:12px;
+      border:1px solid #ccc;
+      border-radius:6px;
+      background:#fff;
+      cursor:pointer;
+      font-weight:500;
+      font-size:14px;
+      transition:background 0.3s,box-shadow 0.3s;
+    }
+    .social-btn img{width:18px;height:18px;}
+    .social-btn:hover{background:#f9f9f9;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+
+    /* Form */
+    form{display:flex;flex-direction:column;gap:15px;}
+    input{padding:14px;border:1px solid #ccc;border-radius:6px;font-size:15px;}
+    .checkbox{display:flex;align-items:center;gap:8px;font-size:14px;}
+    .btn{
+      padding:14px;
+      background:#4a148c;
+      color:#fff;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:16px;
+      transition:background 0.3s;
+    }
+    .btn:hover{background:#6a1b9a;}
+
+    .footer-text{margin-top:15px;font-size:14px;text-align:center;color:#555;}
+    .footer-text a{color:#4a148c;text-decoration:none;font-weight:600;}
+
+    @media(max-width:768px){
+      .container{flex-direction:column;}
+      .left{min-height:200px;align-items:center;justify-content:center;text-align:center;padding:20px;}
+      .left h1{max-width:none;font-size:22px;}
+      .right{padding:30px 20px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Left Side -->
+    <div class="left">
+      <h1>Welcome back, continue exploring the journey with us!</h1>
+    </div>
+
+    <!-- Right Side -->
+    <div class="right">
+      <h2>Login</h2>
+
+      <div class="social-buttons">
+        <button class="social-btn">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google">
+          Login with Google
+        </button>
+        <button class="social-btn">
+          <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/facebook/facebook-original.svg" alt="Facebook">
+          Login with Facebook
+        </button>
+      </div>
+
+      <form>
+        <input type="email" placeholder="Email or Username" required>
+        <input type="password" placeholder="Password" required>
+        
+        <div class="checkbox">
+          <input type="checkbox" id="remember">
+          <label for="remember">Remember me</label>
+        </div>
+
+        <button type="submit" class="btn">Login</button>
+      </form>
+
+      <div class="footer-text">
+        Forgot your password? <a href="#">Reset</a><br>
+        Don’t have an account? <a href="/register.html">Sign Up</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,265 @@
+
+:root {
+    --bg-color: #E6E7E9;
+    --theme-color: #fff;
+}
+
+$bg-color: var(--bg-color);
+$sub-color: var(--sub-color);
+$theme-color: var(--theme-color);
+$body-color: var(--font-color);
+$heading-color: var(--heading-color);
+$p-color: var(--p-color);
+$border-color: var(--border-color);
+$mobile-xs-screen: 480px;
+$tablet-sm-screen: 768px;
+$desk-md-screen: 992px;
+$desk-lg-screen: 1300px;
+
+
+
+@font-face {
+    font-family: 'Halyard-Display';
+    src: url('../fonts/Halyard/fonnts.com-Halyard_Display.otf') format('woff2');
+}
+
+
+// menu
+@import 'menu';
+
+// header
+@import 'header';
+
+// Intro
+@import 'intro';
+
+// Services
+@import 'services';
+
+// Works
+@import 'works';
+
+// Clients
+@import 'clients';
+
+// testimonials
+@import 'testimonials';
+
+// blogs
+@import 'blogs';
+
+// contact
+@import 'contact';
+
+// footer
+@import 'footer';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+body{
+    font-family: "Inter", sans-serif;
+    font-family: "Halyard-Display", sans-serif;
+    font-size: 18px;
+    line-height: 28px;
+    font-weight: 400;
+    color: #0D0D0D;
+    background-color: $theme-color;
+}
+
+h1, h2, h3, h4, h5, h6{
+    font-weight: 400;
+    line-height: 1.2;
+    margin: 0;
+}
+
+h1{
+    font-size: 64px;
+}
+
+h2{
+    font-size: 54px;
+}
+
+h3{
+    font-size: 44px;
+}
+
+h4{
+    font-size: 36px;
+}
+
+h5{
+    font-size: 32px;
+}
+
+h6{
+    font-size: 24px;
+}
+
+p{
+    font-family: "Inter", sans-serif;
+    font-size: 16px;
+    font-weight: 300;
+    margin: 0;
+}
+
+.main-color{
+    color: #1567F5 !important;
+}
+
+.sub-head{
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 7px 25px;
+    border: 1px solid rgba(0,0,0,.1);
+    border-radius: 30px;
+}
+
+.sub-title{
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.italic{
+    font-style: italic;
+    display: inline;
+}
+
+.loader-wrap svg{
+    fill: #1d1d1d;
+}
+
+.butn{
+
+    &.butn-bord{
+        border: 1px solid rgba(255,255,255,.3);
+
+        &:hover{
+            background: #fff;
+            color: #212121;
+        }
+    }
+}
+
+.icon.invert{
+
+    img{
+        filter: invert(1);
+    }
+}
+
+.butn{
+
+    .icon{
+        width: 18px;
+    }
+
+    &:hover{
+
+        .icon.invert{
+
+            img{
+                filter: invert(0);
+            }
+        }
+    }
+}
+
+/* ====================== [ Start Responsive ] ====================== */
+
+@media screen and (max-width: $desk-md-screen) {
+
+    .header-ms{
+        padding-bottom: 120px;
+    }
+
+    .header-ms .award-box,
+    .header-ms .vid-box{
+        display: none;
+    }
+
+    .hero-ms .exp:after{
+        width: 80vw;
+        height: 80vw;
+        right: -20%;
+    }
+
+    .hero-ms .exp .icon{
+        left: 30%;
+    }
+
+    .serv-ms .item{
+        height: auto;
+    }
+
+    .testim-sm .brands .row .img{
+        margin: 15px auto;
+    }
+    
+}
+
+@media screen and (max-width: $tablet-sm-screen) {
+
+    .header-ms .caption h1{
+        font-size: 50px;
+
+        .arrow{
+            width: 40px;
+            height: 40px;
+            line-height: 30px;
+
+            svg{
+                width: 20px;
+            }
+        }
+    }
+
+    .hero-ms .main-text h2{
+        font-size: 36px;
+
+    }
+
+    .hero-ms .exp{
+
+        .text-right{
+            text-align: center;
+        }
+
+        .icon{
+            display: none;
+        }
+
+        &:after{
+            display: none;
+        }
+    }
+
+    .hero-ms{
+
+        .img1,
+        .img2{
+            display: none;
+        }
+
+        .qoutes {
+            display: block !important;
+
+            .text{
+                margin: 15px 0 0 0 !important;
+            }
+        }
+    }
+}

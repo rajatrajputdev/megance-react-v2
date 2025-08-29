@@ -1,0 +1,104 @@
+/* --------------- header --------------- */
+
+.header-ms{
+    padding-top: 200px;
+
+    .caption{
+
+        h1{
+            font-size: 120px;
+            font-weight: 500;
+            text-transform: uppercase;
+            line-height: 1;
+
+            .arrow{
+                width: 70px;
+                height: 70px;
+                line-height: 40px;
+                text-align: center;
+                border-radius: 50%;
+                background: #fff;
+    
+                svg{
+                    transform: rotate(90deg);
+                }
+            }
+
+            .underline{
+                position: relative;
+                border-bottom: 2px solid #fff;
+            }
+        }
+
+        p{
+            font-size: 20px;
+            color: #BDBDBD;
+        }
+    }
+
+    .award-box{
+        padding: 70px 40px 40px;
+        border-radius: 30px;
+        background: $bg-color;
+        color: #2A2D2F;
+        position: relative;
+
+        .arrow{
+            width: 45px;
+            height: 45px;
+            line-height: 40px;
+            text-align: center;
+            border-radius: 50%;
+            border: 1px solid #2A2D2F;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+
+            svg{
+                width: 15px;
+            }
+        }
+        
+        .img{
+            text-align: center;
+            margin-bottom: 15px;
+            animation: rotatecircle 20s infinite linear;
+        }
+
+        h6{
+            color: #2A2D2F;
+        }
+    }
+
+    .vid-box{
+        border-radius: 10px;
+        overflow: hidden !important;
+
+        video{
+            width: 100%;
+        }
+
+        video::-webkit-media-controls {
+            display: none;
+        }
+    }
+
+    .feat{
+        position: relative;
+
+        &:after{
+            content: "";
+            border-left: 1px solid rgba(255,255,255,.1);
+            position: absolute;
+            left: 50%;
+            top: -50px;
+            bottom: -70px;
+        }
+    }
+}
+
+
+@keyframes rotatecircle {
+    0% { transform:rotate(0deg); }
+    100% { transform:rotate(360deg); }
+}

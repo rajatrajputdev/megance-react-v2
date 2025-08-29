@@ -1,0 +1,27 @@
+/* --------------- Clients --------------- */
+
+.clients-sa{
+
+    .item{
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 50%;
+        text-align: center;
+
+        .img{
+            width: 100px;
+        }
+
+        .cont{
+
+            .icon{
+                width: 40px;
+                margin: 0 auto 10px;
+            }
+
+            span{
+                font-size: 14px;
+                line-height: 20px;
+            }
+        }
+    }
+}
