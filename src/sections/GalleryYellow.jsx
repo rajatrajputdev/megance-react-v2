@@ -2,8 +2,9 @@ import { useEffect } from "react";
 
 export default function GalleryYellow() {
   useEffect(() => {
-    const SwiperCtor = window.Swiper;
-    if (typeof SwiperCtor === "function") {
+    const init = () => {
+      const SwiperCtor = window.Swiper;
+      if (typeof SwiperCtor !== "function") return false;
       const container = document.querySelector(".gallery-yellow-swiper");
       if (container && !container.getAttribute("data-initialized")) {
         new SwiperCtor(".gallery-yellow-swiper", {
@@ -22,7 +23,15 @@ export default function GalleryYellow() {
         });
         container.setAttribute("data-initialized", "true");
       }
+      return true;
+    };
+    const onVendors = () => init();
+    window.addEventListener("vendors:ready", onVendors);
+    if (!init()) {
+      let t = 0;
+      const tm = setInterval(() => { if (init() || ++t > 40) clearInterval(tm); }, 100);
     }
+    return () => window.removeEventListener("vendors:ready", onVendors);
   }, []);
 
   return (
@@ -40,7 +49,7 @@ export default function GalleryYellow() {
             {[1, 2, 3, 4, 5].map((i) => (
               <div className="swiper-slide" key={i}>
                 <div className="item">
-                  <img src="./assets/imgs/shoes/s1.png" alt="" />
+                  <img src="/assets/imgs/shoes/s1.png" alt="" />
                 </div>
               </div>
             ))}

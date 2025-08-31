@@ -1,19 +1,24 @@
+import { Link, NavLink } from "react-router-dom";
+import { useCart } from "../context/CartContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import Logo from "./Logo.jsx";
+
 export default function Navbar() {
+  const { count } = useCart();
+  const { user, logout } = useAuth();
   return (
     <>
       <nav className="navbar navbar-expand-lg">
         <div className="container">
-          <a className="logo-wrapper">
-            <img src="/assets/imgs/megance_logo_w.png" alt="Megance Logo" />
-          </a>
+          <Logo />
 
           <div className="collapse navbar-collapse" id="navbarSupportedContent">
             <ul className="navbar-nav">
               <li className="nav-item">
-                <a className="nav-link active" href="#">Home</a>
+                <NavLink className="nav-link" to="/">Home</NavLink>
               </li>
               <li className="nav-item">
-                <a className="nav-link" href="/">Shop</a>
+                <NavLink className="nav-link" to="/shop">Shop</NavLink>
               </li>
               <li className="nav-item">
                 <a className="nav-link" href="/">About Us</a>
@@ -25,6 +30,21 @@ export default function Navbar() {
           </div>
 
           <div className="topnav d-flex align-items-center">
+            <Link to="/cart" className="butn butn-rounded mr-10">
+              <div className="d-flex align-items-center">
+                <span>Cart ({count})</span>
+                <span className="icon ml-10">
+                  <img src="/common/imgs/icons/arrow-top-right.svg" alt="" />
+                </span>
+              </div>
+            </Link>
+
+            {user ? (
+              <button className="butn butn-rounded mr-10" onClick={logout}>Logout</button>
+            ) : (
+              <Link to="/login" className="butn butn-rounded mr-10">Login</Link>
+            )}
+
             <a href="/" className="butn butn-rounded">
               <div className="d-flex align-items-center">
                 <span>Contact Us</span>
@@ -145,4 +165,3 @@ export default function Navbar() {
     </>
   );
 }
-

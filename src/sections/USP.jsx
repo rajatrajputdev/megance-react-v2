@@ -8,7 +8,7 @@ export default function USP() {
               <div className="d-flex align-items-center">
                 <div className="ml-auto"></div>
               </div>
-              <img src="./assets/imgs/usp/left.jpg" alt="" />
+              <img src="/assets/imgs/usp/left.jpg" alt="" />
             </div>
           </div>
           <div className="col-lg-4">
@@ -16,7 +16,7 @@ export default function USP() {
               <div className="d-flex align-items-center">
                 <div className="ml-auto"></div>
               </div>
-              <img src="./assets/imgs/usp/middle.jpg" alt="" />
+              <img src="/assets/imgs/usp/middle.jpg" alt="" />
             </div>
           </div>
           <div className="col-lg-4">
@@ -24,7 +24,7 @@ export default function USP() {
               <div className="d-flex align-items-center">
                 <div className="ml-auto"></div>
               </div>
-              <img src="./assets/imgs/usp/right.jpg" alt="" />
+              <img src="/assets/imgs/usp/right.jpg" alt="" />
             </div>
           </div>
         </div>
@@ -32,4 +32,3 @@ export default function USP() {
     </section>
   );
 }
-

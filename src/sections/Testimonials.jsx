@@ -2,10 +2,9 @@ import { useEffect } from "react";
 
 export default function Testimonials() {
   useEffect(() => {
-    // Initialize Swiper (from CDN) for this block
-    const SwiperCtor = window.Swiper;
-    if (typeof SwiperCtor === "function") {
-      // Avoid multiple inits by checking a data-flag on container
+    const init = () => {
+      const SwiperCtor = window.Swiper;
+      if (typeof SwiperCtor !== "function") return false;
       const container = document.querySelector("#testimonials .testim-swiper");
       if (container && !container.getAttribute("data-initialized")) {
         new SwiperCtor(".testim-sm .testim-swiper", {
@@ -28,7 +27,15 @@ export default function Testimonials() {
         });
         container.setAttribute("data-initialized", "true");
       }
+      return true;
+    };
+    const onVendors = () => init();
+    window.addEventListener("vendors:ready", onVendors);
+    if (!init()) {
+      let t = 0;
+      const tm = setInterval(() => { if (init() || ++t > 40) clearInterval(tm); }, 100);
     }
+    return () => window.removeEventListener("vendors:ready", onVendors);
   }, []);
 
   return (
@@ -47,7 +54,7 @@ export default function Testimonials() {
                     <div className="info d-flex align-items-center pt-30 mb-15">
                       <div>
                         <div className="img-author">
-                          <img src="assets/imgs/testim/avatar1.jpg" alt="" />
+                          <img src="/assets/imgs/testim/avatar1.jpg" alt="" />
                         </div>
                       </div>
                       <div className="info-text">

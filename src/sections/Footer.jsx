@@ -6,7 +6,7 @@ export default function Footer() {
           <div className="row">
             <div className="col-lg-5">
               <a href="#" className="logo md-mb50">
-                <img src="assets/imgs/megance_logo_w.png" alt="" />
+                <img src="/assets/imgs/megance_logo_w.png" alt="" />
               </a>
             </div>
             <div className="col-lg-6">
@@ -84,4 +84,3 @@ export default function Footer() {
     </footer>
   );
 }
-
