@@ -11,12 +11,14 @@ import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
 import "./styles/app-overrides.css";
+import Loader from "./components/Loader.jsx";
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <CartProvider>
+          <Loader />
           {/* Global elements expected by legacy scripts */}
           <div className="loader-wrap">
             <svg viewBox="0 0 1000 1000" preserveAspectRatio="none">
