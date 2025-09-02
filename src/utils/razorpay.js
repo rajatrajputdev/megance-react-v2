@@ -11,7 +11,8 @@ export function loadRazorpay(src = "https://checkout.razorpay.com/v1/checkout.js
 
 export async function openRazorpayCheckout({ amount, currency = "INR", name, description, prefill, notes, onSuccess, onDismiss }) {
   await loadRazorpay();
-  const key = import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_1234567890abcd"; // placeholder for demo
+  // Hardcoded for now as requested (do not use secret on frontend)
+  const key = "rzp_test_RCPn3qRC9s7g22";
   const options = {
     key,
     amount: Math.round(amount * 100),
@@ -33,4 +34,3 @@ export async function openRazorpayCheckout({ amount, currency = "INR", name, des
   const rzp = new window.Razorpay(options);
   rzp.open();
 }
-
