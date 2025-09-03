@@ -14,22 +14,27 @@ export default function ProductPage() {
   const [tab, setTab] = useState("desc"); // desc | specs | reviews
 
   const sizes = ["6", "7", "8", "9", "10", "11"];
-
-  // Lens overlay over image (no zoom) — appears on hover
   const mediaRef = useRef(null);
   const [lensVisible, setLensVisible] = useState(false);
   const [lensPos, setLensPos] = useState({ x: 0, y: 0 });
+  const [zoomPos, setZoomPos] = useState({ x: 0, y: 0 });
   const LENS_SIZE = 120;
+  const ZOOM_LEVEL = 2.5;
 
   const onMediaMove = (e) => {
     const el = mediaRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const relX = e.clientX - rect.left;
-    const relY = e.clientY - rect.top;
-    const x = Math.max(0, Math.min(rect.width - LENS_SIZE, relX - LENS_SIZE / 2));
-    const y = Math.max(0, Math.min(rect.height - LENS_SIZE, relY - LENS_SIZE / 2));
-    setLensPos({ x, y });
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const lensX = Math.max(0, Math.min(x - LENS_SIZE / 2, rect.width - LENS_SIZE));
+    const lensY = Math.max(0, Math.min(y - LENS_SIZE / 2, rect.height - LENS_SIZE));
+    setLensPos({ x: lensX, y: lensY });
+
+    const zoomX = -(lensX * ZOOM_LEVEL);
+    const zoomY = -(lensY * ZOOM_LEVEL);
+    setZoomPos({ x: zoomX, y: zoomY });
   };
 
   const cartProduct = useMemo(() => {
@@ -69,10 +74,17 @@ export default function ProductPage() {
               onMouseMove={onMediaMove}
             >
               <img src={product.image} alt={product.name} className="img-fluid" />
-              <div
-                className={`pd-lens${lensVisible ? " visible" : ""}`}
-                style={{ width: LENS_SIZE, height: LENS_SIZE, transform: `translate(${lensPos.x}px, ${lensPos.y}px)` }}
-              />
+              {lensVisible && (
+                <>
+                  <div
+                    className="pd-lens visible"
+                    style={{ width: LENS_SIZE, height: LENS_SIZE, transform: `translate(${lensPos.x}px, ${lensPos.y}px)` }}
+                  />
+                  <div className="pd-zoom-container">
+                    <div className="pd-zoom-image" style={{ backgroundImage: `url(${product.image})`, backgroundPosition: `${zoomPos.x}px ${zoomPos.y}px`, backgroundSize: `${100 * ZOOM_LEVEL}%` }} />
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <div className="col-md-6">
@@ -96,7 +108,7 @@ export default function ProductPage() {
                   </button>
                 ))}
               </div>
-              {!size && <div className="inline-hint">Please select a size</div>}
+              {!size && <div className="inline-hint">select the available size</div>}
             </div>
 
             {/* Quantity + Add to cart */}

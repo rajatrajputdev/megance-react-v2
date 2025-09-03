@@ -1,8 +1,9 @@
 /* Minimal aesthetic alignment for internal pages to match theme */
 
 .page-section {
-  padding-top: 60px;
+  padding-top: 120px;
   padding-bottom: 60px;
+  background: #fff;
 }
 
 /* Navbar: make padding, background, and colors consistent */
@@ -285,6 +286,26 @@
   display: none;
 }
 .pd-lens.visible { display: block; }
+
+.pd-zoom-container {
+  position: absolute;
+  top: 0;
+  left: 105%;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 14px;
+  overflow: hidden;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.pd-zoom-image {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
 
 .tabs-pill { display: flex; gap: 10px; flex-wrap: wrap; }
 .tabs-pill .pill,
