@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import SEO from "../components/general_components/SEO.jsx";
 
 export default function CartPage() {
   const { items, updateQty, removeItem, amount } = useCart();
@@ -10,6 +11,7 @@ export default function CartPage() {
 
   return (
     <>
+      <SEO title="Your Cart" description="Review items and proceed to checkout on Megance." image="/assets/logo.svg" type="website" twitterCard="summary" />
       <section className="page-hero">
         <div className="container">
           <div className="row align-items-end">

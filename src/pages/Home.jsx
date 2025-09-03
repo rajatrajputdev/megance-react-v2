@@ -1,14 +1,15 @@
-import HeaderHero from "../components/HeaderHero.jsx";
-import Intro from "../sections/Intro.jsx";
-import USP from "../sections/USP.jsx";
-import Marquee from "../sections/Marquee.jsx";
-import ZellerSection from "../sections/ZellerSection.jsx";
-import GalleryYellow from "../sections/GalleryYellow.jsx";
-import Testimonials from "../sections/Testimonials.jsx";
-import FAQ from "../sections/FAQ.jsx";
-import Newsletter from "../sections/Newsletter.jsx";
-import Footer from "../sections/Footer.jsx";
+import HeaderHero from "../components/homepage_components/HeaderHero.jsx";
+import Intro from "../components/homepage_components/Intro.jsx";
+import USP from "../components/homepage_components/USP.jsx";
+import Marquee from "../components/homepage_components/Marquee.jsx";
+import ZellerSection from "../components/homepage_components/ZellerSection.jsx";
+import GalleryYellow from "../components/homepage_components/GalleryYellow.jsx";
+import Testimonials from "../components/homepage_components/Testimonials.jsx";
+import FAQ from "../components/homepage_components/FAQ.jsx";
+import Newsletter from "../components/homepage_components/Newsletter.jsx";
+import Footer from "../components/homepage_components/Footer.jsx";
 import { products } from "../data/products.js";
+import SEO from "../components/general_components/SEO.jsx";
 import { useCart } from "../context/CartContext.jsx";
 import { Link } from "react-router-dom";
 
@@ -16,6 +17,7 @@ export default function Home() {
   const { addItem } = useCart();
   return (
     <>
+      <SEO title="Home" description="Elevate every turn with bold, sleek footwear engineered for comfort and performance." image="/assets/logo.svg" type="website" twitterCard="summary" />
       <main>
         <HeaderHero />
         <Intro />

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation } from "react-router-dom";
+import SEO from "../components/general_components/SEO.jsx";
 
 export default function LoginPage() {
   const { user, login, logout } = useAuth();
@@ -18,14 +19,19 @@ export default function LoginPage() {
 
   if (user) {
     return (
-      <section className="container page-section text-center">
-        <h3>You are logged in as {user.name}</h3>
-        <button className="butn butn-md butn-rounded mt-20" onClick={() => logout()}>Logout</button>
-      </section>
+      <>
+        <SEO title="Account" description="You are logged in to Megance." image="/assets/logo.svg" type="website" twitterCard="summary" />
+        <section className="container page-section text-center">
+          <h3>You are logged in as {user.name}</h3>
+          <button className="butn butn-md butn-rounded mt-20" onClick={() => logout()}>Logout</button>
+        </section>
+      </>
     );
   }
 
   return (
+    <>
+      <SEO title="Login" description="Login to Megance to continue to checkout." image="/assets/logo.svg" type="website" twitterCard="summary" />
     <section className="container page-section">
       <div className="row justify-content-center">
         <div className="col-md-6">
@@ -46,5 +52,6 @@ export default function LoginPage() {
         </div>
       </div>
     </section>
+    </>
   );
 }

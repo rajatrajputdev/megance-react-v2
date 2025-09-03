@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar.jsx";
+import Navbar from "./components/general_components/Navbar.jsx";
 import Home from "./pages/Home.jsx";
 import Shop from "./pages/Shop.jsx";
 import ProductPage from "./pages/Product.jsx";
@@ -9,9 +9,9 @@ import LoginPage from "./pages/Login.jsx";
 import OrderSuccess from "./pages/OrderSuccess.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
-import RequireAuth from "./components/RequireAuth.jsx";
+import RequireAuth from "./components/general_components/RequireAuth.jsx";
 import "./styles/app-overrides.css";
-import Loader from "./components/Loader.jsx";
+import Loader from "./components/general_components/Loader.jsx";
 
 export default function App() {
   return (

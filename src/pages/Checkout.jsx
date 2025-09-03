@@ -5,6 +5,7 @@ import { openRazorpayCheckout } from "../utils/razorpay.js";
 import { useNavigate, Link } from "react-router-dom";
 import { INDIAN_STATES } from "../data/indian-states.js";
 import { findCoupon, computeDiscount } from "../data/coupons.js";
+import SEO from "../components/general_components/SEO.jsx";
 
 export default function CheckoutPage() {
   const { items, amount, clearCart } = useCart();
@@ -89,6 +90,8 @@ export default function CheckoutPage() {
   };
 
   return (
+    <>
+    <SEO title="Checkout" description="Complete your Megance order securely with Razorpay." image="/assets/logo.svg" type="website" twitterCard="summary" />
     <section className="container pt-60 pb-60 checkout-page">
       {toast && (
         <div className="toast-container">
@@ -219,5 +222,6 @@ export default function CheckoutPage() {
         </div>
       )}
     </section>
+    </>
   );
 }

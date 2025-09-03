@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 export default function Shop() {
   const { addItem } = useCart();
   return (
+    <>
+      <SEO title="Shop" description="Explore featured Megance products and find your perfect pair." image="/assets/logo.svg" type="website" twitterCard="summary" />
     <section className="container page-section">
       <div className="row mb-40 text-center">
         <div className="col-12">
@@ -32,5 +34,7 @@ export default function Shop() {
         ))}
       </div>
     </section>
+import SEO from "../components/general_components/SEO.jsx";
+    </>
   );
 }

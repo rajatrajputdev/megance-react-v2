@@ -1,6 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
-import { useCart } from "../context/CartContext.jsx";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useCart } from "../../context/CartContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import Logo from "./Logo.jsx";
 
 export default function Navbar() {
@@ -129,7 +129,7 @@ export default function Navbar() {
           <div className="cont-info valign">
             <div className="text-center full-width">
               <div className="logo">
-                <img src="/common/imgs/megance_logo_w.png" alt="" />
+                <img src="/assets/imgs/megance_logo_w.png" alt="" />
               </div>
               <div className="social-icon mt-40">
                 <a href="#">
