@@ -6,6 +6,24 @@ import Logo from "./Logo.jsx";
 export default function Navbar() {
   const { count } = useCart();
   const { user, logout } = useAuth();
+  const openMenu = () => {
+    try {
+      const hm = document.querySelector('.hamenu');
+      if (hm) {
+        hm.classList.add('open');
+        hm.style.left = '0';
+      }
+    } catch {}
+  };
+  const closeMenu = () => {
+    try {
+      const hm = document.querySelector('.hamenu');
+      if (hm) {
+        hm.classList.remove('open');
+        hm.style.left = '-100%';
+      }
+    } catch {}
+  };
   return (
     <>
       <nav className="navbar navbar-expand-lg">
@@ -20,17 +38,11 @@ export default function Navbar() {
               <li className="nav-item">
                 <NavLink className="nav-link" to="/shop">Shop</NavLink>
               </li>
-              <li className="nav-item">
-                <a className="nav-link" href="/">About Us</a>
-              </li>
-              <li className="nav-item">
-                <a className="nav-link" href="/">Club</a>
-              </li>
             </ul>
           </div>
 
           <div className="topnav d-flex align-items-center">
-            <Link to="/cart" className="butn butn-rounded mr-10">
+            <Link to="/cart" className="butn nav-butn cart-butn mr-10">
               <div className="d-flex align-items-center">
                 <span>Cart ({count})</span>
                 <span className="icon ml-10">
@@ -40,32 +52,13 @@ export default function Navbar() {
             </Link>
 
             {user ? (
-              <button className="butn butn-rounded mr-10" onClick={logout}>Logout</button>
+              <button className="butn nav-butn mr-10" onClick={logout}>Logout</button>
             ) : (
-              <Link to="/login" className="butn butn-rounded mr-10">Login</Link>
+              <Link to="/login" className="butn nav-butn mr-10">Login</Link>
             )}
 
-            <a href="/" className="butn butn-rounded">
-              <div className="d-flex align-items-center">
-                <span>Contact Us</span>
-                <span className="icon ml-10">
-                  <img src="/common/imgs/icons/arrow-top-right.svg" alt="" />
-                </span>
-              </div>
-            </a>
-
-            <div className="menu-icon cursor-pointer">
-              <div
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.25)",
-                  backdropFilter: "blur(10px)",
-                  WebkitBackdropFilter: "blur(10px)",
-                  color: "#000",
-                  padding: "2px 5px",
-                  borderRadius: "10%",
-                  marginLeft: 15,
-                }}
-              >
+            <div className="menu-icon cursor-pointer" onClick={openMenu}>
+              <div className="menu-icon-surface">
                 <span className="icon ti-align-right"></span>
               </div>
             </div>
@@ -74,54 +67,36 @@ export default function Navbar() {
       </nav>
 
       <div className="hamenu">
-        <div className="close-menu cursor-pointer ti-close"></div>
+        <div className="close-menu cursor-pointer ti-close" onClick={closeMenu}></div>
         <div className="container-fluid rest d-flex">
           <div className="menu-links">
             <ul className="main-menu rest">
               <li></li>
               <li>
                 <div className="o-hidden">
-                  <a href="/" className="link">
+                  <NavLink to="/" className="link">
                     <span className="fill-text" data-text="Home">
                       Home
                     </span>
-                  </a>
+                  </NavLink>
                 </div>
               </li>
               <li>
                 <div className="o-hidden">
-                  <a href="/inner_pages/contact.html" className="link">
+                  <NavLink to="/shop" className="link">
                     <span className="fill-text" data-text="Shop">
                       Shop
                     </span>
-                  </a>
+                  </NavLink>
                 </div>
               </li>
               <li>
                 <div className="o-hidden">
-                  <a href="/inner_pages/contact.html" className="link">
-                    <span className="fill-text" data-text="About Us">
-                      About Us
-                    </span>
-                  </a>
-                </div>
-              </li>
-              <li>
-                <div className="o-hidden">
-                  <a href="/inner_pages/contact.html" className="link">
-                    <span className="fill-text" data-text="Club">
-                      Club
-                    </span>
-                  </a>
-                </div>
-              </li>
-              <li>
-                <div className="o-hidden">
-                  <a href="/inner_pages/contact.html" className="link">
+                  <NavLink to="/" className="link">
                     <span className="fill-text" data-text="Contact Us">
                       Contact Us
                     </span>
-                  </a>
+                  </NavLink>
                 </div>
               </li>
             </ul>
