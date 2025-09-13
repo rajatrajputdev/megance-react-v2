@@ -1,7 +1,21 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { products } from "../../data/products.js";
+import { useCart } from "../../context/CartContext.jsx";
 
 export default function Intro() {
   const swiperRef = useRef(null);
+  const { addItem } = useCart();
+
+  // Map homepage badges to concrete products in our data
+  const slides = useMemo(
+    () => [
+      { badge: "BESTSELLER", product: products.find(p => p.id === "aeon-eclipse") },
+      { badge: "TRENDING",  product: products.find(p => p.id === "volt-boost-max") },
+      { badge: "HOT",       product: products.find(p => p.id === "stride-runner-pro") },
+      { badge: "NEW",       product: products.find(p => p.id === "echo-flex-zoom") },
+    ].filter(s => !!s.product),
+    []
+  );
 
   useEffect(() => {
     const initSwiper = () => {
@@ -67,66 +81,31 @@ export default function Intro() {
 
       <div className="swiper shoe-carousel">
         <div className="swiper-wrapper">
-          {/* Cards mirror the product data used in Shop */}
-          <div className="swiper-slide">
-            <div className="product-card">
-              <div className="badge">BESTSELLER</div>
-              <div className="product-image-wrapper">
-                <img src="/assets/imgs/shoes/s1.png" className="front-img" alt="Shoe Front" />
-                <img src="/assets/imgs/shoes/s2.jpg" className="hover-img" alt="Shoe Hover" />
+          {/* Generated from products so the + can add to cart */}
+          {slides.map((s, idx) => (
+            <div key={s.product.id + idx} className="swiper-slide">
+              <div className="product-card">
+                <div className="badge">{s.badge}</div>
+                <div className="product-image-wrapper">
+                  <img src={s.product.image} className="front-img" alt={`${s.product.name} front`} />
+                  <img src={s.product.hover} className="hover-img" alt={`${s.product.name} hover`} />
+                </div>
+                <div className="product-details">
+                  <div className="name">{s.product.name}</div>
+                  <div className="price">₹ {s.product.price}</div>
+                </div>
+                <button
+                  type="button"
+                  className="add-icon"
+                  title="Add to cart"
+                  aria-label={`Add ${s.product.name} to cart`}
+                  onClick={() => addItem(s.product, 1)}
+                >
+                  +
+                </button>
               </div>
-              <div className="product-details">
-                <div className="name">Aeon v2 ECLIPSE</div>
-                <div className="price">₹ 4499</div>
-              </div>
-              <div className="add-icon">+</div>
             </div>
-          </div>
-
-          <div className="swiper-slide">
-            <div className="product-card">
-              <div className="badge">TRENDING</div>
-              <div className="product-image-wrapper">
-                <img src="/assets/imgs/shoes/s1.png" className="front-img" alt="Shoe Front" />
-                <img src="/assets/imgs/shoes/s2.jpg" className="hover-img" alt="Shoe Hover" />
-              </div>
-              <div className="product-details">
-                <div className="name">Volt Boost Max</div>
-                <div className="price">₹ 3899</div>
-              </div>
-              <div className="add-icon">+</div>
-            </div>
-          </div>
-
-          <div className="swiper-slide">
-            <div className="product-card">
-              <div className="badge">HOT</div>
-              <div className="product-image-wrapper">
-                <img src="/assets/imgs/shoes/s1.png" className="front-img" alt="Shoe Front" />
-                <img src="/assets/imgs/shoes/s2.jpg" className="hover-img" alt="Shoe Hover" />
-              </div>
-              <div className="product-details">
-                <div className="name">Stride Runner Pro</div>
-                <div className="price">₹ 3299</div>
-              </div>
-              <div className="add-icon">+</div>
-            </div>
-          </div>
-
-          <div className="swiper-slide">
-            <div className="product-card">
-              <div className="badge">NEW</div>
-              <div className="product-image-wrapper">
-                <img src="/assets/imgs/shoes/s1.png" className="front-img" alt="Shoe Front" />
-                <img src="/assets/imgs/shoes/s2.jpg" className="hover-img" alt="Shoe Hover" />
-              </div>
-              <div className="product-details">
-                <div className="name">Echo Flex Zoom</div>
-                <div className="price">₹ 4799</div>
-              </div>
-              <div className="add-icon">+</div>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 

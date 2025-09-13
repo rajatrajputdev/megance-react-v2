@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export default function Footer() {
   return (
     <footer className="footer-sa pb-80">
@@ -70,12 +72,11 @@ export default function Footer() {
             </div>
             <div className="col-lg-4 d-flex justify-content-end">
               <div className="links sub-color d-flex justify-content-between">
-                <a href="#" className="active">
-                  Home
-                </a>
-                <a href="/">Shop</a>
-                <a href="/">About Us</a>
-                <a href="/">Contact Us</a>
+                <Link to="/" className="active">Home</Link>
+                <Link to="/shop">Shop</Link>
+                <Link to="/terms">Terms</Link>
+                <Link to="/privacy">Privacy</Link>
+                <Link to="/terms-of-use">Terms of Use</Link>
               </div>
             </div>
           </div>

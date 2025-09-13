@@ -7,6 +7,9 @@ import CartPage from "./pages/Cart.jsx";
 import CheckoutPage from "./pages/Checkout.jsx";
 import LoginPage from "./pages/Login.jsx";
 import OrderSuccess from "./pages/OrderSuccess.jsx";
+import TermsPage from "./pages/Terms.jsx";
+import PrivacyPage from "./pages/Privacy.jsx";
+import TermsOfUsePage from "./pages/TermsOfUse.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./components/general_components/RequireAuth.jsx";
@@ -57,6 +60,9 @@ export default function App() {
                 />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/order-success" element={<OrderSuccess />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms-of-use" element={<TermsOfUsePage />} />
               </Routes>
             </div>
           </div>

@@ -124,6 +124,7 @@
   border-radius: 50%;
   border: 1px solid #ddd;
   background: #fff;
+  cursor: pointer;
 }
 
 .summary-box {
