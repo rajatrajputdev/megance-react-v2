@@ -15,6 +15,7 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./components/general_components/RequireAuth.jsx";
 import "./styles/app-overrides.css";
 import Loader from "./components/general_components/Loader.jsx";
+import Analytics from "./components/general_components/Analytics.jsx";
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
       <AuthProvider>
         <CartProvider>
           <Loader />
+          <Analytics />
           {/* Global elements expected by legacy scripts */}
           <div className="loader-wrap">
             <svg viewBox="0 0 1000 1000" preserveAspectRatio="none">

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { trackAddToCart } from "../utils/analytics.js";
 
 const CartContext = createContext(null);
 
@@ -26,6 +27,7 @@ export function CartProvider({ children }) {
       if (idx !== -1) {
         const next = [...prev];
         next[idx] = { ...next[idx], qty: next[idx].qty + qty };
+        try { trackAddToCart(product, qty); } catch {}
         return next;
       }
       return [
@@ -65,4 +67,3 @@ export function useCart() {
   if (!ctx) throw new Error("useCart must be used within CartProvider");
   return ctx;
 }
-
