@@ -1,12 +1,13 @@
 import { products } from "../data/products.js";
 import { useCart } from "../context/CartContext.jsx";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
 
 export default function Shop() {
   const { addItem } = useCart();
+  const location = useLocation();
   const [range, setRange] = useState('all');
 
   const ranges = [
@@ -16,14 +17,24 @@ export default function Shop() {
     { id: 'gt4500', label: 'Above ₹4500', test: (p) => p.price > 4500 },
   ];
 
-  const items = useMemo(() => products.filter((p) => (ranges.find(r => r.id === range)?.test || (()=>true))(p)), [range]);
+  const gender = useMemo(() => new URLSearchParams(location.search).get('g') || 'all', [location.search]);
+  const genderMap = useMemo(() => ({
+    men: new Set(['aeon-eclipse', 'stride-runner-pro']),
+    women: new Set(['volt-boost-max', 'echo-flex-zoom']),
+  }), []);
+  const items = useMemo(() => {
+    const byPrice = ranges.find(r => r.id === range)?.test || (() => true);
+    return products
+      .filter((p) => gender === 'all' ? true : genderMap[gender]?.has(p.id))
+      .filter(byPrice);
+  }, [range, gender, genderMap]);
   return (
     <>
       <SEO title="Shop" description="Explore featured Megance products and find your perfect pair." image="/assets/logo.svg" type="website" twitterCard="summary" />
       <section className="container page-section shop-page">
         <div className="row align-items-end">
           <div className="col-lg-8">
-            <h1 className="section-title">Shop</h1>
+            <h1 className="section-title">Shop{gender !== 'all' ? ` — ${gender[0].toUpperCase()}${gender.slice(1)}` : ''}</h1>
             <p className="mt-10 opacity-7">Explore featured products</p>
           </div>
           <div className="col-lg-4 mt-20 d-flex justify-content-lg-end justify-content-start">
@@ -31,6 +42,10 @@ export default function Shop() {
           </div>
         </div>
       </section>
+
+      {/* (Removed) Shop by Gender cards moved to navbar */}
+
+      {/* Product list first */}
 
       <section className="container page-section">
       <div className="row align-items-center mb-20">
@@ -69,6 +84,52 @@ export default function Shop() {
           </div>
         ))}
       </div>
+      </section>
+
+      {/* Duo section: text left, image right */}
+      <section className="shop-duo">
+        <div className="container">
+          <div className="row align-items-center">
+            <div className="col-lg-6 mb-30">
+              <h2 className="section-title">Engineered For Every Step</h2>
+              <p className="mt-15">From morning runs to late-night strolls, our designs balance cushioning and control so you feel supported all day.</p>
+              <p className="mt-10 opacity-7">Dialed-in fit. Breathable comfort. Reliable grip for every surface.</p>
+            </div>
+            <div className="col-lg-6 mb-30">
+              <img className="duo-img" src="/assets/imgs/works/1.jpg" alt="Product lifestyle" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Duo section: image left, text right */}
+      <section className="shop-duo">
+        <div className="container">
+          <div className="row align-items-center">
+            <div className="col-lg-6 mb-30 order-lg-1">
+              <img className="duo-img" src="/assets/imgs/works/2.jpg" alt="City-ready shoes" />
+            </div>
+            <div className="col-lg-6 mb-30 order-lg-2">
+              <h2 className="section-title">Built Light. Ready to Move.</h2>
+              <p className="mt-15">City-ready traction meets breathable comfort. Perfect for commutes and weekend wander.</p>
+              <p className="mt-10 opacity-7">Flexible uppers and locked-in stability keep you confident at pace.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Fullscreen edge-to-edge image */}
+      <section className="shop-hero-full" style={{backgroundImage: "url('/assets/imgs/works/3.jpg')"}} aria-label="Megance full screen visual" />
+
+      {/* Copy block with padding */}
+      <section className="container page-section shop-copy">
+        <div className="row justify-content-center text-center">
+          <div className="col-lg-9">
+            <h3 className="section-title">Designed with Purpose</h3>
+            <p className="mt-15">We obsess over the details—materials, airflow, flex patterns—so every pair works harder for you.</p>
+            <p className="mt-5 opacity-7">Whether you’re training, exploring, or slowing down, your Megance stays uncompromisingly comfortable.</p>
+          </div>
+        </div>
       </section>
       <Footer />
     </>

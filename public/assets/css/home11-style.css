@@ -260,15 +260,13 @@
 
 .product-card {
   position: relative;
-  /* border-radius: 16px; */
   text-align: left;
   width: 100%;
-  /* max-width: 280px; */
   padding: 16px;
-  /* background: #fff; */
+  background: #fff;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-  border: 1px solid black;
-  border-right: 0;
+  border: 1px solid #e5e5e5;
+  border-radius: 0; /* sharp edges */
   transition: 0.3s ease;
 }
 .product-card:hover {
@@ -279,12 +277,14 @@
   position: absolute;
   top: 40px;
   left: 5px;
-  background: #ff4e4e;
-  color: white;
+  background: #fff;
+  color: #111;
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 700;
+  letter-spacing: 0.3px;
   padding: 4px 10px;
-  border-radius: 4px;
+  border: 1px solid #111;
+  border-radius: 2px; /* slightly sharp */
   z-index: 10;
 }
 
@@ -298,7 +298,7 @@
   width: 100%;
   display: block;
   transition: opacity 0.4s ease;
-  border-radius: 10px;
+  border-radius: 0; /* sharp image corners */
 }
 
 .hover-img {
@@ -336,22 +336,24 @@
   position: absolute;
   right: 12px;
   bottom: 12px;
-  width: 28px;
-  height: 28px;
-  background: #eee;
-  border-radius: 50%;
-  font-size: 18px;
-  font-weight: bold;
-  color: #333;
-  display: flex;
+  padding: 6px 12px;
+  background: #fff;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111; /* black text */
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: 0.3s ease;
+  border: 1px solid #111;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .add-icon:hover {
-  background: #000;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+  background: #111;
   color: #fff;
 }
 /* --------------- Awards --------------- */
@@ -831,24 +833,120 @@
 }
 
 .faq-answer {
-  padding     : 0 20px;
+  padding     : 0 20px 15px; /* add bottom padding to match top spacing */
   max-height  : 0;
   overflow    : hidden;
   opacity     : 0;
   transition  : max-height 0.5s ease, opacity 0.3s ease;
+  box-sizing  : border-box;
 }
 
 
 .faq-answer p {
-  margin   : 15px 0 0 0;
+  margin   : 15px 0; /* symmetrical top & bottom */
   font-size: 16px;
   color    : #333;
+}
+
+.faq-item.open .arrow {
+  transform: rotate(180deg);
+}
+
+.faq-item.open .faq-answer {
+  opacity: 1;
 }
 
 .arrow {
   display   : inline-block;
   transition: transform 0.3s ease;
 }
+
+/* --------------- Shop custom sections --------------- */
+.shop-duo {
+  padding: 60px 0;
+  padding-bottom: 0px;
+}
+.shop-duo .col-lg-6 {
+  padding-left: 0;
+  padding-right: 0; /* remove horizontal gutters so edges meet at center */
+}
+.shop-duo:first-of-type {
+  padding-bottom: 0; /* remove gap below first duo */
+}
+.shop-duo + .shop-duo {
+  padding-top: 0; /* remove gap above second duo */
+}
+.shop-duo .mb-30 {
+  margin-bottom: 0 !important; /* remove inner column gap */
+}
+.shop-duo .duo-img {
+  width: 100%;
+  height: 70vh;
+  max-height: none;
+  object-fit: cover;
+  border-radius: 0; /* connect edges */
+  box-shadow: none; /* connect edges */
+  display: block;
+}
+
+.shop-split {
+  position: relative;
+  overflow: hidden;
+  padding: 60px 0;
+}
+.shop-split .content {
+  position: relative;
+  z-index: 2;
+}
+.shop-split .edge-image {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 55vw;
+  height: 60vh;
+  object-fit: cover;
+  z-index: 1;
+}
+.shop-split .edge-image.right {
+  right: 0;
+}
+.shop-split .edge-image.left {
+  left: 0;
+}
+.shop-hero-full {
+  width: 100vw;
+  min-height: 100vh;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  margin-left: calc(50% - 50vw);
+}
+.shop-copy {
+  padding: 60px 0;
+}
+
+@media screen and (max-width: 992px) {
+  .shop-duo {
+    padding: 20px 0;
+  }
+  .shop-duo:first-of-type { padding-bottom: 0; }
+  .shop-duo + .shop-duo { padding-top: 0; }
+  .shop-duo .duo-img { height: 40vh; border-radius: 10px; }
+  .shop-duo .mb-30 { margin-bottom: 15px !important; }
+  .shop-split {
+    padding: 30px 0;
+  }
+  .shop-split .edge-image {
+    position: static;
+    width: 100%;
+    height: 40vh;
+    transform: none;
+    margin-top: 20px;
+    border-radius: 10px;
+  }
+}
+
+/* (Removed) Shop by Gender styles — now only in navbar */
 
 /* --------------- Blogs --------------- */
 .blog-mp {
@@ -1317,7 +1415,7 @@ p {
  .zeller_section {
   position: relative;
   min-height: 100vh;
-  padding: 80px 0;
+  padding: 60px 0; /* balanced vertical spacing */
   overflow: hidden;
   background: #111;
   color: #fff;
@@ -1328,7 +1426,7 @@ p {
   height: 150%;
   top: -25%;
   left: 0;
-  background: url('../imgs/creators.jpg') no-repeat center center/cover;
+  background: url('../imgs/creators.png') no-repeat center center/cover;
   z-index: 0;
 }
 .zeller_overlay {
@@ -1346,22 +1444,27 @@ p {
   z-index: 2;
   text-align: center;
 }
+.zeller_content h1 {
+  margin-top: 20px; /* ensure space above heading */
+}
 .zeller_cards {
   display: flex;
   flex-wrap: wrap;
   gap: 30px;
   justify-content: center;
-  margin-top: 60vh;
+  margin-top: 40px; /* bring cards closer to heading */
 }
 .zeller_card {
-  background: #222;
+  background: #fff; /* white cards */
+  color: #111;
   padding: 20px;
-  border-radius: 15px;
+  border-radius: 0; /* sharp edges */
+  border: 1px solid #e5e5e5;
   width: 300px;
   transition: transform 0.3s ease;
 }
 .zeller_card img {
   width: 100%;
-  border-radius: 10px;
+  border-radius: 0; /* sharp image corners */
   margin-bottom: 15px;
 }

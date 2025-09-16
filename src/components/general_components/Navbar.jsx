@@ -61,8 +61,12 @@ export default function Navbar() {
                 <li className="nav-item mr-20">
                   <NavLink className="nav-link" to="/">Home</NavLink>
                 </li>
-                <li className="nav-item">
-                  <NavLink className="nav-link" to="/shop">Shop</NavLink>
+                <li className="nav-item dropdown">
+                  <a href="#0" className="nav-link">Shop</a>
+                  <div className="dropdown-menu">
+                    <NavLink className="dropdown-item" to="/shop?g=men">Men</NavLink>
+                    <NavLink className="dropdown-item" to="/shop?g=women">Women</NavLink>
+                  </div>
                 </li>
               </ul>
             </div>
@@ -117,11 +121,20 @@ export default function Navbar() {
               </li>
               <li>
                 <div className="o-hidden">
-                  <NavLink to="/shop" className="link" onClick={closeMenu}>
-                    <span className="fill-text" data-text="Shop">
-                      Shop
-                    </span>
-                  </NavLink>
+                  <a href="#0" className="link dmenu">
+                    <span className="fill-text" data-text="Shop">Shop</span>
+                    <i></i>
+                  </a>
+                </div>
+                <div className="sub-menu">
+                  <ul>
+                    <li>
+                      <NavLink to="/shop?g=men" className="sub-link" onClick={closeMenu}>Men</NavLink>
+                    </li>
+                    <li>
+                      <NavLink to="/shop?g=women" className="sub-link" onClick={closeMenu}>Women</NavLink>
+                    </li>
+                  </ul>
                 </div>
               </li>
               <li>

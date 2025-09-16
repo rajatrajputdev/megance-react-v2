@@ -1330,7 +1330,7 @@ p {
   height: 150%;
   top: -25%;
   left: 0;
-  background: url('../imgs/creators.jpg') no-repeat center center/cover;
+  background: url('../imgs/creators.png') no-repeat center center/cover;
   z-index: 0;
 }
 .zeller_overlay {

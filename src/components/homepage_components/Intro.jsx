@@ -101,7 +101,7 @@ export default function Intro() {
                   aria-label={`Add ${s.product.name} to cart`}
                   onClick={() => addItem(s.product, 1)}
                 >
-                  +
+                  Add
                 </button>
               </div>
             </div>

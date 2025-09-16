@@ -23,38 +23,29 @@ export default function Footer() {
           <div className="row">
             <div className="col-lg-6 offset-lg-5">
               <div className="row">
-                <div className="col-md-6">
-                  <div className="item">
-                    <span className="sub-color">location</span>
-                    <p>152 Thatcher Road St, Mahattan, NY 10463, US</p>
-                  </div>
-                </div>
-                <div className="col-md-6 d-flex justify-content-end justify-end">
+                <div className="col-md-12 d-flex justify-content-between align-items-center">
                   <div className="item">
                     <span className="sub-color">inquiry</span>
-                    <p>hello@hubfolio.agency</p>
-                    <p>+0685689696</p>
+                    <p>hello@megance.in</p>
+                  </div>
+                  <div className="social-icon">
+                    <a href="#0">
+                      <i className="fa-brands fa-instagram"></i>
+                    </a>
+                    <a href="#0">
+                      <i className="fa-brands fa-facebook-f"></i>
+                    </a>
+                    <a href="#0">
+                      <i className="fa-brands fa-x-twitter"></i>
+                    </a>
+                    <a href="#0">
+                      <i className="fa-brands fa-pinterest-p"></i>
+                    </a>
+                    <a href="#0">
+                      <i className="fa-brands fa-linkedin-in"></i>
+                    </a>
                   </div>
                 </div>
-              </div>
-            </div>
-            <div className="col-lg-6 offset-lg-5">
-              <div className="social-icon">
-                <a href="#0">
-                  <i className="fa-brands fa-instagram"></i>
-                </a>
-                <a href="#0">
-                  <i className="fa-brands fa-facebook-f"></i>
-                </a>
-                <a href="#0">
-                  <i className="fa-brands fa-x-twitter"></i>
-                </a>
-                <a href="#0">
-                  <i className="fa-brands fa-pinterest-p"></i>
-                </a>
-                <a href="#0">
-                  <i className="fa-brands fa-linkedin-in"></i>
-                </a>
               </div>
             </div>
           </div>

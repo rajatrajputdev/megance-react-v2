@@ -5,7 +5,7 @@ export default function FAQ() {
     const gsap = window.gsap;
     const ScrollTrigger = window.ScrollTrigger;
     if (gsap && ScrollTrigger) {
-      gsap.registerPlugin(ScrollTrigger);
+      try { gsap.registerPlugin(ScrollTrigger); } catch (_) {}
     }
 
     const onClick = (e) => {
@@ -13,34 +13,51 @@ export default function FAQ() {
       e.stopPropagation();
 
       const question = e.currentTarget;
+      const item = question.closest('.faq-item');
       const answer = question.nextElementSibling;
       const arrow = question.querySelector('.arrow');
-      if (!answer || !gsap) return;
+      if (!answer) return;
+
+      const closeNode = (ans, itm, arr) => {
+        if (gsap) {
+          gsap.to(ans, { maxHeight: 0, opacity: 0, duration: 0.3 });
+          if (arr) gsap.to(arr, { rotation: 0, duration: 0.3 });
+        } else {
+          ans.style.maxHeight = '0px';
+          ans.style.opacity = '0';
+          if (arr) arr.style.transform = 'rotate(0deg)';
+        }
+        if (itm) itm.classList.remove('open');
+      };
+
+      const openNode = (ans, itm, arr) => {
+        const contentHeight = ans.scrollHeight + 'px';
+        if (gsap) {
+          gsap.to(ans, {
+            maxHeight: contentHeight,
+            opacity: 1,
+            duration: 0.3,
+            onUpdate: () => { if (ScrollTrigger && ScrollTrigger.refresh) ScrollTrigger.refresh(); },
+          });
+          if (arr) gsap.to(arr, { rotation: 180, duration: 0.3 });
+        } else {
+          ans.style.maxHeight = contentHeight;
+          ans.style.opacity = '1';
+          if (arr) arr.style.transform = 'rotate(180deg)';
+        }
+        if (itm) itm.classList.add('open');
+      };
 
       // Collapse others
-      document.querySelectorAll('.faq-answer').forEach((node) => {
-        if (node !== answer) {
-          gsap.to(node, { maxHeight: 0, opacity: 0, duration: 0.3 });
-        }
-      });
-      document.querySelectorAll('.faq-question .arrow').forEach((node) => {
-        if (node !== arrow) gsap.to(node, { rotation: 0, duration: 0.3 });
+      document.querySelectorAll('.faq-item').forEach((itm) => {
+        const ans = itm.querySelector('.faq-answer');
+        const arr = itm.querySelector('.faq-question .arrow');
+        if (ans && itm !== item) closeNode(ans, itm, arr);
       });
 
-      const isOpen = getComputedStyle(answer).maxHeight !== '0px';
-      if (isOpen) {
-        gsap.to(answer, { maxHeight: 0, opacity: 0, duration: 0.3 });
-        if (arrow) gsap.to(arrow, { rotation: 0, duration: 0.3 });
-      } else {
-        const contentHeight = answer.scrollHeight + 'px';
-        gsap.to(answer, {
-          maxHeight: contentHeight,
-          opacity: 1,
-          duration: 0.3,
-          onUpdate: () => { if (ScrollTrigger && ScrollTrigger.refresh) ScrollTrigger.refresh(); },
-        });
-        if (arrow) gsap.to(arrow, { rotation: 180, duration: 0.3 });
-      }
+      const isOpen = item?.classList.contains('open');
+      if (isOpen) closeNode(answer, item, arrow);
+      else openNode(answer, item, arrow);
     };
 
     const questions = Array.from(document.querySelectorAll('.faq-question'));
@@ -106,4 +123,3 @@ export default function FAQ() {
     </section>
   );
 }
-
