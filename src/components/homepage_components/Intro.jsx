@@ -112,18 +112,18 @@ export default function Intro() {
       <div className="container">
         <div className="row justify-content-center text-center mb-100">
           <div className="col-lg-11">
-            <span className="sub-head mt-30 mb-30">What we offer</span>
+            {/* <span className="sub-head mt-30 mb-30">What we offer</span> */}
             <div className="text-center main-text">
-              <h2>
+              {/* <h2>
                 From creators to athletes, trendsetters to everyday explorers — we walk together, delivering sneakers
                 that match every <span className="main-color">path, pace, and personality.</span>
-              </h2>
-              <div className="img1 fit-img">
+              </h2> */}
+              {/* <div className="img1 fit-img">
                 <img src="/assets/imgs/intro/1.png" alt="" />
               </div>
               <div className="img2 fit-img">
                 <img src="/assets/imgs/intro/2.png" alt="" />
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

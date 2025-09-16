@@ -21,6 +21,28 @@
   z-index: 10000;
   transform: translateY(0) !important;
 }
+.navbar .container { position: relative; z-index: 1; }
+
+/* Subtle backdrop that fades in when nav has the class .has-backdrop */
+.navbar::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.5); /* switched to black, same opacity */
+  border: 1px solid rgba(255,255,255,0.08); /* subtle edge on dark */
+  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: opacity .2s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+.navbar.has-backdrop::before { opacity: 1; }
 .navbar.nav-scroll { top: 0 !important; box-shadow: none; }
 .navbar .navbar-nav {
   padding: 6px 8px !important;

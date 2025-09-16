@@ -24,9 +24,9 @@ export default function Home() {
         <USP />
         <Marquee />
         <ZellerSection />
-        <GalleryYellow />
+        {/* <GalleryYellow /> */}
         {/* Featured products with Add to Cart */}
-        <section className="container page-section">
+        {/* <section className="container page-section">
           <div className="row mb-30 text-center">
             <div className="col-12">
               <h3 className="section-title">Featured Products</h3>
@@ -52,8 +52,8 @@ export default function Home() {
               </div>
             ))}
           </div>
-        </section>
-        <Testimonials />
+        </section> */}
+        {/* <Testimonials /> */}
         <FAQ />
       </main>
       <Newsletter />

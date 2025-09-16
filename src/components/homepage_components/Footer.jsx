@@ -41,19 +41,19 @@ export default function Footer() {
             <div className="col-lg-6 offset-lg-5">
               <div className="social-icon">
                 <a href="#0">
-                  <i className="fa-brands fa-x-twitter"></i>
-                </a>
-                <a href="#0">
                   <i className="fa-brands fa-instagram"></i>
                 </a>
                 <a href="#0">
-                  <i className="fa-brands fa-dribbble"></i>
+                  <i className="fa-brands fa-facebook-f"></i>
                 </a>
                 <a href="#0">
-                  <i className="fa-brands fa-behance"></i>
+                  <i className="fa-brands fa-x-twitter"></i>
                 </a>
                 <a href="#0">
-                  <i className="fa-brands fa-github"></i>
+                  <i className="fa-brands fa-pinterest-p"></i>
+                </a>
+                <a href="#0">
+                  <i className="fa-brands fa-linkedin-in"></i>
                 </a>
               </div>
             </div>

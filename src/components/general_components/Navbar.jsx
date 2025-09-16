@@ -1,9 +1,12 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { useEffect, useRef } from "react";
 import { useCart } from "../../context/CartContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import Logo from "./Logo.jsx";
 
 export default function Navbar() {
+  const navRef = useRef(null);
+  const location = useLocation();
   const { count } = useCart();
   const { user, logout } = useAuth();
   const openMenu = () => {
@@ -15,6 +18,26 @@ export default function Navbar() {
       }
     } catch {}
   };
+  
+  // Close the hamenu on any route change (e.g., clicking a link)
+  useEffect(() => {
+    closeMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // Toggle a subtle backdrop when scrolling past the hero/into busy content
+  useEffect(() => {
+    const node = navRef.current;
+    if (!node) return;
+    const onScroll = () => {
+      const y = window.scrollY || window.pageYOffset || 0;
+      if (y > 20) node.classList.add('has-backdrop');
+      else node.classList.remove('has-backdrop');
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const closeMenu = () => {
     try {
       const hm = document.querySelector('.hamenu');
@@ -26,40 +49,51 @@ export default function Navbar() {
   };
   return (
     <>
-      <nav className="navbar navbar-expand-lg">
+      <nav ref={navRef} className="navbar navbar-expand-lg">
         <div className="container">
-          <Logo />
+          <div
+            className="w-100"
+            style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}
+          >
+            {/* Left: primary links (desktop) */}
+            <div className="navbar-left d-none d-lg-flex align-items-center">
+              <ul className="navbar-nav flex-row">
+                <li className="nav-item mr-20">
+                  <NavLink className="nav-link" to="/">Home</NavLink>
+                </li>
+                <li className="nav-item">
+                  <NavLink className="nav-link" to="/shop">Shop</NavLink>
+                </li>
+              </ul>
+            </div>
 
-          <div className="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul className="navbar-nav">
-              <li className="nav-item">
-                <NavLink className="nav-link" to="/">Home</NavLink>
-              </li>
-              <li className="nav-item">
-                <NavLink className="nav-link" to="/shop">Shop</NavLink>
-              </li>
-            </ul>
-          </div>
+            {/* Center: logo (adaptive visibility) */}
+            <div className="navbar-center" style={{ justifySelf: 'center' }}>
+              <Logo />
+            </div>
 
-          <div className="topnav d-flex align-items-center">
-            <Link to="/cart" className="butn nav-butn cart-butn mr-10">
-              <div className="d-flex align-items-center">
-                <span>Cart ({count})</span>
-                <span className="icon ml-10">
-                  <img src="/common/imgs/icons/arrow-top-right.svg" alt="" />
-                </span>
-              </div>
-            </Link>
+            {/* Right: cart, auth, hamburger */}
+            <div className="navbar-right topnav d-flex align-items-center" style={{ justifySelf: 'end' }}>
+              {/* Hide cart/login on small screens; show from lg and up */}
+              <Link to="/cart" className="butn nav-butn cart-butn mr-10 d-none d-lg-inline-flex">
+                <div className="d-flex align-items-center">
+                  <span>Cart ({count})</span>
+                  <span className="icon ml-10">
+                    <img src="/common/imgs/icons/arrow-top-right.svg" alt="" />
+                  </span>
+                </div>
+              </Link>
 
-            {user ? (
-              <button className="butn nav-butn mr-10" onClick={logout}>Logout</button>
-            ) : (
-              <Link to="/login" className="butn nav-butn mr-10">Login</Link>
-            )}
+              {user ? (
+                <button className="butn nav-butn mr-10 d-none d-lg-inline-flex" onClick={logout}>Logout</button>
+              ) : (
+                <Link to="/login" className="butn nav-butn mr-10 d-none d-lg-inline-flex">Login</Link>
+              )}
 
-            <div className="menu-icon cursor-pointer" onClick={openMenu}>
-              <div className="menu-icon-surface">
-                <span className="icon ti-align-right"></span>
+              <div className="menu-icon cursor-pointer" onClick={openMenu}>
+                <div className="menu-icon-surface">
+                  <span className="icon ti-align-right"></span>
+                </div>
               </div>
             </div>
           </div>
@@ -74,7 +108,7 @@ export default function Navbar() {
               <li></li>
               <li>
                 <div className="o-hidden">
-                  <NavLink to="/" className="link">
+                  <NavLink to="/" className="link" onClick={closeMenu}>
                     <span className="fill-text" data-text="Home">
                       Home
                     </span>
@@ -83,7 +117,7 @@ export default function Navbar() {
               </li>
               <li>
                 <div className="o-hidden">
-                  <NavLink to="/shop" className="link">
+                  <NavLink to="/shop" className="link" onClick={closeMenu}>
                     <span className="fill-text" data-text="Shop">
                       Shop
                     </span>
@@ -92,7 +126,7 @@ export default function Navbar() {
               </li>
               <li>
                 <div className="o-hidden">
-                  <NavLink to="/" className="link">
+                  <NavLink to="/" className="link" onClick={closeMenu}>
                     <span className="fill-text" data-text="Contact Us">
                       Contact Us
                     </span>
