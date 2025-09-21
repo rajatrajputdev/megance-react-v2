@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import { products } from "../../data/products.js";
-import { useCart } from "../../context/CartContext.jsx";
+import { useNavigate } from "react-router-dom";
+import IntroProductCard from "./IntroProductCard.jsx";
 
 export default function Intro() {
   const swiperRef = useRef(null);
-  const { addItem } = useCart();
+  const navigate = useNavigate();
 
   // Map homepage badges to concrete products in our data
   const slides = useMemo(
@@ -81,29 +82,13 @@ export default function Intro() {
 
       <div className="swiper shoe-carousel">
         <div className="swiper-wrapper">
-          {/* Generated from products so the + can add to cart */}
           {slides.map((s, idx) => (
             <div key={s.product.id + idx} className="swiper-slide">
-              <div className="product-card">
-                <div className="badge">{s.badge}</div>
-                <div className="product-image-wrapper">
-                  <img src={s.product.image} className="front-img" alt={`${s.product.name} front`} />
-                  <img src={s.product.hover} className="hover-img" alt={`${s.product.name} hover`} />
-                </div>
-                <div className="product-details">
-                  <div className="name">{s.product.name}</div>
-                  <div className="price">₹ {s.product.price}</div>
-                </div>
-                <button
-                  type="button"
-                  className="add-icon"
-                  title="Add to cart"
-                  aria-label={`Add ${s.product.name} to cart`}
-                  onClick={() => addItem(s.product, 1)}
-                >
-                  Add
-                </button>
-              </div>
+              <IntroProductCard
+                badge={s.badge}
+                product={s.product}
+                onBuy={(p) => navigate(`/product/${p.id}`)}
+              />
             </div>
           ))}
         </div>

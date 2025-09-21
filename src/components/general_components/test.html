@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scroll Image Swap</title>
+<style>
+  body {
+    margin: 0;
+    height: 200vh; /* enough scroll space */
+  }
+
+  .container {
+    position: relative; /* normal flow */
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .image {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <img src="https://picsum.photos/id/1025/1920/1080" class="image" id="img1" style="z-index: 1;">
+  <img src="https://picsum.photos/id/1022/1920/1080" class="image" id="img2" style="z-index: 0; top: 100%;">
+</div>
+
+<script>
+  const img2 = document.getElementById('img2');
+  const wrapper = document.querySelector('.container');
+
+  window.addEventListener('scroll', () => {
+    const wrapperTop = wrapper.offsetTop;
+    const scrollTop = window.scrollY;
+    const wrapperHeight = wrapper.offsetHeight;
+
+    // Calculate scroll inside container
+    let scrollInside = scrollTop - wrapperTop;
+    if (scrollInside < 0) scrollInside = 0;
+    if (scrollInside > wrapperHeight) scrollInside = wrapperHeight;
+
+    // Move second image up
+    const newTop = wrapperHeight - scrollInside;
+    img2.style.top = `${newTop}px`;
+
+    // Swap z-index if fully covered
+    if (scrollInside >= wrapperHeight) {
+      img2.style.zIndex = 2;
+      img1.style.zIndex = 1;
+    } else {
+      img2.style.zIndex = 0;
+      img1.style.zIndex = 1;
+    }
+  });
+</script>
+
+</body>
+</html>

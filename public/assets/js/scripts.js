@@ -166,38 +166,9 @@ $(function () {
 //         }
 //     });
 // });
+// Disable legacy FAQ handler to avoid conflicts with React FAQ2 component
 $(function () {
-    $(".faq-question").on("click", function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        const answer = $(this).next(".faq-answer");
-        const arrow = $(this).find(".arrow");
-
-        // Collapse other answers
-        $(".faq-answer").not(answer).each(function () {
-            gsap.to(this, { maxHeight: 0, opacity: 0, duration: 0.3 });
-        });
-        $(".arrow").not(arrow).each(function () {
-            gsap.to(this, { rotation: 0, duration: 0.3 });
-        });
-
-        if (answer.css("max-height") !== "0px") {
-            // Collapse current
-            gsap.to(answer[0], { maxHeight: 0, opacity: 0, duration: 0.3 });
-            gsap.to(arrow[0], { rotation: 0, duration: 0.3 });
-        } else {
-            // Expand current
-            const scrollHeight = answer[0].scrollHeight + "px";
-            gsap.to(answer[0], {
-                maxHeight: scrollHeight,
-                opacity: 1,
-                duration: 0.3,
-                onUpdate: ScrollTrigger.refresh // ✅ Tell GSAP scroll has changed
-            });
-            gsap.to(arrow[0], { rotation: 180, duration: 0.3 });
-        }
-    });
+    $(document).off('click', '.faq-question');
 });
 
   $(function () {

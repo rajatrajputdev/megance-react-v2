@@ -1,75 +1,85 @@
 import { Link } from "react-router-dom";
+import "./footer.css";
 
 export default function Footer() {
+  const year = new Date().getFullYear();
   return (
-    <footer className="footer-sa pb-80">
-      <div className="container section-padding">
-        <div className="sec-head mb-80">
-          <div className="row">
-            <div className="col-lg-5">
-              <a href="#" className="logo md-mb50">
-                <img src="/assets/imgs/megance_logo_w.png" alt="" />
-              </a>
-            </div>
-            <div className="col-lg-6">
-              <h4>
-                We hope to empower user and simplify
-                <span className="sub-color inline">their everyday lives.</span>
-              </h4>
+    <footer className="rh-footer">
+      <div className="rh-container">
+        {/* Brand */}
+        <div className="rh-brand">
+          <Link to="/" aria-label="Megance home">
+            <img src="/assets/logo.svg" alt="Megance" className="rh-logo" />
+          </Link>
+        </div>
+        <div className="rh-divider" />
+
+        {/* Newsletter */}
+        <div className="rh-newsletter">
+          <div className="rh-news-text">
+            <h4>Be the first to know</h4>
+            <p>Sign up to receive updates on drops, restocks and more.</p>
+          </div>
+          <form className="rh-news-form" onSubmit={(e) => e.preventDefault()} aria-label="Newsletter signup">
+            <input type="email" placeholder="Enter your email" aria-label="Email address" required />
+            <button type="submit" aria-label="Subscribe">
+              <span>Subscribe</span>
+            </button>
+          </form>
+          <div className="rh-news-legal">
+            <small>By subscribing, you agree to our <Link to="/terms">Terms</Link> and <Link to="/privacy">Privacy Policy</Link>.</small>
+          </div>
+        </div>
+
+        {/* Links grid */}
+        <div className="rh-links">
+          <div className="rh-col">
+            <h6>Shop</h6>
+            <ul>
+              <li><Link to="/shop">All</Link></li>
+              <li><Link to="/shop?g=men">Men</Link></li>
+              <li><Link to="/shop?g=women">Women</Link></li>
+              <li><Link to="/shop">New Arrivals</Link></li>
+              <li><Link to="/shop">Best Sellers</Link></li>
+            </ul>
+          </div>
+          <div className="rh-col">
+            <h6>Help</h6>
+            <ul>
+              <li><a href="#faq2">FAQs</a></li>
+              <li><Link to="/terms">Shipping</Link></li>
+              <li><Link to="/terms">Returns</Link></li>
+              <li><a href="mailto:hello@megance.in">Contact</a></li>
+            </ul>
+          </div>
+          <div className="rh-col">
+            <h6>Company</h6>
+            <ul>
+              <li><Link to="/about-us">About</Link></li>
+              <li><Link to="/terms-of-use">Terms of Use</Link></li>
+              <li><Link to="/privacy">Privacy Policy</Link></li>
+            </ul>
+          </div>
+          <div className="rh-col rh-social">
+            <h6>Follow</h6>
+            <div className="rh-social-row">
+              <a href="#" aria-label="Instagram"><i className="fab fa-instagram"></i></a>
+              <a href="#" aria-label="Twitter"><i className="fab fa-x-twitter"></i></a>
+              <a href="#" aria-label="Facebook"><i className="fab fa-facebook-f"></i></a>
+              <a href="#" aria-label="YouTube"><i className="fab fa-youtube"></i></a>
             </div>
           </div>
         </div>
-        <div className="contact-info">
-          <div className="row">
-            <div className="col-lg-6 offset-lg-5">
-              <div className="row">
-                <div className="col-md-12 d-flex justify-content-between align-items-center">
-                  <div className="item">
-                    <span className="sub-color">inquiry</span>
-                    <p>hello@megance.in</p>
-                  </div>
-                  <div className="social-icon">
-                    <a href="#0">
-                      <i className="fa-brands fa-instagram"></i>
-                    </a>
-                    <a href="#0">
-                      <i className="fa-brands fa-facebook-f"></i>
-                    </a>
-                    <a href="#0">
-                      <i className="fa-brands fa-x-twitter"></i>
-                    </a>
-                    <a href="#0">
-                      <i className="fa-brands fa-pinterest-p"></i>
-                    </a>
-                    <a href="#0">
-                      <i className="fa-brands fa-linkedin-in"></i>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
+
+        {/* Sub footer */}
+        <div className="rh-sub">
+          <div className="rh-left">
+            <span>© {year} Megance</span>
           </div>
-        </div>
-      </div>
-      <div className="sub-footer">
-        <div className="container">
-          <div className="row">
-            <div className="col-lg-8">
-              <div className="copy sub-color md-mb30">
-                <p>
-                  © 2025 - 2026 <a href="#0">Megance</a>. All Right Reserved
-                </p>
-              </div>
-            </div>
-            <div className="col-lg-4 d-flex justify-content-end">
-              <div className="links sub-color d-flex justify-content-between">
-                <Link to="/" className="active">Home</Link>
-                <Link to="/shop">Shop</Link>
-                <Link to="/terms">Terms</Link>
-                <Link to="/privacy">Privacy</Link>
-                <Link to="/terms-of-use">Terms of Use</Link>
-              </div>
-            </div>
+          <div className="rh-right">
+            <Link to="/terms-of-use">Terms</Link>
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Returns</Link>
           </div>
         </div>
       </div>

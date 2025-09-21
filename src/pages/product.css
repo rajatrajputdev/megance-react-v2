@@ -1,0 +1,165 @@
+/* Product page isolated styles. Scoped to .product-page-wrap to avoid vendor bleed. */
+
+.product-page-wrap {
+  background: #fff;
+  border-radius: 14px;
+  padding: 32px 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+
+.product-page-wrap .section-title { margin-bottom: 6px; }
+
+/* Media + zoom */
+.product-page-wrap .pd-media {
+  position: relative;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 380px;
+  display: grid;
+  place-items: center;
+}
+.product-page-wrap .pd-media img { transition: transform .35s ease; }
+.product-page-wrap .pd-media:hover img { transform: scale(1.12); }
+.product-page-wrap .pd-media img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+.product-page-wrap .pd-lens {
+  position: absolute;
+  border: 2px solid rgba(0,0,0,0.15);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+.product-page-wrap .pd-zoom-container {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 180px;
+  height: 180px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.08);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  pointer-events: none;
+}
+.product-page-wrap .pd-zoom-image {
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Labels, pills, buttons */
+.product-page-wrap .label-sm { font-size: 13px; letter-spacing: .2px; color: #555; }
+.product-page-wrap .filter-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.product-page-wrap .filter-pills .pill {
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.1);
+  padding: 8px 14px;
+  transition: all .2s ease;
+  color: #111;
+}
+.product-page-wrap .filter-pills .pill.active,
+.product-page-wrap .filter-pills .pill:focus-visible {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+.product-page-wrap .inline-hint { color: #c00; font-size: 12px; margin-top: 6px; }
+
+.product-page-wrap .product-actions .butn[disabled] { opacity: .6; cursor: not-allowed; }
+
+/* Actions: stacked layout */
+.product-page-wrap .pp-actions { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.product-page-wrap .pp-primary-btn {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid #111;
+  background: #111;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.product-page-wrap .pp-primary-btn:hover { background: #000; box-shadow: 0 8px 18px rgba(0,0,0,0.2); }
+.product-page-wrap .pp-primary-btn[disabled] { opacity: .6; cursor: not-allowed; }
+
+.product-page-wrap .pp-secondary-btn {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid #111;
+  background: #fff;
+  color: #111;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  text-decoration: none;
+}
+.product-page-wrap .pp-secondary-btn:hover { background: #f6f6f6; box-shadow: 0 6px 14px rgba(0,0,0,0.12); }
+
+/* Quantity control */
+.product-page-wrap .qty-control {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.product-page-wrap .qty-control button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  background: #fafafa;
+  color: #111;
+  font-size: 18px;
+  line-height: 1;
+  transition: background .2s ease;
+}
+.product-page-wrap .qty-control button:hover { background: #f0f0f0; }
+.product-page-wrap .qty-control input {
+  width: 64px;
+  text-align: center;
+  height: 42px;
+  border: 0;
+  outline: 0;
+  font-size: 16px;
+  color: #111;
+  background: #fff;
+}
+
+/* Remove number input spinners */
+.product-page-wrap input[type=number]::-webkit-outer-spin-button,
+.product-page-wrap input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.product-page-wrap input[type=number] { -moz-appearance: textfield; }
+
+/* Tabs */
+.product-page-wrap .pp-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.product-page-wrap .pp-tabs .pill { border-radius: 999px; border: 1px solid rgba(0,0,0,0.1); padding: 8px 14px; background: #fff; }
+.product-page-wrap .pp-tabs .pill.active { background: #111; color: #fff; border-color: #111; }
+.product-page-wrap .pp-tab-body { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 16px; }
+
+/* Continuous sections */
+.product-page-wrap .pp-section { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 16px; }
+
+@media (max-width: 576px) {
+  .product-page-wrap { padding: 20px 16px; }
+}

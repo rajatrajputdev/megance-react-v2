@@ -7,6 +7,7 @@ import Logo from "./Logo.jsx";
 export default function Navbar() {
   const navRef = useRef(null);
   const location = useLocation();
+  const g = new URLSearchParams(location.search).get('g') || 'all';
   const { count } = useCart();
   const { user, logout } = useAuth();
   const openMenu = () => {
@@ -25,13 +26,14 @@ export default function Navbar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  // Toggle a subtle backdrop when scrolling past the hero/into busy content
+  // Toggle a subtle backdrop when navbar becomes sticky
   useEffect(() => {
     const node = navRef.current;
     if (!node) return;
     const onScroll = () => {
       const y = window.scrollY || window.pageYOffset || 0;
-      if (y > 20) node.classList.add('has-backdrop');
+      // Match the vendor sticky threshold (set in public/common/js/common_scripts.js)
+      if (y > 80) node.classList.add('has-backdrop');
       else node.classList.remove('has-backdrop');
     };
     onScroll();
@@ -64,8 +66,8 @@ export default function Navbar() {
                 <li className="nav-item dropdown">
                   <a href="#0" className="nav-link">Shop</a>
                   <div className="dropdown-menu">
-                    <NavLink className="dropdown-item" to="/shop?g=men">Men</NavLink>
-                    <NavLink className="dropdown-item" to="/shop?g=women">Women</NavLink>
+                    <Link className={`dropdown-item${g === 'men' ? ' active' : ''}`} to="/shop?g=men">Men</Link>
+                    <Link className={`dropdown-item${g === 'women' ? ' active' : ''}`} to="/shop?g=women">Women</Link>
                   </div>
                 </li>
               </ul>
@@ -129,10 +131,10 @@ export default function Navbar() {
                 <div className="sub-menu">
                   <ul>
                     <li>
-                      <NavLink to="/shop?g=men" className="sub-link" onClick={closeMenu}>Men</NavLink>
+                      <Link to="/shop?g=men" className={`sub-link${g === 'men' ? ' active' : ''}`} onClick={closeMenu}>Men</Link>
                     </li>
                     <li>
-                      <NavLink to="/shop?g=women" className="sub-link" onClick={closeMenu}>Women</NavLink>
+                      <Link to="/shop?g=women" className={`sub-link${g === 'women' ? ' active' : ''}`} onClick={closeMenu}>Women</Link>
                     </li>
                   </ul>
                 </div>

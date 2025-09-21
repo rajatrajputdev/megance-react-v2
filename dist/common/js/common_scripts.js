@@ -67,13 +67,15 @@ $(function () {
         $(".navbar .navbar-collapse").toggleClass("show");
     });
 
+    // Make the navbar stick sooner to avoid a blind spot while scrolling.
+    // Previously triggered at 300px, which left a gap where the navbar was off-screen.
     wind.on("scroll", function () {
 
         var bodyScroll = wind.scrollTop(),
             navbar = $(".navbar"),
             logo = $(".navbar.change .logo> img");
 
-        if (bodyScroll > 300) {
+        if (bodyScroll > 80) {
 
             navbar.addClass("nav-scroll");
             logo.attr('src', 'assets/imgs/logo-dark.png');

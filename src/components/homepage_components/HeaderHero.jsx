@@ -66,8 +66,8 @@ export default function HeaderHero() {
       <div className="container">
         <div className="row">
           <div className="col-lg-9">
-            <div className="caption mb-100">
-              <h1>
+            <div className="caption"style={{paddingBottom:"150px"}}>
+              <h1 className="hero-title">
                 We Create <br />
                 <span className="arrow">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -76,23 +76,10 @@ export default function HeaderHero() {
                 </span>{" "}
                 <span className="italic">T</span>he<span className="fw-200">bold step For every journey </span>
               </h1>
-              <p className="mt-30"></p>
+              <p className="mb-30"></p>
             </div>
           </div>
           <div className="col-lg-3">{/* award box intentionally left commented */}</div>
-        </div>
-        <div className="row">
-          <div className="col-lg-4">
-            <div className="vid-box mb-40">
-              <video autoPlay muted disablePictureInPicture controlsList="nodownload"></video>
-            </div>
-          </div>
-          <div className="col-lg-7 offset-lg-1">
-            <div className="feat row justify-content-between">
-              <div className="col-md-5"></div>
-              <div className="col-md-5"></div>
-            </div>
-          </div>
         </div>
       </div>
     </header>

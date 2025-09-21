@@ -1,25 +1,56 @@
 import { useParams, Link } from "react-router-dom";
 import { getProductById } from "../data/products.js";
 import { useCart } from "../context/CartContext.jsx";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
+import "./product.css";
 
 export default function ProductPage() {
   const { id } = useParams();
   const product = getProductById(id);
   const { addItem } = useCart();
   const [qty, setQty] = useState(1);
+  const [gender, setGender] = useState("men");
   const [size, setSize] = useState("");
-  const [tab, setTab] = useState("desc"); // desc | specs | reviews
 
-  const sizes = ["6", "7", "8", "9", "10", "11"];
+  const genderOptions = useMemo(() => product?.genders || ["men", "women"], [product]);
+  const sizes = useMemo(() => (product?.sizes?.[gender] || []), [product, gender]);
+
+  // Initialize gender based on product availability
+  useEffect(() => {
+    if (product?.genders && product.genders.length > 0) {
+      setGender(product.genders[0]);
+      setSize("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id]);
+
+  // Ensure page is scrolled to top when viewing a product
+  useEffect(() => {
+    try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(_) { window.scrollTo(0,0); }
+  }, [product?.id]);
+  useEffect(() => {
+    try {
+      const mql = window.matchMedia('(hover: hover) and (pointer: fine)');
+      setCanHover(mql.matches);
+      const handler = (e) => setCanHover(e.matches);
+      if (mql.addEventListener) mql.addEventListener('change', handler);
+      else if (mql.addListener) mql.addListener(handler);
+      return () => {
+        if (mql.removeEventListener) mql.removeEventListener('change', handler);
+        else if (mql.removeListener) mql.removeListener(handler);
+      };
+    } catch { setCanHover(true); }
+  }, []);
   const mediaRef = useRef(null);
   const [lensVisible, setLensVisible] = useState(false);
   const [lensPos, setLensPos] = useState({ x: 0, y: 0 });
   const [zoomPos, setZoomPos] = useState({ x: 0, y: 0 });
+  const [bgSize, setBgSize] = useState("0px 0px");
   const LENS_SIZE = 120;
   const ZOOM_LEVEL = 2.5;
+  const [canHover, setCanHover] = useState(true);
 
   const onMediaMove = (e) => {
     const el = mediaRef.current;
@@ -35,16 +66,20 @@ export default function ProductPage() {
     const zoomX = -(lensX * ZOOM_LEVEL);
     const zoomY = -(lensY * ZOOM_LEVEL);
     setZoomPos({ x: zoomX, y: zoomY });
+    setBgSize(`${Math.round(rect.width * ZOOM_LEVEL)}px ${Math.round(rect.height * ZOOM_LEVEL)}px`);
   };
+  const onMediaEnter = () => { if (canHover) setLensVisible(true); };
+  const onMediaLeave = () => { setLensVisible(false); };
 
   const cartProduct = useMemo(() => {
-    if (!size) return product;
+    if (!size || !gender) return product;
     return {
       ...product,
-      id: `${product.id}-s${size}`,
-      name: `${product.name} (Size ${size})`,
+      id: `${product.id}-${gender}-s${size}`,
+      name: `${product.name} (${gender === 'men' ? 'Men' : 'Women'} Size ${size})`,
+      meta: { gender, size },
     };
-  }, [product, size]);
+  }, [product, size, gender]);
 
   // No zoom interactions; keep image normal and contained.
 
@@ -63,25 +98,25 @@ export default function ProductPage() {
   return (
     <>
       <SEO title={product.name} description={product.description} image={product.image} type="product" twitterCard="summary_large_image" />
-      <section className="container page-section product-page">
+      <section className="container page-section nav-offset product-page-wrap" onClick={(e)=>{ /* prevent any bubbling handlers */ e.stopPropagation(); }}>
         <div className="row">
           <div className="col-md-6 mb-20">
             <div
               ref={mediaRef}
               className="pd-media"
-              onMouseEnter={() => setLensVisible(true)}
-              onMouseLeave={() => setLensVisible(false)}
+              onMouseEnter={onMediaEnter}
+              onMouseLeave={onMediaLeave}
               onMouseMove={onMediaMove}
             >
               <img src={product.image} alt={product.name} className="img-fluid" />
-              {lensVisible && (
+              {lensVisible && canHover && (
                 <>
                   <div
                     className="pd-lens visible"
                     style={{ width: LENS_SIZE, height: LENS_SIZE, transform: `translate(${lensPos.x}px, ${lensPos.y}px)` }}
                   />
                   <div className="pd-zoom-container">
-                    <div className="pd-zoom-image" style={{ backgroundImage: `url(${product.image})`, backgroundPosition: `${zoomPos.x}px ${zoomPos.y}px`, backgroundSize: `${100 * ZOOM_LEVEL}%` }} />
+                    <div className="pd-zoom-image" style={{ backgroundImage: `url(${product.image})`, backgroundPosition: `${zoomPos.x}px ${zoomPos.y}px`, backgroundSize: bgSize }} />
                   </div>
                 </>
               )}
@@ -91,7 +126,26 @@ export default function ProductPage() {
             <h2 className="section-title">{product.name}</h2>
             <div className="h4 mt-10">₹ {product.price}</div>
             
-            {/* Sizes */}
+            {/* Gender */}
+            <div className="mt-20">
+              <div className="label-sm">Select Gender</div>
+              <div className="filter-pills mt-10">
+                {genderOptions.map((g) => (
+                  <button
+                    key={g}
+                    className={`pill${gender === g ? ' active' : ''}`}
+                    onClick={() => { setGender(g); setSize(''); }}
+                    type="button"
+                    aria-pressed={gender === g}
+                    aria-label={`Select ${g}`}
+                  >
+                    {g === 'men' ? 'Men' : 'Women'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sizes (dependent on gender) */}
             <div className="mt-20">
               <div className="label-sm">Select Size</div>
               <div className="filter-pills size-pills mt-10">
@@ -108,11 +162,16 @@ export default function ProductPage() {
                   </button>
                 ))}
               </div>
-              {!size && <div className="inline-hint">select the available size</div>}
+              {sizes.length === 0 && (
+                <div className="inline-hint">Not available for the selected gender</div>
+              )}
+              {!size && sizes.length > 0 && (
+                <div className="inline-hint">Select the available size</div>
+              )}
             </div>
 
-            {/* Quantity + Add to cart */}
-            <div className="product-actions d-flex align-items-center mt-20">
+            {/* Quantity + Add to cart (stacked for white theme) */}
+            <div className="pp-actions mt-20">
               <div className="qty-control">
                 <button onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Decrease">-</button>
                 <input
@@ -124,69 +183,34 @@ export default function ProductPage() {
                 <button onClick={() => setQty((q) => q + 1)} aria-label="Increase">+</button>
               </div>
               <button
-                className="butn butn-md butn-rounded ml-10"
-                onClick={() => size ? addItem(cartProduct, qty) : null}
-                disabled={!size}
-                title={!size ? "Select a size" : "Add to Cart"}
+                className="pp-primary-btn"
+                onClick={() => (size && gender) ? addItem(cartProduct, qty) : null}
+                disabled={!size || !gender}
+                title={!size ? "Select a size" : (!gender ? "Select gender" : "Add to Cart")}
               >
                 Add to Cart
               </button>
-              <Link to="/cart" className="butn butn-md butn-rounded ml-10">Go to cart</Link>
+              <Link to="/cart" className="pp-secondary-btn">Go to Cart</Link>
             </div>
           </div>
         </div>
-        {/* Tabs for Description / Specs / Reviews */}
+        {/* Continuous content: Description + Specifications (no reviews) */}
         <div className="row mt-40">
           <div className="col-12">
-            <div className="tabs-pill" onClick={(e)=>{ e.preventDefault(); e.stopPropagation(); }}>
-              {[
-                { id: "desc", label: "Description" },
-                { id: "specs", label: "Specifications" },
-                { id: "reviews", label: "Reviews" },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  className={`pill${tab === t.id ? " active" : ""}`}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTab(t.id); }}
-                  type="button"
-                >
-                  {t.label}
-                </button>
-              ))}
+            <div className="pp-section card-like">
+              <h3>Description</h3>
+              <p className="mt-10">{product.description}</p>
+              <p className="mt-10 opacity-7">Designed for comfort, built for everyday miles. Pair with your favorite fits and go further.</p>
             </div>
-            <div className="tab-body card-like mt-15">
-              {tab === "desc" && (
-                <div>
-                  <p>{product.description}</p>
-                  <p className="mt-10 opacity-7">Designed for comfort, built for everyday miles. Pair with your favorite fits and go further.</p>
-                </div>
-              )}
-              {tab === "specs" && (
-                <ul className="spec-list">
-                  <li><strong>Upper:</strong> Breathable knit mesh</li>
-                  <li><strong>Midsole:</strong> Responsive EVA foam</li>
-                  <li><strong>Outsole:</strong> High-traction rubber</li>
-                  <li><strong>Fit:</strong> True to size</li>
-                  <li><strong>Weight:</strong> ~280g (UK 9)</li>
-                </ul>
-              )}
-              {tab === "reviews" && (
-                <div className="reviews">
-                  {[{n:'Aarav',r:5,t:'Super comfy and looks great.'},{n:'Zoya',r:4,t:'Good grip. Feels premium.'},{n:'Kabir',r:5,t:'Perfect daily runner.'}].map((rv) => (
-                    <div key={rv.n} className="rv-item">
-                      <div className="d-flex justify-content-between">
-                        <div className="fw-600">{rv.n}</div>
-                        <div className="stars">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <i key={i} className={`fas fa-star${i < rv.r ? '' : '-o'}`}></i>
-                          ))}
-                        </div>
-                      </div>
-                      <p className="mt-5">{rv.t}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="pp-section card-like mt-20">
+              <h3>Specifications</h3>
+              <ul className="spec-list mt-10">
+                <li><strong>Upper:</strong> Breathable knit mesh</li>
+                <li><strong>Midsole:</strong> Responsive EVA foam</li>
+                <li><strong>Outsole:</strong> High-traction rubber</li>
+                <li><strong>Fit:</strong> True to size</li>
+                <li><strong>Weight:</strong> ~280g (UK 9)</li>
+              </ul>
             </div>
           </div>
         </div>

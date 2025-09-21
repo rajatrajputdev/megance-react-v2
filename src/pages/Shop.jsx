@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
+import "./shop.css";
 
 export default function Shop() {
   const { addItem } = useCart();
@@ -18,20 +19,16 @@ export default function Shop() {
   ];
 
   const gender = useMemo(() => new URLSearchParams(location.search).get('g') || 'all', [location.search]);
-  const genderMap = useMemo(() => ({
-    men: new Set(['aeon-eclipse', 'stride-runner-pro']),
-    women: new Set(['volt-boost-max', 'echo-flex-zoom']),
-  }), []);
   const items = useMemo(() => {
     const byPrice = ranges.find(r => r.id === range)?.test || (() => true);
     return products
-      .filter((p) => gender === 'all' ? true : genderMap[gender]?.has(p.id))
+      .filter((p) => gender === 'all' ? true : (p.genders || []).includes(gender))
       .filter(byPrice);
-  }, [range, gender, genderMap]);
+  }, [range, gender]);
   return (
     <>
       <SEO title="Shop" description="Explore featured Megance products and find your perfect pair." image="/assets/logo.svg" type="website" twitterCard="summary" />
-      <section className="container page-section shop-page">
+      <section className="container page-section shop-page nav-offset">
         <div className="row align-items-end">
           <div className="col-lg-8">
             <h1 className="section-title">Shop{gender !== 'all' ? ` — ${gender[0].toUpperCase()}${gender.slice(1)}` : ''}</h1>
@@ -47,14 +44,14 @@ export default function Shop() {
 
       {/* Product list first */}
 
-      <section className="container page-section">
+      <section className="container page-section shop-wrap">
       <div className="row align-items-center mb-20">
         <div className="col-12">
-          <div className="filter-pills">
+          <div className="shop-filters">
             {ranges.map(r => (
               <button
                 key={r.id}
-                className={`pill${range === r.id ? ' active' : ''}`}
+                className={`shop-pill${range === r.id ? ' is-active' : ''}`}
                 onClick={() => setRange(r.id)}
                 type="button"
                 aria-pressed={range === r.id}
@@ -68,17 +65,17 @@ export default function Shop() {
       <div className="row">
         {items.map((p) => (
           <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
-            <div className="product-card p-15">
-              <Link to={`/product/${p.id}`} className="d-block mb-10">
-                <img src={p.image} alt={p.name} className="img-fluid" />
+            <div className="shop-card">
+              <Link to={`/product/${p.id}`} className="shop-image">
+                <img src={p.image} alt={p.name} />
               </Link>
-              <div className="product-details">
-                <div className="name">{p.name}</div>
-                <div className="price">₹ {p.price}</div>
+              <div className="shop-meta">
+                <div className="shop-name">{p.name}</div>
+                <div className="shop-price">₹ {p.price}</div>
               </div>
-              <div className="d-flex mt-10">
-                <Link to={`/product/${p.id}`} className="butn butn-md butn-rounded mr-10">View</Link>
-                <button className="butn butn-md butn-rounded" onClick={() => addItem(p, 1)}>Add</button>
+              <div className="shop-actions">
+                <Link to={`/product/${p.id}`} className="shop-btn shop-btn--secondary">View</Link>
+                <button className="shop-btn shop-btn--primary" onClick={() => addItem(p, 1)}>Add</button>
               </div>
             </div>
           </div>

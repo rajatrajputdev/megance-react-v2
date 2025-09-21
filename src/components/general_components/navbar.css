@@ -1,0 +1,53 @@
+.navbar {
+  transition: all 0.3s ease;
+  background: transparent !important;
+}
+
+/* Default state: transparent with white text */
+.navbar .nav-link,
+.navbar .dropdown-item {
+  color: #fff !important;
+  transition: color 0.3s ease;
+}
+
+.navbar .nav-butn {
+  background: transparent !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.navbar .menu-icon-surface {
+  color: #fff;
+  transition: color 0.3s ease;
+}
+
+/* Scrolled state: white backdrop */
+.navbar.has-backdrop {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.navbar.has-backdrop .nav-link,
+.navbar.has-backdrop .dropdown-item {
+  color: #333 !important;
+}
+
+.navbar.has-backdrop .nav-link:hover,
+.navbar.has-backdrop .dropdown-item:hover {
+  color: #000 !important;
+}
+
+.navbar.has-backdrop .nav-butn {
+  color: #333 !important;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.navbar.has-backdrop .menu-icon-surface {
+  color: #333 !important;
+}
+
+.navbar.has-backdrop .logo-img.adaptive {
+  filter: none !important;
+}

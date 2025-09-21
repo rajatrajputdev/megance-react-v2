@@ -5,7 +5,7 @@ import Marquee from "../components/homepage_components/Marquee.jsx";
 import ZellerSection from "../components/homepage_components/ZellerSection.jsx";
 import GalleryYellow from "../components/homepage_components/GalleryYellow.jsx";
 import Testimonials from "../components/homepage_components/Testimonials.jsx";
-import FAQ from "../components/homepage_components/FAQ.jsx";
+import FAQ2 from "../components/homepage_components/FAQ2.jsx";
 import Newsletter from "../components/homepage_components/Newsletter.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
 import { products } from "../data/products.js";
@@ -54,7 +54,7 @@ export default function Home() {
           </div>
         </section> */}
         {/* <Testimonials /> */}
-        <FAQ />
+        <FAQ2 />
       </main>
       <Newsletter />
       <hr />

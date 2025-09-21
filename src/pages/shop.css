@@ -1,0 +1,51 @@
+/* Isolated shop page styles: sharp corners, white theme, clean buttons */
+
+.shop-wrap { padding-top: 10px; }
+
+.shop-filters { display: flex; flex-wrap: wrap; gap: 10px; }
+.shop-pill {
+  appearance: none;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: #fff;
+  color: #111;
+  padding: 8px 14px;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.shop-pill.is-active,
+.shop-pill:focus-visible {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.shop-card {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 0;
+  padding: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.shop-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.12); }
+
+.shop-image { display: block; width: 100%; overflow: hidden; border-radius: 0; }
+.shop-image img { display: block; width: 100%; height: auto; object-fit: contain; transition: transform .25s ease; }
+.shop-card:hover .shop-image img { transform: scale(1.05); }
+
+.shop-meta { margin-top: 8px; display: flex; align-items: baseline; justify-content: space-between; }
+.shop-name { font-weight: 600; color: #111; font-size: 15px; }
+.shop-price { color: #444; font-size: 14px; }
+
+.shop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.shop-btn { height: 40px; border-radius: 0; border: 1px solid #111; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; letter-spacing: .2px; text-decoration: none; cursor: pointer; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
+.shop-btn--secondary { background: #fff; color: #111; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.shop-btn--secondary:hover { background: #f6f6f6; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.shop-btn--primary { background: #111; color: #fff; }
+.shop-btn--primary:hover { background: #000; }
+
+@media (max-width: 576px) {
+  .shop-actions { grid-template-columns: 1fr; }
+}
+

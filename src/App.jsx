@@ -10,6 +10,7 @@ import OrderSuccess from "./pages/OrderSuccess.jsx";
 import TermsPage from "./pages/Terms.jsx";
 import PrivacyPage from "./pages/Privacy.jsx";
 import TermsOfUsePage from "./pages/TermsOfUse.jsx";
+import About from "./pages/About.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./components/general_components/RequireAuth.jsx";
@@ -24,18 +25,6 @@ export default function App() {
         <CartProvider>
           <Loader />
           <Analytics />
-          {/* Global elements expected by legacy scripts */}
-          <div className="loader-wrap">
-            <svg viewBox="0 0 1000 1000" preserveAspectRatio="none">
-              <path id="svg" d="M0,1005S175,995,500,995s500,5,500,5V0H0Z" />
-            </svg>
-            <div className="loader-wrap-heading">
-              <div className="logo-blink">
-                <img src="/assets/imgs/megance_logo_w.png" style={{ width: 400 }} alt="logo" />
-              </div>
-            </div>
-          </div>
-
           <div className="cursor"></div>
 
           <div className="progress-wrap cursor-pointer">
@@ -65,6 +54,7 @@ export default function App() {
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms-of-use" element={<TermsOfUsePage />} />
+                <Route path="/about-us" element={<About />} />
               </Routes>
             </div>
           </div>
