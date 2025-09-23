@@ -18,10 +18,10 @@ export default function Loader() {
     if (!overlay || !svg) return;
 
     const paths = Array.from(svg.querySelectorAll('[data-stroke="1"]'));
-    let t1, t2, t3;
+    let t1, t2;
+    let animationFrameId;
 
-    // Delay priming stroke-dash until layout is stable
-    t3 = setTimeout(() => {
+    const setupAnimation = () => {
       // Prime stroke-dash based on actual length
       paths.forEach((p, i) => {
         try {
@@ -44,7 +44,9 @@ export default function Loader() {
       // Fallback in case animationend isn't fired
       t2 = setTimeout(onEnd, 2400 + paths.length * 220);
       last?.addEventListener("animationend", onEnd, { once: true });
-    }, 50); // 50ms delay
+    };
+
+    animationFrameId = requestAnimationFrame(setupAnimation);
 
     const onSlideEnd = (e) => {
       if (e.animationName === "loader-slide") setDone(true);
@@ -54,7 +56,7 @@ export default function Loader() {
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      clearTimeout(t3);
+      cancelAnimationFrame(animationFrameId);
       overlay.removeEventListener("animationend", onSlideEnd);
     };
   }, []);

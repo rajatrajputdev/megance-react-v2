@@ -53,52 +53,58 @@ export default function Navbar() {
     <>
       <nav ref={navRef} className="navbar navbar-expand-lg">
         <div className="container">
-          <div
-            className="w-100"
-            style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}
-          >
-            {/* Left: primary links (desktop) */}
-            <div className="navbar-left d-none d-lg-flex align-items-center">
-              <ul className="navbar-nav flex-row">
-                <li className="nav-item mr-20">
-                  <NavLink className="nav-link" to="/">Home</NavLink>
-                </li>
-                <li className="nav-item dropdown">
-                  <a href="#0" className="nav-link">Shop</a>
-                  <div className="dropdown-menu">
-                    <Link className={`dropdown-item${g === 'men' ? ' active' : ''}`} to="/shop?g=men">Men</Link>
-                    <Link className={`dropdown-item${g === 'women' ? ' active' : ''}`} to="/shop?g=women">Women</Link>
-                  </div>
-                </li>
-              </ul>
-            </div>
-
-            {/* Center: logo (adaptive visibility) */}
-            <div className="navbar-center" style={{ justifySelf: 'center' }}>
+          <div className="row w-100 align-items-center">
+            {/* Mobile: Logo on left, Hamburger on right */}
+            <div className="col-6 d-lg-none">
               <Logo />
             </div>
-
-            {/* Right: cart, auth, hamburger */}
-            <div className="navbar-right topnav d-flex align-items-center" style={{ justifySelf: 'end' }}>
-              {/* Hide cart/login on small screens; show from lg and up */}
-              <Link to="/cart" className="butn nav-butn cart-butn mr-10 d-none d-lg-inline-flex">
-                <div className="d-flex align-items-center">
-                  <span>Cart ({count})</span>
-                  <span className="icon ml-10">
-                    <img src="/common/imgs/icons/arrow-top-right.svg" alt="" />
-                  </span>
-                </div>
-              </Link>
-
-              {user ? (
-                <button className="butn nav-butn mr-10 d-none d-lg-inline-flex" onClick={logout}>Logout</button>
-              ) : (
-                <Link to="/login" className="butn nav-butn mr-10 d-none d-lg-inline-flex">Login</Link>
-              )}
-
+            <div className="col-6 d-lg-none text-end">
               <div className="menu-icon cursor-pointer" onClick={openMenu}>
                 <div className="menu-icon-surface">
                   <span className="icon ti-align-right"></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop: 3-column layout */}
+            <div className="col-lg-4 d-none d-lg-block">
+              <div className="navbar-left d-flex align-items-center">
+                <ul className="navbar-nav flex-row">
+                  <li className="nav-item mr-20">
+                    <NavLink className="nav-link" to="/">Home</NavLink>
+                  </li>
+                  <li className="nav-item dropdown">
+                    <a href="#0" className="nav-link">Shop</a>
+                    <div className="dropdown-menu">
+                      <Link className={`dropdown-item${g === 'men' ? ' active' : ''}`} to="/shop?g=men">Men</Link>
+                      <Link className={`dropdown-item${g === 'women' ? ' active' : ''}`} to="/shop?g=women">Women</Link>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div className="col-lg-4 d-none d-lg-block text-center">
+              <Logo />
+            </div>
+            <div className="col-lg-4 d-none d-lg-block">
+              <div className="navbar-right topnav d-flex align-items-center justify-content-end">
+                <Link to="/cart" className="butn nav-butn cart-butn mr-10">
+                  <div className="d-flex align-items-center">
+                    <span>Cart ({count})</span>
+                    <span className="icon ml-10">
+                      <img src="/common/imgs/icons/arrow-top-right.svg" alt="" />
+                    </span>
+                  </div>
+                </Link>
+                {user ? (
+                  <button className="butn nav-butn mr-10" onClick={logout}>Logout</button>
+                ) : (
+                  <Link to="/login" className="butn nav-butn mr-10">Login</Link>
+                )}
+                <div className="menu-icon cursor-pointer" onClick={openMenu}>
+                  <div className="menu-icon-surface">
+                    <span className="icon ti-align-right"></span>
+                  </div>
                 </div>
               </div>
             </div>
