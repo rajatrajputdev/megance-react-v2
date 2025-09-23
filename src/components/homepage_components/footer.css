@@ -1,13 +1,17 @@
 /* Rhode-inspired clean white footer; scoped to .rh-footer */
 
-.rh-footer { background: #fff; border-top: 1px solid rgba(0,0,0,0.06); color: #111; }
+.rh-footer { background: #fff; border-top: 1px solid rgba(0,0,0,0.06); color: #111; font-family: "Helvetica", sans-serif; }
 .rh-container { max-width: 1320px; margin: 0 auto; padding: 48px 16px; }
 
-/* Newsletter */
-.rh-brand { display:flex; justify-content:center; }
-.rh-brand .rh-logo { width: clamp(160px, 22vw, 280px); height: auto; display:block; }
+/* Brand */
+.rh-brand { display:flex; justify-content: flex-start; }
+.rh-logo-group { display: flex; flex-direction: column; align-items: flex-start; text-decoration: none; color: inherit; }
+.rh-big-logo { width: 150px; height: auto; margin-bottom: 10px; }
+.rh-m-logo { width: 75px; height: auto; }
+
 .rh-divider { height: 1px; background: rgba(0,0,0,0.08); margin: 20px 0 28px; }
 
+/* Newsletter */
 .rh-newsletter { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; align-items: center; padding-bottom: 32px; }
 .rh-newsletter h4 { margin: 0; font-weight: 700; }
 .rh-newsletter p { margin: 6px 0 0 0; color: #555; }

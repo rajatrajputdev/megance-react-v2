@@ -8,8 +8,9 @@ export default function Footer() {
       <div className="rh-container">
         {/* Brand */}
         <div className="rh-brand">
-          <Link to="/" aria-label="Megance home">
-            <img src="/assets/logo.svg" alt="Megance" className="rh-logo" />
+          <Link to="/" aria-label="Megance home" className="rh-logo-group">
+                      <img src="/assets/logo.svg" alt="Megance M" style={{paddingBottom:"20px"}} className="rh-m-logo" />
+            <img src="/assets/imgs/megance_logo_b.svg" alt="Megance" className="rh-big-logo" />
           </Link>
         </div>
         <div className="rh-divider" />
@@ -64,9 +65,9 @@ export default function Footer() {
             <h6>Follow</h6>
             <div className="rh-social-row">
               <a href="#" aria-label="Instagram"><i className="fab fa-instagram"></i></a>
-              <a href="#" aria-label="Twitter"><i className="fab fa-x-twitter"></i></a>
               <a href="#" aria-label="Facebook"><i className="fab fa-facebook-f"></i></a>
-              <a href="#" aria-label="YouTube"><i className="fab fa-youtube"></i></a>
+              <a href="#" aria-label="Twitter"><i className="fab fa-x-twitter"></i></a>
+              <a href="#" aria-label="Pinterest"><i className="fab fa-pinterest"></i></a>
             </div>
           </div>
         </div>
