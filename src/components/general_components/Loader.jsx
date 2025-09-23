@@ -18,29 +18,33 @@ export default function Loader() {
     if (!overlay || !svg) return;
 
     const paths = Array.from(svg.querySelectorAll('[data-stroke="1"]'));
-    // Prime stroke-dash based on actual length
-    paths.forEach((p, i) => {
-      try {
-        const len = p.getTotalLength();
-        p.style.strokeDasharray = `${len}`;
-        p.style.strokeDashoffset = `${len}`;
-        p.style.setProperty("--len", `${len}`);
-        p.style.setProperty("--delay", `${i * 220}ms`);
-      } catch (_) {}
-    });
+    let t1, t2, t3;
 
-    setAnim(true);
+    // Delay priming stroke-dash until layout is stable
+    t3 = setTimeout(() => {
+      // Prime stroke-dash based on actual length
+      paths.forEach((p, i) => {
+        try {
+          const len = p.getTotalLength();
+          p.style.strokeDasharray = `${len}`;
+          p.style.strokeDashoffset = `${len}`;
+          p.style.setProperty("--len", `${len}`);
+          p.style.setProperty("--delay", `${i * 220}ms`);
+        } catch (_) {}
+      });
 
-    // When the last path finishes its draw, fade fills and then reveal
-    const last = paths[paths.length - 1];
-    let t1, t2;
-    const onEnd = () => {
-      svg.classList.add("is-filled");
-      t1 = setTimeout(() => setReveal(true), 600);
-    };
-    // Fallback in case animationend isn't fired
-    t2 = setTimeout(onEnd, 2400 + paths.length * 220);
-    last?.addEventListener("animationend", onEnd, { once: true });
+      setAnim(true);
+
+      // When the last path finishes its draw, fade fills and then reveal
+      const last = paths[paths.length - 1];
+      const onEnd = () => {
+        svg.classList.add("is-filled");
+        t1 = setTimeout(() => setReveal(true), 600);
+      };
+      // Fallback in case animationend isn't fired
+      t2 = setTimeout(onEnd, 2400 + paths.length * 220);
+      last?.addEventListener("animationend", onEnd, { once: true });
+    }, 50); // 50ms delay
 
     const onSlideEnd = (e) => {
       if (e.animationName === "loader-slide") setDone(true);
@@ -48,7 +52,9 @@ export default function Loader() {
     overlay.addEventListener("animationend", onSlideEnd);
 
     return () => {
-      clearTimeout(t1); clearTimeout(t2);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
       overlay.removeEventListener("animationend", onSlideEnd);
     };
   }, []);
