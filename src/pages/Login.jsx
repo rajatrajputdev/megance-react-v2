@@ -43,7 +43,7 @@ export default function LoginPage() {
   return (
     <>
       <SEO title="Login" description="Login to Megance to continue to checkout." image="/assets/logo.svg" type="website" twitterCard="summary" />
-    <section className="container page-section">
+    <section className="container page-section white-navbar-page">
       <div className="row justify-content-center">
         <div className="col-md-6">
           <div className="p-20 card-like text-center">

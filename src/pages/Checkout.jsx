@@ -105,7 +105,7 @@ export default function CheckoutPage() {
   return (
     <>
     <SEO title="Checkout" description="Complete your Megance order securely with Razorpay." image="/assets/logo.svg" type="website" twitterCard="summary" />
-    <section className="container pt-60 pb-60 checkout-page">
+    <section className="container pt-60 pb-60 checkout-page white-navbar-page">
       {toast && (
         <div className="toast-container">
           <div className={`alert-toast ${toast.type}`}>

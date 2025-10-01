@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { auth, db } from "../firebase.js";
-import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, linkWithPhoneNumber } from "firebase/auth";
+import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, linkWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 
 const AuthContext = createContext(null);
@@ -14,6 +14,7 @@ export function AuthProvider({ children }) {
   const profileUnsubRef = React.useRef(null);
   const recaptchaRef = React.useRef(null);
   const phoneLinkConfirmRef = React.useRef(null);
+  const phoneChangeVerificationIdRef = React.useRef(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -88,6 +89,34 @@ export function AuthProvider({ children }) {
     return res.user;
   };
 
+  // Change existing phone number: verify, then updatePhoneNumber
+  const startChangePhone = async (phoneNumber) => {
+    if (!auth.currentUser) throw new Error("Sign in first");
+    setError(null);
+    try { if (recaptchaRef.current) recaptchaRef.current.clear(); } catch {}
+    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+    try {
+      await recaptchaRef.current.render();
+      const provider = new PhoneAuthProvider(auth);
+      const verificationId = await provider.verifyPhoneNumber(phoneNumber, recaptchaRef.current);
+      phoneChangeVerificationIdRef.current = verificationId;
+      return true;
+    } catch (e) {
+      try { if (recaptchaRef.current) recaptchaRef.current.clear(); } catch {}
+      recaptchaRef.current = null;
+      throw e;
+    }
+  };
+
+  const confirmChangePhone = async (code) => {
+    setError(null);
+    if (!phoneChangeVerificationIdRef.current) throw new Error("Start phone change first");
+    const cred = PhoneAuthProvider.credential(phoneChangeVerificationIdRef.current, code);
+    await updatePhoneNumber(auth.currentUser, cred);
+    phoneChangeVerificationIdRef.current = null;
+    return auth.currentUser;
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
@@ -105,6 +134,8 @@ export function AuthProvider({ children }) {
       // phone link
       startLinkPhone,
       confirmLinkPhone,
+      startChangePhone,
+      confirmChangePhone,
       // common
       logout,
     }),

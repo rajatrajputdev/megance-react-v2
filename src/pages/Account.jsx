@@ -6,7 +6,7 @@ import SEO from "../components/general_components/SEO.jsx";
 import { INDIAN_STATES } from "../data/indian-states.js";
 
 export default function Account() {
-  const { user, profile, profileLoading, logout, startLinkPhone, confirmLinkPhone } = useAuth();
+  const { user, profile, profileLoading, logout, startLinkPhone, confirmLinkPhone, startChangePhone, confirmChangePhone } = useAuth();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -22,6 +22,9 @@ export default function Account() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   useEffect(() => {
     setForm((f) => ({
@@ -44,8 +47,10 @@ export default function Account() {
   }, [toast]);
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
-  const isPhoneVerified = Boolean(user?.phoneNumber) || profile?.phoneVerified === true || otpVerified === true;
-  const canSave = !!form.name && !!form.email && !!form.phone && !!form.address && !!form.city && !!form.state && !!form.zip;
+  const hasLinkedPhone = Boolean(user?.phoneNumber);
+  const baseVerified = hasLinkedPhone || profile?.phoneVerified === true;
+  const effectiveVerified = (baseVerified && !editingPhone) || otpVerified === true;
+  const canSave = !!form.name && !!form.email && !!form.phone && !!form.address && !!form.city && !!form.state && !!form.zip && (!editingPhone || otpVerified === true);
 
   const save = async () => {
     if (!user) return;
@@ -61,7 +66,7 @@ export default function Account() {
           city: form.city,
           state: form.state,
           zip: form.zip,
-          phoneVerified: isPhoneVerified,
+          phoneVerified: effectiveVerified,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -75,22 +80,31 @@ export default function Account() {
   };
 
   const sendOtp = async () => {
+    setSendingOtp(true);
     try {
-      await startLinkPhone(form.phone);
+      if (editingPhone || baseVerified) await startChangePhone(form.phone);
+      else await startLinkPhone(form.phone);
       setOtpSent(true);
       setToast({ type: "info", text: "OTP sent" });
     } catch (e) {
       setToast({ type: "error", text: e.message || "Failed to send OTP" });
+    } finally {
+      setSendingOtp(false);
     }
   };
 
   const verifyOtp = async () => {
+    setVerifyingOtp(true);
     try {
-      await confirmLinkPhone(otpCode);
+      if (editingPhone || baseVerified) await confirmChangePhone(otpCode);
+      else await confirmLinkPhone(otpCode);
       setOtpVerified(true);
+      setEditingPhone(false);
       setToast({ type: "success", text: "Phone verified" });
     } catch (e) {
       setToast({ type: "error", text: e.message || "Invalid OTP" });
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -122,28 +136,33 @@ export default function Account() {
                   <input className="form-control" name="email" type="email" value={form.email} onChange={onChange} />
                 </div>
                 <div className="col-md-6 mb-10">
-                  <label>Phone {isPhoneVerified && <span className="badge success ml-10">Verified</span>}</label>
-                  <input className="form-control" name="phone" value={form.phone} onChange={onChange} disabled={isPhoneVerified} />
-                  {!isPhoneVerified && (
+                  <label>
+                    Phone {effectiveVerified && !editingPhone && <span className="badge success ml-10">Verified</span>}
+                    {effectiveVerified && !editingPhone && (
+                      <button type="button" className="underline ml-10" onClick={() => { setEditingPhone(true); setOtpSent(false); setOtpCode(""); setOtpVerified(false); }}>Change</button>
+                    )}
+                  </label>
+                  <input className="form-control" name="phone" value={form.phone} onChange={onChange} disabled={effectiveVerified && !editingPhone} />
+                  {(!effectiveVerified || editingPhone) && (
                     <div className="otp-section mt-6">
                       {!otpSent ? (
                         <>
                           <div className="form-hint">We’ll send a one-time code to verify this number.</div>
-                          <button type="button" className="butn butn-sm butn-rounded mt-6" onClick={sendOtp}>Send OTP</button>
+                          <button type="button" className="butn butn-sm butn-rounded mt-6" disabled={sendingOtp} onClick={sendOtp}>{sendingOtp ? "Sending…" : "Send OTP"}</button>
                         </>
                       ) : (
                         <>
                           <label className="mt-4">Enter OTP Code</label>
                           <div className="otp-inline mt-4">
                             <input className="form-control otp-code-input" placeholder="6-digit code" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={otpCode} onChange={(e)=>setOtpCode(e.target.value)} />
-                            <button type="button" className="butn butn-sm butn-rounded" onClick={verifyOtp}>Verify OTP</button>
-                            <button type="button" className="underline" onClick={sendOtp}>Resend</button>
+                            <button type="button" className="butn butn-sm butn-rounded" disabled={verifyingOtp} onClick={verifyOtp}>{verifyingOtp ? "Verifying…" : "Verify OTP"}</button>
+                            <button type="button" className="underline" disabled={sendingOtp} onClick={sendOtp}>Resend</button>
                           </div>
                         </>
                       )}
                     </div>
                   )}
-                  {isPhoneVerified && <div className="inline-hint" style={{color:'#1aa34a'}}>Your phone number is verified.</div>}
+                  {effectiveVerified && !editingPhone && <div className="inline-hint" style={{color:'#1aa34a'}}>Your phone number is verified.</div>}
                 </div>
                 <div className="col-12 mb-10">
                   <label>Street Address</label>

@@ -14,6 +14,8 @@ export default function Setup() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const from = new URLSearchParams(location.search).get("from") || "/";
@@ -86,23 +88,29 @@ export default function Setup() {
 
   const sendOtp = async () => {
     setErr(""); setMsg("");
+    setSendingOtp(true);
     try {
       await startLinkPhone(form.phone);
       setOtpSent(true);
       setMsg("OTP sent to your phone");
     } catch (e) {
       setErr(e.message || "Failed to send OTP");
+    } finally {
+      setSendingOtp(false);
     }
   };
 
   const verifyOtp = async () => {
     setErr(""); setMsg("");
+    setVerifyingOtp(true);
     try {
       await confirmLinkPhone(otpCode);
       setOtpVerified(true);
       setMsg("Phone verified");
     } catch (e) {
       setErr(e.message || "Invalid OTP");
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -137,7 +145,7 @@ export default function Setup() {
                         {!otpSent ? (
                           <>
                             <div className="form-hint">We’ll send a one-time code to verify this number.</div>
-                            <button type="button" className="butn butn-sm butn-rounded mt-6" onClick={sendOtp}>Send OTP</button>
+                            <button type="button" className="butn butn-sm butn-rounded mt-6" disabled={sendingOtp} onClick={sendOtp}>{sendingOtp ? "Sending…" : "Send OTP"}</button>
                           </>
                         ) : (
                           <>
@@ -152,8 +160,8 @@ export default function Setup() {
                                 value={otpCode}
                                 onChange={(e) => setOtpCode(e.target.value)}
                               />
-                              <button type="button" className="butn butn-sm butn-rounded" onClick={verifyOtp}>Verify OTP</button>
-                              <button type="button" className="underline" onClick={sendOtp}>Resend</button>
+                              <button type="button" className="butn butn-sm butn-rounded" disabled={verifyingOtp} onClick={verifyOtp}>{verifyingOtp ? "Verifying…" : "Verify OTP"}</button>
+                              <button type="button" className="underline" disabled={sendingOtp} onClick={sendOtp}>Resend</button>
                             </div>
                           </>
                         )}
