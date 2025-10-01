@@ -97,7 +97,10 @@ export default function Navbar() {
                   </div>
                 </Link>
                 {user ? (
-                  <button className="butn nav-butn mr-10" onClick={logout}>Logout</button>
+                  <>
+                    <Link to="/account" className="butn nav-butn mr-10">Account</Link>
+                    <button className="butn nav-butn mr-10" onClick={logout}>Logout</button>
+                  </>
                 ) : (
                   <Link to="/login" className="butn nav-butn mr-10">Login</Link>
                 )}
@@ -154,6 +157,17 @@ export default function Navbar() {
                   </NavLink>
                 </div>
               </li>
+              {user && (
+                <li>
+                  <div className="o-hidden">
+                    <NavLink to="/account" className="link" onClick={closeMenu}>
+                      <span className="fill-text" data-text="Account">
+                        Account
+                      </span>
+                    </NavLink>
+                  </div>
+                </li>
+              )}
             </ul>
           </div>
           <div className="cont-info valign">

@@ -9,18 +9,31 @@ import SEO from "../components/general_components/SEO.jsx";
 
 export default function CheckoutPage() {
   const { items, amount, clearCart } = useCart();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
-    email: user?.email || "",
-    name: user?.name || "",
-    phone: "",
-    address: "",
-    city: "",
-    state: "",
-    zip: "",
+    email: (profile?.email || user?.email) || "",
+    name: (profile?.name || user?.displayName) || "",
+    phone: profile?.phone || "",
+    address: profile?.address || "",
+    city: profile?.city || "",
+    state: profile?.state || "",
+    zip: profile?.zip || "",
   });
+
+  useEffect(() => {
+    setForm((f) => ({
+      ...f,
+      email: (profile?.email || user?.email) || f.email,
+      name: (profile?.name || user?.displayName) || f.name,
+      phone: profile?.phone || f.phone,
+      address: profile?.address || f.address,
+      city: profile?.city || f.city,
+      state: profile?.state || f.state,
+      zip: profile?.zip || f.zip,
+    }));
+  }, [user, profile]);
 
   // Coupon application state
   const [couponInput, setCouponInput] = useState("");

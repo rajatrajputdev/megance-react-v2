@@ -1,18 +1,62 @@
+/* Make navbar white at all times (no scroll-triggered transparency) */
+.navbar {
+  background-color: #fff !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  /* Force sticky, flush to top */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  padding: 15px 0 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  z-index: 9999999;
+}
+
+/* Ensure navbar content is dark on white background */
+.navbar .nav-link,
+.navbar .dropdown-item,
+.navbar .butn {
+  color: #111 !important;
+}
+
+.navbar .nav-link:hover,
+.navbar .dropdown-item:hover {
+  color: #000 !important;
+}
+
+.navbar .menu-icon-surface {
+  color: #111 !important;
+}
+
+/* Always use non-inverted logo in navbar */
+.navbar .logo-img,
+.navbar .logo-img.adaptive {
+  filter: none !important;
+}
+.navbar {
+  background-color: #fff !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+/* Keep compatibility: if .has-backdrop is toggled by JS, keep same visuals */
 .navbar.has-backdrop {
-  background-color: white !important;
+  background-color: #fff !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .navbar.has-backdrop .nav-link,
-.navbar.has-backdrop .butn {
-  color: black !important;
+.navbar.has-backdrop .dropdown-item,
+.navbar.has-backdrop .butn,
+.navbar.has-backdrop .menu-icon-surface {
+  color: #111 !important;
 }
 
-.navbar .logo-img.adaptive {
-  filter: brightness(0) invert(1);
-}
-
-.navbar.has-backdrop .logo-img.adaptive {
-  filter: invert(0);
+/* Neutralize vendor nav-scroll animation/backdrop so visuals stay constant */
+.navbar.nav-scroll {
+  -webkit-transform: none !important;
+  transform: none !important;
+  top: 0 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 /* Make gender selections visually distinct in menus */
@@ -59,3 +103,79 @@
 }
 
 /* (Product page styles moved to src/pages/product.css for isolation) */
+
+/* Setup wizard animations and layout */
+.setup-steps .steps-tracker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.setup-steps .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ddd;
+  transition: background-color 240ms ease;
+}
+.setup-steps .dot.active { background: #111; }
+.setup-steps .line {
+  height: 2px;
+  width: 40px;
+  background: #ddd;
+  transition: background-color 240ms ease;
+}
+.setup-steps .line.active { background: #111; }
+.setup-steps .steps-viewport {
+  position: relative;
+  min-height: 180px;
+  margin-top: 16px;
+}
+.setup-steps .step-card {
+  will-change: transform, opacity;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 10px;
+  padding: 16px;
+}
+.animate-in {
+  animation: fadeSlideIn 260ms ease both;
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Generic inline alerts */
+.alert {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.alert.success { border-color: #b9e6c9; background: #edf9f1; color: #0f7a3f; }
+.alert.error { border-color: #f0b7b7; background: #fdecec; color: #a61717; }
+.alert.info { border-color: #cfe1ff; background: #eef4ff; color: #194b9b; }
+
+/* Small badge */
+.badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid #ddd; }
+.badge.success { background: #edf9f1; color: #0f7a3f; border-color: #b9e6c9; }
+
+/* Simple spacing helpers */
+.gap-10 { gap: 10px; }
+.mt-6 { margin-top: 6px; }
+.mt-4 { margin-top: 4px; }
+
+/* OTP section block */
+.otp-section { border: 1px dashed rgba(0,0,0,0.15); background: #fafafa; border-radius: 10px; padding: 12px; }
+.otp-inline { display: flex; align-items: center; gap: 10px; }
+.otp-code-input { max-width: 220px; }
+
+/* Hints */
+.inline-hint { font-size: 12px; opacity: 0.8; margin-top: 6px; }
+.form-hint { font-size: 13px; opacity: 0.85; }
+
+/* Recaptcha holder (container element only; the Google badge may still appear) */
+#recaptcha-container.recaptcha-holder { min-height: 0; }
+
+/* Button small variant (if not provided by theme) */
+.butn.butn-sm { padding: 6px 10px; font-size: 13px; line-height: 1.2; }

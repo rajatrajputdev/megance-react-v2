@@ -6,6 +6,8 @@ import ProductPage from "./pages/Product.jsx";
 import CartPage from "./pages/Cart.jsx";
 import CheckoutPage from "./pages/Checkout.jsx";
 import LoginPage from "./pages/Login.jsx";
+import Account from "./pages/Account.jsx";
+import Setup from "./pages/Setup.jsx";
 import OrderSuccess from "./pages/OrderSuccess.jsx";
 import TermsPage from "./pages/Terms.jsx";
 import PrivacyPage from "./pages/Privacy.jsx";
@@ -14,6 +16,7 @@ import About from "./pages/About.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./components/general_components/RequireAuth.jsx";
+import RequireProfile from "./components/general_components/RequireProfile.jsx";
 import "./styles/app-overrides.css";
 import Loader from "./components/general_components/Loader.jsx";
 import Analytics from "./components/general_components/Analytics.jsx";
@@ -45,7 +48,17 @@ export default function App() {
                   path="/checkout"
                   element={
                     <RequireAuth>
-                      <CheckoutPage />
+                      <RequireProfile>
+                        <CheckoutPage />
+                      </RequireProfile>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/setup"
+                  element={
+                    <RequireAuth>
+                      <Setup />
                     </RequireAuth>
                   }
                 />
@@ -55,6 +68,14 @@ export default function App() {
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms-of-use" element={<TermsOfUsePage />} />
                 <Route path="/about-us" element={<About />} />
+                <Route
+                  path="/account"
+                  element={
+                    <RequireAuth>
+                      <Account />
+                    </RequireAuth>
+                  }
+                />
               </Routes>
             </div>
           </div>
