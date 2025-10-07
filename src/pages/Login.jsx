@@ -24,9 +24,8 @@ export default function LoginPage() {
     setErr("");
     try {
       await signInWithGoogle();
-      // If profile exists already, go back; else go to setup
-      if (!profileLoading && profile) navigate(from, { replace: true });
-      else navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
+      // Always go to setup to complete onboarding (production flow)
+      navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
     } catch (e) {
       // Handle account-exists-with-different-credential gracefully
       if (e?.code === "auth/account-exists-with-different-credential") {

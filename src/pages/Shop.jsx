@@ -112,7 +112,6 @@ export default function Shop() {
               </div>
               <div className="shop-actions">
                 <div className="skeleton skeleton-line" />
-                <div className="skeleton skeleton-line" />
               </div>
             </div>
           </div>
@@ -125,19 +124,15 @@ export default function Shop() {
               </Link>
               <div className="shop-meta">
                 <div className="shop-name">{p.name}</div>
-                <div className="shop-price">₹ {p.price}</div>
+                <div className="shop-price">
+                  ₹ {p.price}
+                  {Number(p.quantity) === 0 && (
+                    <span className="stock-badge oos" title="Out of stock">Out of stock</span>
+                  )}
+                </div>
               </div>
               <div className="shop-actions">
-                <Link to={`/product/${p.id}`} className="shop-btn shop-btn--secondary">View</Link>
-                <button
-                  className="shop-btn shop-btn--primary"
-                  onClick={() => {
-                    addItem(p, 1);
-                    try { showToast('success', 'Added to cart'); } catch {}
-                  }}
-                >
-                  Add
-                </button>
+                <Link to={`/product/${p.id}`} className="shop-btn shop-btn--primary">View</Link>
               </div>
             </div>
           </div>

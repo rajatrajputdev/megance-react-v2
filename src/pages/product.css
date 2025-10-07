@@ -77,6 +77,16 @@
   opacity: .45;
   cursor: not-allowed;
 }
+.product-page-wrap .filter-pills .pill .pill-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: 999px;
+  background: #fdecec;
+  color: #a61717;
+  border: 1px solid #f0b7b7;
+}
 .product-page-wrap .inline-hint { color: #c00; font-size: 12px; margin-top: 6px; }
 
 .product-page-wrap .product-actions .butn[disabled] { opacity: .6; cursor: not-allowed; }

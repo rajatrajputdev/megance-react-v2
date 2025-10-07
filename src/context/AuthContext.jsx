@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { auth, db } from "../firebase.js";
-import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, linkWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber } from "firebase/auth";
-import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
+import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, linkWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const AuthContext = createContext(null);
 
@@ -19,6 +19,8 @@ export function AuthProvider({ children }) {
   const phoneChangeVerificationIdRef = React.useRef(null);
 
   useEffect(() => {
+    // Ensure session persistence across reloads (production behavior)
+    try { setPersistence(auth, browserLocalPersistence).catch(() => {}); } catch {}
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setInitializing(false);
@@ -62,10 +64,7 @@ export function AuthProvider({ children }) {
   // Fully clear any existing reCAPTCHA instance and its DOM container
   const resetRecaptcha = async () => {
     try { if (recaptchaRef.current?.clear) { await recaptchaRef.current.clear(); } } catch {}
-    try {
-      const el = recaptchaContainerRef.current;
-      if (el && el.parentNode) el.parentNode.removeChild(el);
-    } catch {}
+    // Keep DOM nodes intact to avoid third-party script referencing removed elements
     recaptchaRef.current = null;
     recaptchaContainerRef.current = null;
   };
@@ -113,7 +112,9 @@ export function AuthProvider({ children }) {
     setError(null);
     if (!phoneLinkConfirmRef.current) throw new Error("Start phone link first");
     const res = await phoneLinkConfirmRef.current.confirm(code);
-    phoneLinkConfirmRef.current = null;
+    // Leave confirmation around for a moment, then clear.
+    // This allows quick retries if UI re-triggers confirm without resend.
+    setTimeout(() => { phoneLinkConfirmRef.current = null; }, 0);
     return res.user;
   };
 
@@ -139,19 +140,6 @@ export function AuthProvider({ children }) {
     if (!phoneChangeVerificationIdRef.current) throw new Error("Start phone change first");
     const cred = PhoneAuthProvider.credential(phoneChangeVerificationIdRef.current, code);
     await updatePhoneNumber(auth.currentUser, cred);
-    // Persist the new phone in profile for consistency
-    try {
-      const u = auth.currentUser;
-      if (u?.uid && u?.phoneNumber) {
-        await setDoc(
-          doc(db, "users", u.uid),
-          { phone: u.phoneNumber, phoneVerified: true, updatedAt: serverTimestamp() },
-          { merge: true }
-        );
-      }
-    } catch (_) {
-      // Non-fatal: UI still reflects auth state; profile will sync on next save
-    }
     phoneChangeVerificationIdRef.current = null;
     return auth.currentUser;
   };

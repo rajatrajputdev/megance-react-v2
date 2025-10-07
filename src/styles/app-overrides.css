@@ -183,6 +183,11 @@
 
 /* Recaptcha holder (container element only; the Google badge may still appear) */
 .recaptcha-holder { position: fixed; width: 1px; height: 1px; overflow: hidden; left: -9999px; top: -9999px; }
+.recaptcha-holder.recaptcha-visible {
+  width: auto; height: auto; overflow: visible;
+  left: auto; top: auto; right: 16px; bottom: 16px;
+  z-index: 999999;
+}
 
 /* Button small variant (if not provided by theme) */
 .butn.butn-sm { padding: 6px 10px; font-size: 13px; line-height: 1.2; }

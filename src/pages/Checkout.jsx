@@ -11,6 +11,7 @@ import { db } from "../firebase.js";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
 import { trackEvent } from "../utils/analytics.js";
 import { decrementStockForItems } from "../services/inventory.js";
+import { decrementStockForOrder } from "../services/orders.js";
 const USE_CLIENT_STOCK_DECREMENT = String(import.meta.env.VITE_USE_CLIENT_STOCK || '').toLowerCase() === 'true';
 
 export default function CheckoutPage() {
@@ -93,8 +94,8 @@ export default function CheckoutPage() {
           updatedAt: serverTimestamp(),
         };
         const oid = await createOrderDocs(payload);
-        // Decrement stock on client only when explicitly enabled to avoid double-up with Cloud Function
-        if (USE_CLIENT_STOCK_DECREMENT) { try { await decrementStockForItems(items); } catch {} }
+        // Ensure server-side stock decrement (idempotent)
+        try { await decrementStockForOrder(oid); } catch {}
         // Track purchase (COD)
         try {
           trackEvent('purchase', {
@@ -149,8 +150,8 @@ export default function CheckoutPage() {
               updatedAt: serverTimestamp(),
             };
             const oid = await createOrderDocs(payload);
-            // Decrement stock on client only when explicitly enabled to avoid double-up with Cloud Function
-            if (USE_CLIENT_STOCK_DECREMENT) { try { await decrementStockForItems(items); } catch {} }
+            // Ensure server-side stock decrement (idempotent)
+            try { await decrementStockForOrder(oid); } catch {}
             // Track purchase
             try {
               trackEvent('purchase', {

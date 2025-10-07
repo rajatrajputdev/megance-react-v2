@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { doc, serverTimestamp, setDoc, collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebase.js";
+import { updateUserProfileServer } from "../services/profile.js";
 import SEO from "../components/general_components/SEO.jsx";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
 import { INDIAN_STATES } from "../data/indian-states.js";
+import { friendlyOtpError } from "../utils/errors.js";
 
 export default function Account() {
   const { user, profile, profileLoading, logout, startLinkPhone, confirmLinkPhone, startChangePhone, confirmChangePhone } = useAuth();
@@ -57,6 +59,8 @@ export default function Account() {
     }));
   }, [user, profile]);
 
+  // No cooldown timers
+
   // Toasts handled globally
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -69,21 +73,14 @@ export default function Account() {
     if (!user) return;
     setSaving(true);
     try {
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          name: form.name,
-          email: form.email,
-          phone: form.phone,
-          address: form.address,
-          city: form.city,
-          state: form.state,
-          zip: form.zip,
-          phoneVerified: effectiveVerified,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      await updateUserProfileServer({
+        name: form.name,
+        email: form.email,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+      });
       showToast("success", "Profile saved");
     } catch (e) {
       showToast("error", e.message || "Failed to save");
@@ -92,15 +89,18 @@ export default function Account() {
     }
   };
 
+  // No cooldown logic
+
   const sendOtp = async () => {
     setSendingOtp(true);
     try {
       if (editingPhone || baseVerified) await startChangePhone(form.phone);
       else await startLinkPhone(form.phone);
+      setOtpCode("");
       setOtpSent(true);
       showToast("info", "OTP sent");
     } catch (e) {
-      showToast("error", e.message || "Failed to send OTP");
+      showToast("error", friendlyOtpError(e, 'send'));
     } finally {
       setSendingOtp(false);
     }
@@ -109,13 +109,16 @@ export default function Account() {
   const verifyOtp = async () => {
     setVerifyingOtp(true);
     try {
-      if (editingPhone || baseVerified) await confirmChangePhone(otpCode);
-      else await confirmLinkPhone(otpCode);
+      let u;
+      if (editingPhone || baseVerified) u = await confirmChangePhone(otpCode);
+      else u = await confirmLinkPhone(otpCode);
       setOtpVerified(true);
       setEditingPhone(false);
+      try { if (u?.phoneNumber) setForm((f) => ({ ...f, phone: u.phoneNumber })); } catch {}
       showToast("success", "Phone verified");
     } catch (e) {
-      showToast("error", e.message || "Invalid OTP");
+      showToast("error", friendlyOtpError(e, 'verify'));
+      setOtpCode("");
     } finally {
       setVerifyingOtp(false);
     }
@@ -171,7 +174,9 @@ export default function Account() {
                       {!otpSent ? (
                         <>
                           <div className="form-hint">We’ll send a one-time code to verify this number.</div>
-                          <button type="button" className="butn butn-sm butn-rounded mt-6" disabled={sendingOtp} onClick={sendOtp}>{sendingOtp ? "Sending…" : "Send OTP"}</button>
+                          <button type="button" className="butn butn-sm butn-rounded mt-6" disabled={sendingOtp} onClick={sendOtp}>
+                            {sendingOtp ? "Sending…" : "Send OTP"}
+                          </button>
                         </>
                       ) : (
                         <>

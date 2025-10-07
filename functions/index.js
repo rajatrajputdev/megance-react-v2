@@ -1,5 +1,6 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
-const { onRequest } = require('firebase-functions/v2/https');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
+const functions = require('firebase-functions');
 const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
@@ -7,19 +8,12 @@ const crypto = require('crypto');
 
 try { admin.initializeApp(); } catch (_) {}
 
+const REGION = process.env.FUNCTIONS_REGION || 'asia-south2';
+
 // Owner email to receive order copies
 const OWNER_EMAIL = 'megancetech@gmail.com';
 
-// Secrets: set with `firebase functions:secrets:set`
-const MAIL_USER = defineSecret('MAIL_USER');
-const MAIL_PASS = defineSecret('MAIL_PASS');
-const MAIL_FROM = defineSecret('MAIL_FROM');
-const MAIL_HOST = defineSecret('MAIL_HOST'); // optional, for custom SMTP
-const MAIL_PORT = defineSecret('MAIL_PORT'); // optional, for custom SMTP
-
-// Razorpay secrets (do NOT expose on client)
-const RAZORPAY_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
-const RAZORPAY_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');
+// Secrets are used conditionally below to avoid requiring setup in dev
 
 function buildTransporter(env) {
   const user = env.MAIL_USER || '';
@@ -93,10 +87,20 @@ function renderOrderEmail({ orderId, data }) {
   return { html, text };
 }
 
+function findCaseInsensitiveKey(obj, key) {
+  if (!obj || typeof obj !== 'object') return null;
+  if (Object.prototype.hasOwnProperty.call(obj, key)) return key;
+  const low = String(key || '').toLowerCase();
+  for (const k of Object.keys(obj)) {
+    if (String(k).toLowerCase() === low) return k;
+  }
+  return null;
+}
+
+if (process.env.EMAIL_ENABLED === 'true') {
 exports.sendOwnerEmailOnOrder = onDocumentCreated({
   document: 'orders/{orderId}',
-  region: 'asia-south2',
-  secrets: [MAIL_USER, MAIL_PASS, MAIL_FROM, MAIL_HOST, MAIL_PORT],
+  region: REGION,
 }, async (event) => {
   const snap = event.data;
   if (!snap) return;
@@ -104,11 +108,11 @@ exports.sendOwnerEmailOnOrder = onDocumentCreated({
   if (!data) return;
 
   const env = {
-    MAIL_USER: MAIL_USER.value(),
-    MAIL_PASS: MAIL_PASS.value(),
-    MAIL_FROM: MAIL_FROM.value(),
-    MAIL_HOST: MAIL_HOST.value(),
-    MAIL_PORT: MAIL_PORT.value(),
+    MAIL_USER: process.env.MAIL_USER || '',
+    MAIL_PASS: process.env.MAIL_PASS || '',
+    MAIL_FROM: process.env.MAIL_FROM || '',
+    MAIL_HOST: process.env.MAIL_HOST || '',
+    MAIL_PORT: process.env.MAIL_PORT || '',
   };
 
   if (!env.MAIL_USER || !env.MAIL_PASS) {
@@ -130,12 +134,13 @@ exports.sendOwnerEmailOnOrder = onDocumentCreated({
     html,
   });
 });
+}
 
 // Decrement product stock when an order is created.
 // Idempotent via an order flag `stockDeducted` in the same transaction.
 exports.decrementStockOnOrder = onDocumentCreated({
   document: 'orders/{orderId}',
-  region: 'asia-south2',
+  region: REGION,
 }, async (event) => {
   const db = admin.firestore();
   const orderId = event.params.orderId;
@@ -153,7 +158,10 @@ exports.decrementStockOnOrder = onDocumentCreated({
         const idx = base.lastIndexOf(`-s${size}`);
         base = idx !== -1 ? base.slice(0, idx) : base;
       }
-      if (!gender) {
+      // Strip gender suffix from base id if present (regardless of whether meta.gender exists)
+      if (gender && (base.endsWith(`-${gender}`))) {
+        base = base.slice(0, -(`-${gender}`).length);
+      } else if (!gender) {
         if (base.endsWith('-men')) { gender = 'men'; base = base.slice(0, -4); }
         else if (base.endsWith('-women')) { gender = 'women'; base = base.slice(0, -6); }
       }
@@ -197,12 +205,13 @@ exports.decrementStockOnOrder = onDocumentCreated({
         const sq = { ...data.sizeQuantities };
         for (const p of parts) {
           if (!p.size || !p.gender) continue;
-          const arr = Array.isArray(sq[p.gender]) ? [...sq[p.gender]] : [];
+          const gkey = findCaseInsensitiveKey(sq, p.gender);
+          const arr = gkey && Array.isArray(sq[gkey]) ? [...sq[gkey]] : [];
           const idx = arr.findIndex((r) => String(r.size) === String(p.size));
           if (idx !== -1) {
             const cur = Number(arr[idx].quantity) || 0;
             arr[idx] = { ...arr[idx], quantity: Math.max(0, cur - p.qty) };
-            sq[p.gender] = arr;
+            if (gkey) sq[gkey] = arr;
           }
         }
         updates.sizeQuantities = sq;
@@ -226,6 +235,26 @@ exports.decrementStockOnOrder = onDocumentCreated({
         updates.sizes = sizes;
         topQty = sizes.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
         applied = true;
+      } else if (data.sizes && typeof data.sizes === 'object') {
+        const smap = { ...data.sizes };
+        for (const p of parts) {
+          if (!p.size) continue;
+          const gkey = findCaseInsensitiveKey(smap, p.gender || '');
+          const arr = gkey && Array.isArray(smap[gkey]) ? [...smap[gkey]] : [];
+          const objIdx = arr.findIndex((r) => r && typeof r === 'object' && String(r.size) === String(p.size));
+          if (objIdx !== -1) {
+            const cur = Number(arr[objIdx].quantity) || 0;
+            arr[objIdx] = { ...arr[objIdx], quantity: Math.max(0, cur - p.qty) };
+            if (gkey) smap[gkey] = arr;
+          }
+        }
+        updates.sizes = smap;
+        topQty = 0;
+        for (const g of Object.keys(smap)) {
+          const arr = Array.isArray(smap[g]) ? smap[g] : [];
+          topQty += arr.reduce((a, b) => a + (b && typeof b === 'object' ? (Number(b.quantity) || 0) : 0), 0);
+        }
+        applied = true;
       } else {
         // Fallback: no per-size quantities present. Decrement top-level quantity only.
         const totalQty = parts.reduce((a, b) => a + (Number(b.qty) || 0), 0);
@@ -247,9 +276,11 @@ exports.decrementStockOnOrder = onDocumentCreated({
   });
 });
 
-// Create a Razorpay Order on the server to avoid exposing secrets and to enable secure signature verification
+// Razorpay Order endpoints (require secrets to be set)
+const RAZORPAY_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
+const RAZORPAY_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');
 exports.createRazorpayOrder = onRequest({
-  region: 'asia-south2',
+  region: REGION,
   cors: true,
   secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET],
 }, async (req, res) => {
@@ -289,7 +320,7 @@ exports.createRazorpayOrder = onRequest({
 
 // Verify Razorpay signature and mark order as paid
 exports.verifyRazorpaySignature = onRequest({
-  region: 'asia-south2',
+  region: REGION,
   cors: true,
   secrets: [RAZORPAY_KEY_SECRET],
 }, async (req, res) => {
@@ -320,5 +351,248 @@ exports.verifyRazorpaySignature = onRequest({
     res.status(200).json({ ok: true, valid: true });
   } catch (e) {
     res.status(500).json({ error: e?.message || 'Internal error' });
+  }
+});
+
+// Callable: decrement stock for a given order id (idempotent), owned by the caller
+exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
+  const uid = req.auth?.uid;
+  const orderId = String(req.data?.orderId || '');
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
+  if (!orderId) throw new HttpsError('invalid-argument', 'orderId is required');
+
+  const db = admin.firestore();
+  const orderRef = db.doc(`orders/${orderId}`);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) throw new HttpsError('not-found', 'Order not found');
+  const order = orderSnap.data() || {};
+  if (order.userId && order.userId !== uid) throw new HttpsError('permission-denied', 'Not your order');
+  if (order.stockDeducted === true) return { ok: true, already: true };
+
+  function parseItem(it) {
+    try {
+      const meta = it.meta || {};
+      let size = meta.size ? String(meta.size) : '';
+      let gender = meta.gender || null;
+      let id = String(it.id || '');
+      let base = id;
+      if (size) {
+        const idx = base.lastIndexOf(`-s${size}`);
+        base = idx !== -1 ? base.slice(0, idx) : base;
+      }
+      if (gender && (base.endsWith(`-${gender}`))) {
+        base = base.slice(0, -(`-${gender}`).length);
+      } else if (!gender) {
+        if (base.endsWith('-men')) { gender = 'men'; base = base.slice(0, -4); }
+        else if (base.endsWith('-women')) { gender = 'women'; base = base.slice(0, -6); }
+      }
+      return { productId: base, size, gender, qty: Number(it.qty) || 0 };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(orderRef);
+    if (!fresh.exists) throw new HttpsError('not-found', 'Order missing');
+    if (fresh.get('stockDeducted') === true) return;
+    const items = Array.isArray(fresh.get('items')) ? fresh.get('items') : [];
+    const grouped = new Map();
+    for (const it of items) {
+      const p = parseItem(it);
+      if (!p || !p.productId) continue;
+      if (!grouped.has(p.productId)) grouped.set(p.productId, []);
+      grouped.get(p.productId).push(p);
+    }
+
+    for (const [productId, parts] of grouped.entries()) {
+      const ref = db.doc(`products/${productId}`);
+      const snap = await tx.get(ref);
+      if (!snap.exists) continue;
+      const data = snap.data() || {};
+      let updates = {};
+      let topQty = Number(data.quantity) || 0;
+      let applied = false;
+
+      if (data.sizeQuantities && typeof data.sizeQuantities === 'object') {
+        const sq = { ...data.sizeQuantities };
+        for (const p of parts) {
+          if (!p.size || !p.gender) continue;
+          const gkey = findCaseInsensitiveKey(sq, p.gender);
+          const arr = gkey && Array.isArray(sq[gkey]) ? [...sq[gkey]] : [];
+          const idx = arr.findIndex((r) => String(r.size) === String(p.size));
+          if (idx !== -1) {
+            const cur = Number(arr[idx].quantity) || 0;
+            arr[idx] = { ...arr[idx], quantity: Math.max(0, cur - p.qty) };
+            if (gkey) sq[gkey] = arr;
+          }
+        }
+        updates.sizeQuantities = sq;
+        topQty = 0;
+        for (const g of Object.keys(sq)) {
+          const arr = Array.isArray(sq[g]) ? sq[g] : [];
+          topQty += arr.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+        }
+        applied = true;
+      } else if (Array.isArray(data.sizes) && data.sizes.length && typeof data.sizes[0] === 'object') {
+        const sizes = [...data.sizes];
+        for (const p of parts) {
+          if (!p.size) continue;
+          const idx = sizes.findIndex((r) => String(r.size) === String(p.size));
+          if (idx !== -1) {
+            const cur = Number(sizes[idx].quantity) || 0;
+            sizes[idx] = { ...sizes[idx], quantity: Math.max(0, cur - p.qty) };
+          }
+        }
+        updates.sizes = sizes;
+        topQty = sizes.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+        applied = true;
+      } else if (data.sizes && typeof data.sizes === 'object') {
+        const smap = { ...data.sizes };
+        for (const p of parts) {
+          if (!p.size) continue;
+          const gkey = findCaseInsensitiveKey(smap, p.gender || '');
+          const arr = gkey && Array.isArray(smap[gkey]) ? [...smap[gkey]] : [];
+          const objIdx = arr.findIndex((r) => r && typeof r === 'object' && String(r.size) === String(p.size));
+          if (objIdx !== -1) {
+            const cur = Number(arr[objIdx].quantity) || 0;
+            arr[objIdx] = { ...arr[objIdx], quantity: Math.max(0, cur - p.qty) };
+            if (gkey) smap[gkey] = arr;
+          }
+        }
+        updates.sizes = smap;
+        topQty = 0;
+        for (const g of Object.keys(smap)) {
+          const arr = Array.isArray(smap[g]) ? smap[g] : [];
+          topQty += arr.reduce((a, b) => a + (b && typeof b === 'object' ? (Number(b.quantity) || 0) : 0), 0);
+        }
+        applied = true;
+      } else {
+        const totalQty = parts.reduce((a, b) => a + (Number(b.qty) || 0), 0);
+        topQty = Math.max(0, topQty - totalQty);
+        applied = true;
+      }
+
+      if (applied) {
+        updates.quantity = topQty;
+        updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+        tx.set(ref, updates, { merge: true });
+      }
+    }
+
+    tx.update(orderRef, {
+      stockDeducted: true,
+      stockDeductedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  return { ok: true };
+});
+// Create or hydrate a user profile on first sign-in (optional: disabled by default)
+if (process.env.IDENTITY_ENABLED === 'true') {
+  exports.onUserCreated = functions
+  .region(REGION)
+  .auth.user()
+  .onCreate(async (user) => {
+      if (!user || !user.uid) return;
+      const { uid, displayName, email, phoneNumber } = user;
+      const db = admin.firestore();
+      const ref = db.doc(`users/${uid}`);
+      try {
+        await ref.set({
+          name: displayName || '',
+          email: email || '',
+          phone: phoneNumber || '',
+          phoneVerified: !!phoneNumber,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } catch (e) {
+        console.error('[onUserCreated] failed to create profile', e?.message || e);
+      }
+    });
+}
+
+// Authenticated profile update (server authoritative)
+exports.updateUserProfile = onRequest({
+  region: REGION,
+  cors: true,
+}, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'Method Not Allowed' }); return; }
+    const authHeader = String(req.headers.authorization || '');
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!idToken) { res.status(401).json({ error: 'Missing Authorization' }); return; }
+    let decoded;
+    try {
+      decoded = await admin.auth().verifyIdToken(idToken);
+    } catch (e) {
+      res.status(401).json({ error: 'Invalid token' });
+      return;
+    }
+    const uid = decoded.uid;
+
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const trim = (v, max = 240) => typeof v === 'string' ? v.trim().slice(0, max) : '';
+    const payload = {
+      name: trim(body.name, 120),
+      email: trim(body.email, 200),
+      address: trim(body.address, 240),
+      city: trim(body.city, 120),
+      state: trim(body.state, 120),
+      zip: trim(body.zip, 32),
+    };
+
+    // Derive phone and verification status from auth record (authoritative)
+    const userRecord = await admin.auth().getUser(uid);
+    const phone = userRecord.phoneNumber || '';
+    const email = userRecord.email || '';
+    const profile = {
+      ...payload,
+      email: email || '',
+      phone,
+      phoneVerified: !!phone,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await admin.firestore().doc(`users/${uid}`).set(profile, { merge: true });
+    res.status(200).json({ ok: true, profile: { ...profile, updatedAt: Date.now() } });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || 'Internal error' });
+  }
+});
+
+// Callable variant for frontend (avoids CORS/base-URL issues)
+exports.updateUserProfileCallable = onCall({ region: REGION }, async (req) => {
+  try {
+    const uid = req.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
+    const body = req.data || {};
+    const trim = (v, max = 240) => typeof v === 'string' ? v.trim().slice(0, max) : '';
+    const payload = {
+      name: trim(body.name, 120),
+      email: trim(body.email, 200),
+      address: trim(body.address, 240),
+      city: trim(body.city, 120),
+      state: trim(body.state, 120),
+      zip: trim(body.zip, 32),
+    };
+
+    const userRecord = await admin.auth().getUser(uid);
+    const phone = userRecord.phoneNumber || '';
+    const email = userRecord.email || '';
+    const profile = {
+      ...payload,
+      email: email || payload.email || '',
+      phone,
+      phoneVerified: !!phone,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await admin.firestore().doc(`users/${uid}`).set(profile, { merge: true });
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    throw new HttpsError('internal', e?.message || 'Internal error');
   }
 });

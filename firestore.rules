@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Client must not create/update protected fields; server (Admin SDK) bypasses rules
+    function notChangingProtected() {
+      return !request.resource.data.keys().hasAny(["phone", "phoneVerified"]);
+    }
+
+    // User profile
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && notChangingProtected();
+      allow delete: if false;
+
+      // User orders subcollection (client may create own view copy)
+      match /orders/{orderId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update, delete: if false;
+      }
+    }
+
+    // Top-level orders created by client and used by Cloud Functions
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false; // Server (Admin SDK) bypasses rules
+    }
+
+    // Public catalog
+    match /products/{productId} {
+      allow read: if true;  // public catalog can be read by anyone
+      allow create, update, delete: if false; // edits only via server/admin
+    }
+
+    // Default: deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

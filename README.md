@@ -38,3 +38,9 @@ Security & Payments
   4. Only after successful verification, treat the order as paid in your UI and back office.
 
   The existing Checkout flow still supports a simplified client-only payment for development. Transition to the server flow before going live.
+
+Onboarding & Profiles
+
+- Phone verification is authoritative via Firebase Auth (we check `user.phoneNumber`). The client no longer sets `phoneVerified`; the server writes it based on the auth record.
+- User profile writes are routed to a Firebase Function `updateUserProfile` which validates the ID token and persists the profile on the server. Set `VITE_FUNCTIONS_BASE_URL` in your environment.
+- A server trigger `onUserCreated` initializes a `users/{uid}` document on first sign-in.

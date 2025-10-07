@@ -308,7 +308,7 @@ export default function ProductPage() {
                       disabled={disabled}
                       title={disabled ? "Out of stock" : `Size ${s}`}
                     >
-                      {s}
+                      {s}{disabled && <span className="pill-badge">Out</span>}
                     </button>
                   );
                 })}
@@ -319,8 +319,11 @@ export default function ProductPage() {
               {!size && sizes.length > 0 && (
                 <div className="inline-hint">Select the available size</div>
               )}
-              {size && Number.isFinite(remainingForSize) && remainingForSize !== Infinity && (
+              {size && Number.isFinite(remainingForSize) && remainingForSize !== Infinity && remainingForSize > 0 && (
                 <div className="inline-hint">Only {remainingForSize} left</div>
+              )}
+              {size && Number.isFinite(remainingForSize) && remainingForSize === 0 && (
+                <div className="inline-error">Out of stock</div>
               )}
             </div>
 
@@ -357,8 +360,8 @@ export default function ProductPage() {
                   addItem(cartProduct, clamped);
                   try { showToast('success', 'Added to cart'); } catch {}
                 }}
-                disabled={!size || (Number.isFinite(maxQtyForSize) && maxQtyForSize <= 0)}
-                title={!size ? "Select a size" : (maxQtyForSize <= 0 ? "Out of stock" : "Add to Cart")}
+                disabled={!size || (Number.isFinite(maxQtyForSize) && maxQtyForSize <= 0) || remainingForSize === 0}
+                title={!size ? "Select a size" : ((Number.isFinite(maxQtyForSize) && maxQtyForSize <= 0) || remainingForSize === 0 ? "Out of stock" : "Add to Cart")}
               >
                 Add to Cart
               </button>

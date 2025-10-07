@@ -38,6 +38,19 @@
 .shop-name { font-weight: 600; color: #111; font-size: 15px; }
 .shop-price { color: #444; font-size: 14px; }
 
+/* Out of stock badge on list cards */
+.stock-badge.oos {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  border-radius: 999px;
+  border: 1px solid #f0b7b7;
+  background: #fdecec;
+  color: #a61717;
+}
+
 .shop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .shop-btn { height: 40px; border-radius: 0; border: 1px solid #111; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; letter-spacing: .2px; text-decoration: none; cursor: pointer; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
 .shop-btn--secondary { background: #fff; color: #111; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useLocation, useNavigate } from "react-router-dom";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { db } from "../firebase.js";
+// Profile is updated via server function; no direct Firestore writes here
+import { updateUserProfileServer } from "../services/profile.js";
 import SEO from "../components/general_components/SEO.jsx";
+import { friendlyOtpError } from "../utils/errors.js";
 import { INDIAN_STATES } from "../data/indian-states.js";
 
 export default function Setup() {
@@ -16,8 +17,7 @@ export default function Setup() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
-  const [resendIn, setResendIn] = useState(0);
-  const timerRef = useRef(null);
+  // Cooldown removed for simplicity (instant resend allowed)
   const otpInputRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -62,13 +62,9 @@ export default function Setup() {
     }
   }, [otpSent]);
 
-  // Cleanup cooldown timer
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
+  // No cooldown timers
 
+  // Treat server-auth phone as source of truth; otpVerified just gates the UI button
   const isPhoneVerified = Boolean(user?.phoneNumber) || profile?.phoneVerified === true || otpVerified === true;
   const canSave = !!form.name && !!form.phone && !!form.address && !!form.city && !!form.state && !!form.zip && isPhoneVerified;
 
@@ -79,22 +75,15 @@ export default function Setup() {
     setSaving(true);
     setErr("");
     try {
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          name: form.name || user.displayName || "",
-          email: user.email || "",
-          phone: form.phone,
-          address: form.address,
-          city: form.city,
-          state: form.state,
-          zip: form.zip,
-          phoneVerified: true,
-          updatedAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      // Use server to persist profile; server derives phone + phoneVerified from auth
+      await updateUserProfileServer({
+        name: form.name || user.displayName || "",
+        email: user.email || "",
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+      });
       navigate(from, { replace: true });
     } catch (e) {
       setErr(e.message || "Failed to save profile");
@@ -103,31 +92,19 @@ export default function Setup() {
     }
   };
 
-  const startCooldown = (secs = 30) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setResendIn(secs);
-    timerRef.current = setInterval(() => {
-      setResendIn((s) => {
-        if (s <= 1) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-  };
+  // No cooldown logic
 
   const sendOtp = async () => {
     setErr(""); setMsg("");
     setSendingOtp(true);
     try {
       await startLinkPhone(form.phone);
+      setOtpCode("");
+      setErr("");
       setOtpSent(true);
       setMsg("OTP sent to your phone");
-      startCooldown(30);
     } catch (e) {
-      setErr(e.message || "Failed to send OTP");
+      setErr(friendlyOtpError(e, 'send'));
     } finally {
       setSendingOtp(false);
     }
@@ -137,12 +114,13 @@ export default function Setup() {
     setErr(""); setMsg("");
     setVerifyingOtp(true);
     try {
-      await confirmLinkPhone(otpCode);
+      const u = await confirmLinkPhone(otpCode);
+      try { if (u?.phoneNumber) setForm((f) => ({ ...f, phone: u.phoneNumber })); } catch {}
       setOtpVerified(true);
       setMsg("Phone verified");
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; setResendIn(0); }
     } catch (e) {
-      setErr(e.message || "Invalid OTP");
+      setErr(friendlyOtpError(e, 'verify'));
+      setOtpCode("");
     } finally {
       setVerifyingOtp(false);
     }
@@ -201,9 +179,7 @@ export default function Setup() {
                                 ref={otpInputRef}
                               />
                               <button type="button" className="butn butn-sm butn-rounded" disabled={verifyingOtp} onClick={verifyOtp}>{verifyingOtp ? "Verifying…" : "Verify OTP"}</button>
-                              <button type="button" className="underline" disabled={sendingOtp || resendIn > 0} onClick={sendOtp} title={resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend OTP'}>
-                                {resendIn > 0 ? `Resend (${resendIn}s)` : 'Resend'}
-                              </button>
+                              <button type="button" className="underline" disabled={sendingOtp} onClick={sendOtp}>Resend</button>
                             </div>
                           </>
                         )}

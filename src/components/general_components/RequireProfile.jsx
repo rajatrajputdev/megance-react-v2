@@ -2,7 +2,7 @@ import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 
 export default function RequireProfile({ children }) {
-  const { user, profile, profileLoading, initializing } = useAuth();
+  const { user, profileLoading, initializing } = useAuth();
   const location = useLocation();
 
   if (initializing || profileLoading) {
@@ -13,8 +13,9 @@ export default function RequireProfile({ children }) {
     );
   }
   if (!user) return children; // RequireAuth handles auth
-  // Require a profile and a verified phone
-  if (!profile || !profile.phone || profile.phoneVerified !== true) {
+  // Production: require verified phone on the auth record
+  const hasServerPhone = Boolean(user?.phoneNumber);
+  if (!hasServerPhone) {
     const from = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/setup?from=${from}`} replace />;
   }

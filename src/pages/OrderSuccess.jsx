@@ -1,11 +1,22 @@
+import { useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
 import SEO from "../components/general_components/SEO.jsx";
+import { decrementStockForOrder } from "../services/orders.js";
 
 export default function OrderSuccess() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   const pid = params.get("pid");
   const oid = params.get("oid");
+
+  useEffect(() => {
+    if (!oid) return;
+    let alive = true;
+    (async () => {
+      try { await decrementStockForOrder(oid); } catch {}
+    })();
+    return () => { alive = false; };
+  }, [oid]);
 
   return (
     <>
