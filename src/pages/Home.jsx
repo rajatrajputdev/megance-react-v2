@@ -8,13 +8,9 @@ import Testimonials from "../components/homepage_components/Testimonials.jsx";
 import FAQ2 from "../components/homepage_components/FAQ2.jsx";
 import Newsletter from "../components/homepage_components/Newsletter.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
-import { products } from "../data/products.js";
 import SEO from "../components/general_components/SEO.jsx";
-import { useCart } from "../context/CartContext.jsx";
-import { Link } from "react-router-dom";
 
 export default function Home() {
-  const { addItem } = useCart();
   return (
     <>
       <SEO title="Home" description="Elevate every turn with bold, sleek footwear engineered for comfort and performance." image="/assets/logo.svg" type="website" twitterCard="summary" />
@@ -25,7 +21,6 @@ export default function Home() {
         <Marquee />
         <ZellerSection />
         {/* <GalleryYellow /> */}
-        {/* Featured products with Add to Cart */}
         {/* <section className="container page-section">
           <div className="row mb-30 text-center">
             <div className="col-12">

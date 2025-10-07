@@ -1,30 +1,104 @@
 import { useParams, Link } from "react-router-dom";
-import { getProductById } from "../data/products.js";
+import { fetchProductById } from "../services/products";
 import { useCart } from "../context/CartContext.jsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
 import "./product.css";
+import { useToast } from "../components/general_components/ToastProvider.jsx";
 
 export default function ProductPage() {
   const { id } = useParams();
-  const product = getProductById(id);
-  const { addItem } = useCart();
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const load = async () => {
+    let canceled = false;
+    try {
+      setError("");
+      setLoading(true);
+      const p = await fetchProductById(id);
+      if (canceled) return;
+      setProduct(p);
+    } catch (e) {
+      if (canceled) return;
+      setError("Failed to load product. Please try again.");
+    } finally {
+      if (!canceled) setLoading(false);
+    }
+    return () => { canceled = true; };
+  };
+  useEffect(() => { const c = load(); return () => { try { c?.(); } catch {} }; }, [id]);
+  const { addItem, items } = useCart();
+  const { showToast } = useToast();
   const [qty, setQty] = useState(1);
   const [gender, setGender] = useState("men");
   const [size, setSize] = useState("");
 
-  const genderOptions = useMemo(() => product?.genders || ["men", "women"], [product]);
-  const sizes = useMemo(() => (product?.sizes?.[gender] || []), [product, gender]);
+  const hasGenders = useMemo(() => Array.isArray(product?.genders) && product.genders.length > 0, [product]);
+  const genderOptions = useMemo(() => (hasGenders ? product.genders : []), [hasGenders, product]);
+  const sizes = useMemo(() => {
+    if (!product) return [];
+    if (hasGenders) {
+      const q = product?.sizeQuantities?.[gender];
+      if (Array.isArray(q) && q.length) {
+        return q.filter((s) => (s?.quantity ?? 0) > 0).map((s) => String(s.size));
+      }
+      const raw = product?.sizes?.[gender] || [];
+      if (Array.isArray(raw)) return raw.map((s) => (typeof s === 'object' ? String(s.size) : String(s)));
+      return [];
+    }
+    const raw = product?.sizes || [];
+    if (Array.isArray(raw)) {
+      if (raw.length && typeof raw[0] === 'object') {
+        return raw.filter((s) => (s?.quantity ?? 0) > 0).map((s) => String(s.size));
+      }
+      return raw.map((s) => (typeof s === 'object' ? String(s.size) : String(s)));
+    }
+    return [];
+  }, [product, gender, hasGenders]);
+
+  const maxQtyForSize = useMemo(() => {
+    if (!product || !size) return Infinity;
+    if (hasGenders) {
+      const list = product?.sizeQuantities?.[gender];
+      if (Array.isArray(list)) {
+        const row = list.find((r) => String(r.size) === String(size));
+        return Math.max(0, Number(row?.quantity) || 0);
+      }
+      return Infinity;
+    }
+    if (Array.isArray(product?.sizes) && product.sizes.length && typeof product.sizes[0] === 'object') {
+      const row = product.sizes.find((r) => String(r.size) === String(size));
+      return Math.max(0, Number(row?.quantity) || 0);
+    }
+    return Infinity;
+  }, [product, hasGenders, gender, size]);
+
+  const remainingForSize = useMemo(() => {
+    if (!size) return maxQtyForSize;
+    const id = `${product?.id}${hasGenders ? `-${gender}` : ''}-s${size}`;
+    const inCart = (items || []).find((x) => x.id === id)?.qty || 0;
+    if (!Number.isFinite(maxQtyForSize)) return Infinity;
+    return Math.max(0, maxQtyForSize - inCart);
+  }, [items, product?.id, hasGenders, gender, size, maxQtyForSize]);
 
   // Initialize gender based on product availability
   useEffect(() => {
-    if (product?.genders && product.genders.length > 0) {
+    if (hasGenders) {
       setGender(product.genders[0]);
       setSize("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id]);
+  }, [product?.id, hasGenders]);
+
+  // If only one size available (for current gender), preselect it
+  useEffect(() => {
+    if (Array.isArray(sizes) && sizes.length === 1) {
+      setSize(String(sizes[0]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sizes.join(',')]);
 
   // Ensure page is scrolled to top when viewing a product
   useEffect(() => {
@@ -72,18 +146,59 @@ export default function ProductPage() {
   const onMediaLeave = () => { setLensVisible(false); };
 
   const cartProduct = useMemo(() => {
-    if (!size || !gender) return product;
+    if (!product) return null;
+    if (!size) return product;
+    const genderPart = hasGenders ? `-${gender}` : "";
     return {
       ...product,
-      id: `${product.id}-${gender}-s${size}`,
-      name: `${product.name} (${gender === 'men' ? 'Men' : 'Women'} Size ${size})`,
-      meta: { gender, size },
+      id: `${product.id}${genderPart}-s${size}`,
+      name: hasGenders ? `${product.name} (${gender === 'men' ? 'Men' : 'Women'} Size ${size})` : `${product.name} (Size ${size})`,
+      meta: hasGenders ? { gender, size } : { size },
     };
-  }, [product, size, gender]);
+  }, [product, size, gender, hasGenders]);
+
+  // Image + JSON-LD should not be behind conditional returns; compute early
+  const imageSrc = product?.imageUrl || product?.image || "/assets/logo.svg";
+  const productJsonLd = useMemo(() => {
+    if (!product) return null;
+    const availability = (Number(product.quantity) || 0) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock";
+    const url = (typeof window !== 'undefined' && window.location) ? window.location.href : `/product/${product.id}`;
+    const data = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: product.name,
+      image: [imageSrc],
+      description: product.description || "",
+      sku: product.id,
+      brand: { "@type": "Brand", name: "Megance" },
+      offers: {
+        "@type": "Offer",
+        priceCurrency: "INR",
+        price: Number(product.price) || 0,
+        availability,
+        url,
+      },
+    };
+    try { return JSON.stringify(data); } catch { return null; }
+  }, [product, imageSrc]);
 
   // No zoom interactions; keep image normal and contained.
 
-  if (!product) {
+  if (!loading && error) {
+    return (
+      <>
+        <SEO title="Error" description="Problem loading product." image="/assets/logo.svg" type="website" twitterCard="summary" />
+        <section className="container pt-60 pb-60" role="alert" aria-live="assertive">
+          <h3>We couldn’t load this product</h3>
+          <p className="mt-10">{error}</p>
+          <button className="butn mt-10" onClick={load}>Retry</button>
+          <Link to="/shop" className="butn mt-10 ml-10">Back to Shop</Link>
+        </section>
+      </>
+    );
+  }
+
+  if (!loading && !product) {
     return (
       <>
         <SEO title="Product Not Found" description="The product you are looking for is not available." image="/assets/logo.svg" type="website" twitterCard="summary" />
@@ -95,9 +210,31 @@ export default function ProductPage() {
     );
   }
 
+  if (loading) {
+    return (
+      <>
+        <SEO title="Loading Product" description="Loading product details" image="/assets/logo.svg" type="website" twitterCard="summary" />
+        <section className="container page-section nav-offset product-page-wrap">
+          <div className="row">
+            <div className="col-md-6 mb-20">
+              <div className="pd-media"><div className="skeleton skeleton-image" style={{ width: '100%', height: 380 }} /></div>
+            </div>
+            <div className="col-md-6">
+              <div className="skeleton skeleton-line" style={{ width: '60%', height: 28 }} />
+              <div className="skeleton skeleton-line" style={{ width: '30%', height: 22, marginTop: 10 }} />
+              <div className="skeleton skeleton-line" style={{ width: '100%', height: 16, marginTop: 20 }} />
+              <div className="skeleton skeleton-line" style={{ width: '90%', height: 16, marginTop: 10 }} />
+              <div className="skeleton skeleton-line" style={{ width: '80%', height: 16, marginTop: 10 }} />
+            </div>
+          </div>
+        </section>
+      </>
+    );
+  }
+
   return (
     <>
-      <SEO title={product.name} description={product.description} image={product.image} type="product" twitterCard="summary_large_image" />
+      <SEO title={product.name} description={product.description} image={imageSrc} type="product" twitterCard="summary_large_image" />
       <section className="container page-section nav-offset product-page-wrap" onClick={(e)=>{ /* prevent any bubbling handlers */ e.stopPropagation(); }}>
         <div className="row">
           <div className="col-md-6 mb-20">
@@ -108,7 +245,7 @@ export default function ProductPage() {
               onMouseLeave={onMediaLeave}
               onMouseMove={onMediaMove}
             >
-              <img src={product.image} alt={product.name} className="img-fluid" />
+              <img src={imageSrc} alt={product.name} className="img-fluid" />
               {lensVisible && canHover && (
                 <>
                   <div
@@ -116,7 +253,7 @@ export default function ProductPage() {
                     style={{ width: LENS_SIZE, height: LENS_SIZE, transform: `translate(${lensPos.x}px, ${lensPos.y}px)` }}
                   />
                   <div className="pd-zoom-container">
-                    <div className="pd-zoom-image" style={{ backgroundImage: `url(${product.image})`, backgroundPosition: `${zoomPos.x}px ${zoomPos.y}px`, backgroundSize: bgSize }} />
+                    <div className="pd-zoom-image" style={{ backgroundImage: `url(${imageSrc})`, backgroundPosition: `${zoomPos.x}px ${zoomPos.y}px`, backgroundSize: bgSize }} />
                   </div>
                 </>
               )}
@@ -126,47 +263,64 @@ export default function ProductPage() {
             <h2 className="section-title">{product.name}</h2>
             <div className="h4 mt-10">₹ {product.price}</div>
             
-            {/* Gender */}
-            <div className="mt-20">
-              <div className="label-sm">Select Gender</div>
-              <div className="filter-pills mt-10">
-                {genderOptions.map((g) => (
-                  <button
-                    key={g}
-                    className={`pill${gender === g ? ' active' : ''}`}
-                    onClick={() => { setGender(g); setSize(''); }}
-                    type="button"
-                    aria-pressed={gender === g}
-                    aria-label={`Select ${g}`}
-                  >
-                    {g === 'men' ? 'Men' : 'Women'}
-                  </button>
-                ))}
+            {hasGenders && (
+              <div className="mt-20">
+                <div className="label-sm">Select Gender</div>
+                <div className="filter-pills mt-10">
+                  {genderOptions.map((g) => (
+                    <button
+                      key={g}
+                      className={`pill${gender === g ? ' active' : ''}`}
+                      onClick={() => { setGender(g); setSize(''); }}
+                      type="button"
+                      aria-pressed={gender === g}
+                      aria-label={`Select ${g}`}
+                    >
+                      {g === 'men' ? 'Men' : 'Women'}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Sizes (dependent on gender) */}
             <div className="mt-20">
               <div className="label-sm">Select Size</div>
               <div className="filter-pills size-pills mt-10">
-                {sizes.map((s) => (
-                  <button
-                    key={s}
-                    className={`pill${size === s ? " active" : ""}`}
-                    onClick={() => setSize(s)}
-                    type="button"
-                    aria-pressed={size === s}
-                    aria-label={`Select size ${s}`}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {sizes.map((s) => {
+                  let available = Infinity;
+                  if (hasGenders) {
+                    const row = product?.sizeQuantities?.[gender]?.find((r) => String(r.size) === String(s));
+                    available = Number(row?.quantity) || 0;
+                  } else if (Array.isArray(product?.sizes) && product.sizes.length && typeof product.sizes[0] === 'object') {
+                    const row = product.sizes.find((r) => String(r.size) === String(s));
+                    available = Number(row?.quantity) || 0;
+                  }
+                  const disabled = available === 0;
+                  return (
+                    <button
+                      key={s}
+                      className={`pill${size === s ? " active" : ""}`}
+                      onClick={() => setSize(s)}
+                      type="button"
+                      aria-pressed={size === s}
+                      aria-label={`Select size ${s}`}
+                      disabled={disabled}
+                      title={disabled ? "Out of stock" : `Size ${s}`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
               {sizes.length === 0 && (
                 <div className="inline-hint">Not available for the selected gender</div>
               )}
               {!size && sizes.length > 0 && (
                 <div className="inline-hint">Select the available size</div>
+              )}
+              {size && Number.isFinite(remainingForSize) && remainingForSize !== Infinity && (
+                <div className="inline-hint">Only {remainingForSize} left</div>
               )}
             </div>
 
@@ -177,16 +331,34 @@ export default function ProductPage() {
                 <input
                   type="number"
                   min={1}
-                  value={qty}
-                  onChange={(e) => setQty(Math.max(1, parseInt(e.target.value || 1)))}
+                  value={Math.min(qty, Number.isFinite(remainingForSize) ? Math.max(1, remainingForSize) : qty)}
+                  onChange={(e) => {
+                    const val = Math.max(1, parseInt(e.target.value || 1));
+                    const cap = Number.isFinite(remainingForSize) ? remainingForSize : Infinity;
+                    setQty(Math.min(cap, val));
+                  }}
                 />
-                <button onClick={() => setQty((q) => q + 1)} aria-label="Increase">+</button>
+                <button onClick={() => setQty((q) => (Number.isFinite(remainingForSize) ? Math.min(remainingForSize, q + 1) : q + 1))} aria-label="Increase">+</button>
               </div>
               <button
                 className="pp-primary-btn"
-                onClick={() => (size && gender) ? addItem(cartProduct, qty) : null}
-                disabled={!size || !gender}
-                title={!size ? "Select a size" : (!gender ? "Select gender" : "Add to Cart")}
+                onClick={() => {
+                  if (!size) return;
+                  const currentInCart = (() => {
+                    const id = cartProduct?.id;
+                    if (!id) return 0;
+                    const found = (items || []).find((x) => x.id === id);
+                    return Number(found?.qty) || 0;
+                  })();
+                  const max = Number.isFinite(maxQtyForSize) ? maxQtyForSize : Infinity;
+                  const remaining = Math.max(0, max - currentInCart);
+                  const clamped = Math.min(remaining, qty);
+                  if (clamped <= 0) return;
+                  addItem(cartProduct, clamped);
+                  try { showToast('success', 'Added to cart'); } catch {}
+                }}
+                disabled={!size || (Number.isFinite(maxQtyForSize) && maxQtyForSize <= 0)}
+                title={!size ? "Select a size" : (maxQtyForSize <= 0 ? "Out of stock" : "Add to Cart")}
               >
                 Add to Cart
               </button>
@@ -215,6 +387,9 @@ export default function ProductPage() {
           </div>
         </div>
       </section>
+      {productJsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productJsonLd }} />
+      )}
       <Footer />
     </>
   );

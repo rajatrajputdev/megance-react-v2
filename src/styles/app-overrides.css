@@ -12,7 +12,6 @@
   z-index: 9999999;
 }
 
-/* Ensure navbar content is dark on white background */
 .navbar .nav-link,
 .navbar .dropdown-item,
 .navbar .butn {
@@ -173,9 +172,44 @@
 /* Hints */
 .inline-hint { font-size: 12px; opacity: 0.8; margin-top: 6px; }
 .form-hint { font-size: 13px; opacity: 0.85; }
+/* Inline error helper */
+.inline-error { font-size: 12px; color: #dc2626; margin-top: 6px; }
+
+/* Invalid field outline */
+.form-control[aria-invalid="true"] {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.08);
+}
 
 /* Recaptcha holder (container element only; the Google badge may still appear) */
-#recaptcha-container.recaptcha-holder { min-height: 0; }
+.recaptcha-holder { position: fixed; width: 1px; height: 1px; overflow: hidden; left: -9999px; top: -9999px; }
 
 /* Button small variant (if not provided by theme) */
 .butn.butn-sm { padding: 6px 10px; font-size: 13px; line-height: 1.2; }
+
+/* Orders list */
+.orders-list { list-style: none; padding: 0; margin: 0; }
+.order-item { border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: #fff; }
+.badge.status { border-radius: 999px; border: 1px solid #ddd; padding: 3px 10px; font-size: 12px; }
+.badge.status-ordered { background: #eef4ff; border-color: #cfe1ff; color: #194b9b; }
+.badge.status-shipped { background: #fff7ed; border-color: #fde68a; color: #92400e; }
+.badge.status-delivered { background: #edf9f1; border-color: #b9e6c9; color: #0f7a3f; }
+.badge.status-cancelled { background: #fdecec; border-color: #f0b7b7; color: #a61717; }
+
+/* Toasts */
+.toast-stack { position: fixed; right: 16px; bottom: 16px; z-index: 999999; display: grid; gap: 8px; }
+.toast { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid #ddd; background: #fff; box-shadow: 0 8px 20px rgba(0,0,0,0.08); min-width: 240px; max-width: 360px; }
+.toast .toast-dot { width: 10px; height: 10px; border-radius: 50%; background: #9ca3af; }
+.toast.info { border-color: #cfe1ff; background: #eef4ff; }
+.toast.info .toast-dot { background: #2563eb; }
+.toast.success { border-color: #b9e6c9; background: #edf9f1; }
+.toast.success .toast-dot { background: #16a34a; }
+.toast.error { border-color: #f0b7b7; background: #fdecec; }
+.toast.error .toast-dot { background: #dc2626; }
+.toast .toast-text { font-size: 14px; color: #111; }
+.toast .toast-close { appearance: none; border: 0; background: transparent; cursor: pointer; font-size: 16px; line-height: 1; color: #444; padding: 2px 6px; }
+
+/* Sticky order summary on desktop */
+@media (min-width: 992px) {
+  .summary-box { position: sticky; top: 110px; align-self: flex-start; }
+}

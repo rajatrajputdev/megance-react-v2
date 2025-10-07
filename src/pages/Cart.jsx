@@ -3,12 +3,76 @@ import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
+import { useEffect, useMemo, useState } from "react";
+import { fetchProductById } from "../services/products";
 
 export default function CartPage() {
   const { items, updateQty, removeItem, amount } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const isEmpty = items.length === 0;
+
+  // Availability map per cart item id
+  const [limits, setLimits] = useState({}); // { [cartItemId]: availableNumber|Infinity }
+
+  // Helper to parse cart id and extract base product id and size/gender.
+  const parseCartId = (id) => {
+    // We append "-s<size>" and optionally "-men" or "-women" before it.
+    // Safer parsing using meta if available.
+    const item = items.find((x) => x.id === id);
+    const size = item?.meta?.size || (id.includes("-s") ? id.split("-s").pop() : "");
+    const gender = item?.meta?.gender || (/-men-?s|\-men\-s/.test(id) ? "men" : (/-women-?s|\-women\-s/.test(id) ? "women" : null));
+    const baseId = (() => {
+      if (!size) return id; // fallback
+      const idx = id.lastIndexOf(`-s${size}`);
+      if (idx === -1) return id;
+      return id.slice(0, idx);
+    })();
+    return { baseId, size, gender };
+  };
+
+  useEffect(() => {
+    let disposed = false;
+    const load = async () => {
+      const map = {};
+      // Group items by base id to avoid duplicate fetches
+      const byBase = new Map();
+      for (const it of items) {
+        const parsed = parseCartId(it.id);
+        if (!byBase.has(parsed.baseId)) byBase.set(parsed.baseId, []);
+        byBase.get(parsed.baseId).push({ it, parsed });
+      }
+      for (const [baseId, group] of byBase.entries()) {
+        try {
+          const p = await fetchProductById(baseId);
+          for (const { it, parsed } of group) {
+            let available = Infinity;
+            if (parsed.size) {
+              if (parsed.gender && Array.isArray(p?.sizeQuantities?.[parsed.gender])) {
+                const row = p.sizeQuantities[parsed.gender].find((r) => String(r.size) === String(parsed.size));
+                available = Number(row?.quantity) || 0;
+              } else if (Array.isArray(p?.sizes) && p.sizes.length && typeof p.sizes[0] === 'object') {
+                const row = p.sizes.find((r) => String(r.size) === String(parsed.size));
+                available = Number(row?.quantity) || 0;
+              }
+            }
+            map[it.id] = Number.isFinite(available) ? Math.max(0, available) : Infinity;
+          }
+        } catch {
+          for (const { it } of group) map[it.id] = Infinity;
+        }
+      }
+      if (!disposed) setLimits(map);
+    };
+    load();
+    return () => { disposed = true; };
+  }, [items]);
+
+  const clamp = (id, val) => {
+    const lim = limits[id];
+    if (!Number.isFinite(lim)) return Math.max(1, val);
+    return Math.max(1, Math.min(lim, val));
+  };
 
   return (
     <>
@@ -29,6 +93,9 @@ export default function CartPage() {
             <div className="col-12 text-center">
               <p>Your cart is empty.</p>
               <Link to="/shop" className="butn mt-10">Browse products</Link>
+              <div className="mt-10">
+                <Link to="/shop?price=lt3500" className="underline">See Under ₹3500</Link>
+              </div>
             </div>
           </div>
         ) : (
@@ -50,15 +117,25 @@ export default function CartPage() {
                     <div className="d-flex align-items-center mt-20">
                       <label className="mr-15">Quantity</label>
                       <div className="qty-control">
-                        <button onClick={() => updateQty(it.id, it.qty - 1)} aria-label="Decrease">-</button>
+                        <button onClick={() => updateQty(it.id, Math.max(1, it.qty - 1))} aria-label="Decrease">-</button>
                         <input
                           type="number"
                           min={1}
-                          value={it.qty}
-                          onChange={(e) => updateQty(it.id, Math.max(1, parseInt(e.target.value || 1)))}
+                          value={clamp(it.id, it.qty)}
+                          onChange={(e) => updateQty(it.id, clamp(it.id, parseInt(e.target.value || 1)))}
                         />
-                        <button onClick={() => updateQty(it.id, it.qty + 1)} aria-label="Increase">+</button>
+                        <button
+                          onClick={() => updateQty(it.id, clamp(it.id, it.qty + 1))}
+                          aria-label="Increase"
+                          disabled={Number.isFinite(limits[it.id]) && it.qty >= limits[it.id]}
+                          title={Number.isFinite(limits[it.id]) && it.qty >= limits[it.id] ? "Reached available stock" : "Increase"}
+                        >
+                          +
+                        </button>
                       </div>
+                      {Number.isFinite(limits[it.id]) && (
+                        <span className="ml-10 inline-hint">Only {Math.max(0, limits[it.id] - (it.qty - 0))} left</span>
+                      )}
                     </div>
                   </div>
                 </div>

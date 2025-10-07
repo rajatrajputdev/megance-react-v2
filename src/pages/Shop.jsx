@@ -1,15 +1,48 @@
-import { products } from "../data/products.js";
 import { useCart } from "../context/CartContext.jsx";
 import { Link, useLocation } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchProducts } from "../services/products";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
 import "./shop.css";
+import { useToast } from "../components/general_components/ToastProvider.jsx";
 
 export default function Shop() {
   const { addItem } = useCart();
   const location = useLocation();
+  const { showToast } = useToast();
   const [range, setRange] = useState('all');
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    let canceled = false;
+    try {
+      setError("");
+      setLoading(true);
+      const list = await fetchProducts({ visibleOnly: true });
+      if (canceled) return;
+      setItems(list);
+    } catch (e) {
+      if (canceled) return;
+      setError("Failed to load products. Please try again.");
+    } finally {
+      if (!canceled) setLoading(false);
+    }
+    return () => { canceled = true; };
+  };
+
+  useEffect(() => { const c = load(); return () => { try { c?.(); } catch {} }; }, []);
+
+  // Support price filter via query param, e.g. ?price=lt3500
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const p = sp.get('price');
+    if (p && ['all','lt3500','3500to4500','gt4500'].includes(p)) {
+      setRange(p);
+    }
+  }, [location.search]);
 
   const ranges = [
     { id: 'all', label: 'All', test: () => true },
@@ -19,12 +52,12 @@ export default function Shop() {
   ];
 
   const gender = useMemo(() => new URLSearchParams(location.search).get('g') || 'all', [location.search]);
-  const items = useMemo(() => {
+  const filtered = useMemo(() => {
     const byPrice = ranges.find(r => r.id === range)?.test || (() => true);
-    return products
+    return items
       .filter((p) => gender === 'all' ? true : (p.genders || []).includes(gender))
       .filter(byPrice);
-  }, [range, gender]);
+  }, [items, range, gender]);
   return (
     <>
       <SEO title="Shop" description="Explore featured Megance products and find your perfect pair." image="/assets/logo.svg" type="website" twitterCard="summary" />
@@ -62,8 +95,29 @@ export default function Shop() {
           </div>
         </div>
       </div>
+      {error && (
+        <div className="row"><div className="col-12">
+          <div className="inline-hint" role="alert" aria-live="assertive">{error}</div>
+          <button className="butn mt-10" onClick={load}>Retry</button>
+        </div></div>
+      )}
       <div className="row">
-        {items.map((p) => (
+        {loading && Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="col-sm-6 col-md-4 col-lg-3 mb-30">
+            <div className="shop-card skeleton-card">
+              <div className="skeleton skeleton-image" />
+              <div className="shop-meta">
+                <div className="skeleton skeleton-line" style={{ width: '60%' }} />
+                <div className="skeleton skeleton-line" style={{ width: '30%' }} />
+              </div>
+              <div className="shop-actions">
+                <div className="skeleton skeleton-line" />
+                <div className="skeleton skeleton-line" />
+              </div>
+            </div>
+          </div>
+        ))}
+        {!loading && filtered.map((p) => (
           <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
             <div className="shop-card">
               <Link to={`/product/${p.id}`} className="shop-image">
@@ -75,7 +129,15 @@ export default function Shop() {
               </div>
               <div className="shop-actions">
                 <Link to={`/product/${p.id}`} className="shop-btn shop-btn--secondary">View</Link>
-                <button className="shop-btn shop-btn--primary" onClick={() => addItem(p, 1)}>Add</button>
+                <button
+                  className="shop-btn shop-btn--primary"
+                  onClick={() => {
+                    addItem(p, 1);
+                    try { showToast('success', 'Added to cart'); } catch {}
+                  }}
+                >
+                  Add
+                </button>
               </div>
             </div>
           </div>

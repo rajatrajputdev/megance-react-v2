@@ -1,22 +1,41 @@
-import { useEffect, useMemo, useRef } from "react";
-import { products } from "../../data/products.js";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import IntroProductCard from "./IntroProductCard.jsx";
+import { fetchProductsByCategoryName, fetchProductsByTag } from "../../services/products.js";
+import "./intro.css";
 
 export default function Intro() {
   const swiperRef = useRef(null);
   const navigate = useNavigate();
 
-  // Map homepage badges to concrete products in our data
-  const slides = useMemo(
-    () => [
-      { badge: "BESTSELLER", product: products.find(p => p.id === "aeon-eclipse") },
-      { badge: "TRENDING",  product: products.find(p => p.id === "volt-boost-max") },
-      { badge: "HOT",       product: products.find(p => p.id === "stride-runner-pro") },
-      { badge: "NEW",       product: products.find(p => p.id === "echo-flex-zoom") },
-    ].filter(s => !!s.product),
-    []
-  );
+  const [slides, setSlides] = useState([]);
+  // Load featured items for homepage: bestseller, trending, hot, new
+  useEffect(() => {
+    let canceled = false;
+    const fetchOne = async (label) => {
+      let list = await fetchProductsByCategoryName(label, { visibleOnly: true, limit: 1 });
+      if (!Array.isArray(list) || list.length === 0) {
+        list = await fetchProductsByTag(label, { visibleOnly: true, limit: 1 });
+      }
+      return Array.isArray(list) && list[0] ? list[0] : null;
+    };
+    (async () => {
+      const labels = [
+        { badge: "BESTSELLER", key: "bestseller" },
+        { badge: "TRENDING", key: "trending" },
+        { badge: "HOT", key: "hot" },
+        { badge: "NEW", key: "new" },
+      ];
+      const res = [];
+      for (const l of labels) {
+        const p = await fetchOne(l.key);
+        if (canceled) return;
+        if (p) res.push({ badge: l.badge, product: p });
+      }
+      if (!canceled) setSlides(res);
+    })();
+    return () => { canceled = true; };
+  }, []);
 
   useEffect(() => {
     const initSwiper = () => {
@@ -76,12 +95,18 @@ export default function Intro() {
       }
     };
   }, []);
+
+  // Update swiper layout if slides change after initial mount
+  useEffect(() => {
+    try { swiperRef.current?.update?.(); } catch {}
+  }, [slides.length]);
   return (
     <section className="hero-ms pb-0">
       <div className=""></div>
 
-      <div className="swiper shoe-carousel">
-        <div className="swiper-wrapper">
+      <div className="container intro-wrap">
+        <div className="swiper shoe-carousel">
+          <div className="swiper-wrapper">
           {slides.map((s, idx) => (
             <div key={s.product.id + idx} className="swiper-slide">
               <IntroProductCard
@@ -91,6 +116,7 @@ export default function Intro() {
               />
             </div>
           ))}
+          </div>
         </div>
       </div>
 

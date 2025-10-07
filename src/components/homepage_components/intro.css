@@ -1,0 +1,25 @@
+.intro-wrap {
+  padding: 28px 0 12px;
+}
+@media (min-width: 992px) {
+  .intro-wrap { padding: 40px 0 16px; }
+}
+
+/* Center slides and constrain card width */
+.shoe-carousel .swiper-wrapper {
+  align-items: stretch;
+}
+.shoe-carousel .swiper-slide {
+  display: flex;
+  justify-content: center;
+}
+.shoe-carousel .intro-card {
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* Optional: add gentle side padding at very small widths */
+@media (max-width: 576px) {
+  .intro-wrap { padding-left: 8px; padding-right: 8px; }
+}
+

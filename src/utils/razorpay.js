@@ -11,8 +11,9 @@ export function loadRazorpay(src = "https://checkout.razorpay.com/v1/checkout.js
 
 export async function openRazorpayCheckout({ amount, currency = "INR", name, description, prefill, notes, onSuccess, onDismiss }) {
   await loadRazorpay();
-  // Hardcoded for now as requested (do not use secret on frontend)
-  const key = "rzp_test_RCPn3qRC9s7g22";
+  // Use public key from env (safe to expose on frontend)
+  const key = (import.meta.env.VITE_RAZORPAY_KEY_ID || "").trim();
+  if (!key) throw new Error("Missing VITE_RAZORPAY_KEY_ID. Set it in your .env file.");
   const options = {
     key,
     amount: Math.round(amount * 100),

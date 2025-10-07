@@ -8,6 +8,7 @@ import CheckoutPage from "./pages/Checkout.jsx";
 import LoginPage from "./pages/Login.jsx";
 import Account from "./pages/Account.jsx";
 import Setup from "./pages/Setup.jsx";
+import OrderDetails from "./pages/OrderDetails.jsx";
 import OrderSuccess from "./pages/OrderSuccess.jsx";
 import TermsPage from "./pages/Terms.jsx";
 import PrivacyPage from "./pages/Privacy.jsx";
@@ -20,8 +21,15 @@ import RequireProfile from "./components/general_components/RequireProfile.jsx";
 import "./styles/app-overrides.css";
 import Loader from "./components/general_components/Loader.jsx";
 import Analytics from "./components/general_components/Analytics.jsx";
+import ErrorBoundary from "./components/general_components/ErrorBoundary.jsx";
+import { ToastProvider } from "./components/general_components/ToastProvider.jsx";
+import RecaptchaHost from "./components/general_components/RecaptchaHost.jsx";
+import { useEffect } from "react";
+import { loadRazorpay } from "./utils/razorpay";
 
 export default function App() {
+  // Preload Razorpay script early to avoid checkout delay/flicker
+  useEffect(() => { try { loadRazorpay().catch(() => {}); } catch {} }, []);
   return (
     <BrowserRouter>
       <AuthProvider>
@@ -37,6 +45,9 @@ export default function App() {
           </div>
 
           <Navbar />
+          <ErrorBoundary>
+          <ToastProvider>
+          <RecaptchaHost />
           <div id="smooth-wrapper">
             <div id="smooth-content">
               <Routes>
@@ -76,9 +87,19 @@ export default function App() {
                     </RequireAuth>
                   }
                 />
+                <Route
+                  path="/account/orders/:id"
+                  element={
+                    <RequireAuth>
+                      <OrderDetails />
+                    </RequireAuth>
+                  }
+                />
               </Routes>
             </div>
           </div>
+          </ToastProvider>
+          </ErrorBoundary>
         </CartProvider>
       </AuthProvider>
     </BrowserRouter>
