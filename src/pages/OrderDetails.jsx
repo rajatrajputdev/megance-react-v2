@@ -4,6 +4,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { db } from "../firebase.js";
 import { collection, doc, getDoc, onSnapshot, query, where, limit, getDocs } from "firebase/firestore";
 import SEO from "../components/general_components/SEO.jsx";
+import { auth, app } from "../firebase.js";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -61,8 +63,30 @@ export default function OrderDetails() {
       amount: order.amount || 0,
       discount: order.discount || 0,
       payable: order.payable || 0,
+      gst: typeof order.gst === 'number' ? order.gst : Math.round(Math.max(0, (order.amount || 0) - (order.discount || 0)) * 0.18),
     };
   }, [order]);
+
+  const openInvoicePdf = async () => {
+    try {
+      const region = (import.meta.env.VITE_FUNCTIONS_REGION || '').trim() || undefined;
+      const fns = getFunctions(app, region);
+      const call = httpsCallable(fns, 'getOrderInvoicePdfCallable');
+      const oid = order?.orderId || order?.id || id;
+      const res = await call({ orderId: oid });
+      const { contentType, data, filename } = res.data || {};
+      if (!data) return;
+      const blob = await (await fetch(`data:${contentType||'application/pdf'};base64,${data}`)).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || `invoice-${oid}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch {}
+  };
 
   return (
     <>
@@ -113,9 +137,26 @@ export default function OrderDetails() {
                       <span>- ₹ {totals.discount}</span>
                     </div>
                   )}
+                  <div className="d-flex justify-content-between">
+                    <span>GST (18%)</span>
+                    <span>₹ {totals.gst}</span>
+                  </div>
+                  {order?.coupon?.code && (
+                    <div className="d-flex justify-content-between" style={{ fontSize: 13 }}>
+                      <span>Coupon</span>
+                      <span>
+                        <strong>{order.coupon.code}</strong>
+                        {order.coupon.valid === false && <span className="inline-error" style={{ marginLeft: 6 }}>invalid</span>}
+                      </span>
+                    </div>
+                  )}
                   <div className="d-flex justify-content-between fw-600 mt-6">
                     <span>Payable</span>
                     <span>₹ {totals.payable}</span>
+                  </div>
+
+                  <div className="mt-15">
+                    <button className="butn" onClick={openInvoicePdf}>Download Invoice PDF</button>
                   </div>
 
                   <hr className="mt-15 mb-15" />

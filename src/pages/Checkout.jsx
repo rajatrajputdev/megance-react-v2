@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { openRazorpayCheckout } from "../utils/razorpay.js";
 import { useNavigate, Link } from "react-router-dom";
 import { INDIAN_STATES } from "../data/indian-states.js";
-import { findCoupon, computeDiscount } from "../data/coupons.js";
+import { previewCoupon } from "../services/coupons.js";
 import SEO from "../components/general_components/SEO.jsx";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase.js";
@@ -45,10 +45,12 @@ export default function CheckoutPage() {
 
   // Coupon application state
   const [couponInput, setCouponInput] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discount }
   const [couponError, setCouponError] = useState("");
-  const discount = useMemo(() => computeDiscount({ amount, coupon: appliedCoupon }), [amount, appliedCoupon]);
-  const payable = Math.max(0, amount - discount);
+  const discount = useMemo(() => Number(appliedCoupon?.discount || 0), [amount, appliedCoupon]);
+  const netAmount = useMemo(() => Math.max(0, amount - discount), [amount, discount]);
+  const gst = useMemo(() => Math.round(netAmount * 0.18), [netAmount]);
+  const payable = useMemo(() => netAmount + gst, [netAmount, gst]);
 
   const [paying, setPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); // 'online' or 'cod'
@@ -77,6 +79,8 @@ export default function CheckoutPage() {
           items: items.map(({ id, name, price, qty, meta }) => ({ id, name, price, qty, meta: meta || null })),
           amount,
           discount,
+          gst,
+          couponCode: appliedCoupon?.code || null,
           payable,
           status: "ordered",
           paymentMethod: "cod",
@@ -134,6 +138,8 @@ export default function CheckoutPage() {
               items: items.map(({ id, name, price, qty, meta }) => ({ id, name, price, qty, meta: meta || null })),
               amount,
               discount,
+              gst,
+              couponCode: appliedCoupon?.code || null,
               payable,
               status: "ordered",
               paymentId: resp?.razorpay_payment_id || "test_payment",
@@ -185,23 +191,30 @@ export default function CheckoutPage() {
     }
   };
 
-  const applyCoupon = () => {
-    const c = findCoupon(couponInput);
-    if (!c) {
-      const msg = "Invalid coupon code";
+  const applyCoupon = async () => {
+    try {
+      setCouponError("");
+      const res = await previewCoupon({ code: couponInput, amount });
+      if (!res?.ok) {
+        const reason = res?.reason || 'Invalid coupon code';
+        const msg = (
+          reason === 'amount_not_eligible' ? 'Not eligible for this amount' :
+          reason === 'max_uses_reached' ? 'Coupon usage limit reached' :
+          reason === 'user_limit_reached' ? 'You have already used this coupon' :
+          reason === 'inactive' ? 'Coupon expired or inactive' : 'Invalid coupon code'
+        );
+        setCouponError(msg);
+        showToast("error", msg);
+        return;
+      }
+      setAppliedCoupon({ code: res.code, discount: res.discount });
+      setCouponError("");
+      showToast("success", `Coupon ${res.code} applied`);
+    } catch (_) {
+      const msg = "Could not apply coupon. Try again.";
       setCouponError(msg);
       showToast("error", msg);
-      return;
     }
-    if (c.minAmount && amount < c.minAmount) {
-      const msg = `Valid on minimum order of ₹${c.minAmount}`;
-      setCouponError(msg);
-      showToast("error", msg);
-      return;
-    }
-    setAppliedCoupon(c);
-    setCouponError("");
-    showToast("success", `Coupon ${c.code} applied`);
   };
 
   const removeCoupon = () => {
@@ -338,6 +351,10 @@ export default function CheckoutPage() {
                   <span>- ₹ {discount}</span>
                 </div>
               )}
+              <div className="d-flex justify-content-between">
+                <span>GST (18%)</span>
+                <span>₹ {gst}</span>
+              </div>
               <div className="d-flex justify-content-between fw-600 mt-10">
                 <span>Payable</span>
                 <span>₹ {payable}</span>

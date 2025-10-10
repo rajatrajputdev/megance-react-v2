@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db, app } from '../firebase/config';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 function tsToDate(ts) {
   try {
@@ -23,14 +24,35 @@ const Orders = () => {
 
   useEffect(() => {
     setLoading(true);
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(collection(db, 'orders'), (snap) => {
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Sort locally by createdAt desc (handles docs missing the field)
+      list.sort((a,b)=>((b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0)));
       setOrders(list);
       setLoading(false);
     }, () => setLoading(false));
     return () => unsub();
   }, []);
+
+  const downloadInvoice = async (order) => {
+    try {
+      const region = (import.meta.env.VITE_FUNCTIONS_REGION || '').trim() || undefined;
+      const fns = getFunctions(app, region);
+      const call = httpsCallable(fns, 'getOrderInvoicePdfCallable');
+      const res = await call({ orderId: order?.id });
+      const { contentType, data, filename } = res.data || {};
+      if (!data) return;
+      const blob = await (await fetch(`data:${contentType||'application/pdf'};base64,${data}`)).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || `invoice-${order?.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch {}
+  };
 
   return (
     <div>
@@ -78,11 +100,23 @@ const Orders = () => {
                     <span>- ₹ {o.discount}</span>
                   </div>
                 ) : null}
+                {o.coupon?.code && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555' }}>
+                    <span>Coupon</span>
+                    <span>
+                      <span style={{ fontWeight: 600 }}>{o.coupon.code}</span>
+                      {o.coupon.valid === false && <span style={{ marginLeft: 6, color:'#a61717' }}>(invalid)</span>}
+                    </span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                   <span>Payable</span>
                   <span>₹ {o.payable || o.amount || 0}</span>
                 </div>
                 <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>Payment: {o.paymentId || '-'}</div>
+                <div style={{ marginTop: 10 }}>
+                  <button onClick={() => downloadInvoice(o)}>Invoice PDF</button>
+                </div>
               </div>
             </div>
           ))}

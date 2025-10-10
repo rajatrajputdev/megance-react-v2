@@ -5,6 +5,9 @@ const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+// Lazy/guarded import to avoid local analyzer crash if deps not installed yet
+let PDFDocument;
+try { PDFDocument = require('pdfkit'); } catch (_) { /* will load inside handler */ }
 
 try { admin.initializeApp(); } catch (_) {}
 
@@ -13,7 +16,10 @@ const REGION = process.env.FUNCTIONS_REGION || 'asia-south2';
 // Owner email to receive order copies
 const OWNER_EMAIL = 'megancetech@gmail.com';
 
-// Secrets are used conditionally below to avoid requiring setup in dev
+// Secrets
+const MAIL_USER = defineSecret('MAIL_USER');
+const MAIL_PASS = defineSecret('MAIL_PASS');
+const MAIL_FROM = defineSecret('MAIL_FROM');
 
 function buildTransporter(env) {
   const user = env.MAIL_USER || '';
@@ -36,39 +42,61 @@ function buildTransporter(env) {
   });
 }
 
-function renderOrderEmail({ orderId, data }) {
+function currencyINR(n) { try { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(n)||0); } catch { return `₹ ${n||0}`; } }
+
+function renderOrderEmail({ orderId, data, enrichedItems = [] }) {
   const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate().toLocaleString() : '';
-  const items = Array.isArray(data.items) ? data.items : [];
+  const items = Array.isArray(enrichedItems) && enrichedItems.length ? enrichedItems : (Array.isArray(data.items) ? data.items : []);
   const totalQty = items.reduce((a, b) => a + (b.qty || 0), 0);
-  const rows = items
-    .map((it) => `<tr><td>${(it.name || '').toString()}</td><td align="right">${it.qty || 0}</td><td align="right">₹ ${(it.price || 0) * (it.qty || 0)}</td></tr>`) 
-    .join('');
+  const rows = items.map((it) => {
+    const unit = Number(it.price) || 0;
+    const qty = Number(it.qty) || 0;
+    const amount = unit * qty;
+    const img = it.imageUrl ? `<img src="${it.imageUrl}" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #eee;margin-right:10px" />` : '';
+    const desc = it.description ? `<div style="color:#555;font-size:12px;margin-top:2px;max-width:520px">${String(it.description).slice(0,140)}</div>` : '';
+    return `
+      <tr>
+        <td style="padding:8px 0">
+          <div style="display:flex;align-items:center">
+            ${img}
+            <div>
+              <div style="font-weight:600">${(it.name || '').toString()}</div>
+              ${desc}
+            </div>
+          </div>
+        </td>
+        <td align="right" style="padding:8px 0">${qty}</td>
+        <td align="right" style="padding:8px 0">${currencyINR(amount)}</td>
+      </tr>`;
+  }).join('');
   const billing = data.billing || {};
+  const paymentMethod = (data.paymentMethod || (data.paymentId ? 'online' : 'cod')).toString().toUpperCase();
+  const title = `Order #${(orderId || '').toString().slice(0,6).toUpperCase()}`;
 
   const html = `
-    <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.5; color:#111">
-      <h2 style="margin:0 0 10px">New Order: #${(orderId || '').toString().slice(0,6).toUpperCase()}</h2>
-      <div style="opacity:.7; font-size:13px; margin-bottom:8px">Created: ${created}</div>
-      ${data.paymentId ? `<div style="font-size:13px; margin-bottom:12px">Payment ID: <strong>${data.paymentId}</strong></div>` : ''}
-      <div style="margin:14px 0;">
+    <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.6; color:#111">
+      <h2 style="margin:0 0 4px">${title}</h2>
+      <div style="opacity:.7; font-size:13px;">Placed: ${created} · Payment: ${paymentMethod}${data.paymentId ? ` · <span style=\"opacity:.9\">${data.paymentId}</span>` : ''}</div>
+      <div style="margin:16px 0;">
         <table width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
           <thead>
             <tr style="text-align:left; border-bottom:1px solid #eee">
-              <th>Item</th>
-              <th style="text-align:right">Qty</th>
-              <th style="text-align:right">Amount</th>
+              <th style="padding:6px 0">Item</th>
+              <th style="text-align:right;padding:6px 0">Qty</th>
+              <th style="text-align:right;padding:6px 0">Amount</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="3" style="opacity:.7">No items</td></tr>'}
+            ${rows || '<tr><td colspan="3" style="opacity:.7;padding:8px 0">No items</td></tr>'}
           </tbody>
         </table>
       </div>
-      <div style="margin-top:10px">
+      <div style="margin-top:6px">
         <div><strong>Total items:</strong> ${totalQty}</div>
-        <div><strong>Total:</strong> ₹ ${data.amount || 0}</div>
-        ${data.discount ? `<div><strong>Discount:</strong> - ₹ ${data.discount}</div>` : ''}
-        <div><strong>Payable:</strong> ₹ ${data.payable || 0}</div>
+        <div><strong>Total:</strong> ${currencyINR(data.amount || 0)}</div>
+        ${data.discount ? `<div><strong>Discount:</strong> - ${currencyINR(data.discount)}</div>` : ''}
+        <div><strong>GST (18%):</strong> ${currencyINR(typeof data.gst === 'number' ? data.gst : Math.round(Math.max(0, (Number(data.amount||0) - Number(data.discount||0))) * 0.18))}</div>
+        <div style="font-size:16px;margin-top:4px"><strong>Payable:</strong> ${currencyINR(data.payable || 0)}</div>
       </div>
       <hr style="margin:16px 0; border:none; border-top:1px solid #eee" />
       <div>
@@ -76,15 +104,19 @@ function renderOrderEmail({ orderId, data }) {
         <div>${billing.name || ''}</div>
         <div>${billing.email || ''}</div>
         <div>${billing.phone || ''}</div>
-        <div style="margin-top:6px">${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}</div>
+        <div style="margin-top:6px;max-width:560px">${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}</div>
       </div>
     </div>
   `;
-  const text = `New Order #${(orderId || '').toString().slice(0,6).toUpperCase()}\n` +
-    `Total items: ${totalQty}\nPayable: ₹ ${data.payable || 0}\nPayment: ${data.paymentId || ''}\n` +
+  const text = `${title}\n` +
+    `Placed: ${created}\nPayment: ${paymentMethod}${data.paymentId ? ` (${data.paymentId})` : ''}\n` +
+    items.map((it) => ` - ${it.name} x ${it.qty} = ${Number(it.price||0) * Number(it.qty||0)}`).join('\n') + '\n' +
+    `Total: ${data.amount || 0}\n` +
+    (data.discount ? `Discount: ${data.discount}\n` : '') +
+    `Payable: ${data.payable || 0}\n` +
     `Billing: ${billing.name || ''}, ${billing.phone || ''}, ${billing.email || ''}\n` +
     `${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}`;
-  return { html, text };
+  return { html, text, subject: `${title} – ${currencyINR(data.payable || 0)}` };
 }
 
 function findCaseInsensitiveKey(obj, key) {
@@ -97,10 +129,60 @@ function findCaseInsensitiveKey(obj, key) {
   return null;
 }
 
-if (process.env.EMAIL_ENABLED === 'true') {
+function isCouponActive(c, now = Date.now()) {
+  if (!c) return false;
+  if (c.isActive === false) return false;
+  const start = c.startAt && c.startAt.toDate ? c.startAt.toDate().getTime() : (c.startAt ? new Date(c.startAt).getTime() : 0);
+  const end = c.endAt && c.endAt.toDate ? c.endAt.toDate().getTime() : (c.endAt ? new Date(c.endAt).getTime() : 0);
+  if (start && now < start) return false;
+  if (end && now > end) return false;
+  return true;
+}
+
+function computeCouponDiscount(coupon, amount) {
+  if (!coupon || !amount || amount <= 0) return 0;
+  const minAmount = Number(coupon.minAmount) || 0;
+  if (minAmount && amount < minAmount) return 0;
+  const type = String(coupon.type || '').toLowerCase();
+  const value = Number(coupon.value) || 0;
+  let d = 0;
+  if (type === 'flat') d = Math.min(amount, value);
+  else if (type === 'percent') d = Math.floor((amount * value) / 100);
+  const cap = Number(coupon.maxDiscount) || 0;
+  if (cap && d > cap) d = cap;
+  return Math.max(0, Math.min(amount, d));
+}
+
+async function validateCouponForUser({ db, code, uid, amount }) {
+  const codeUp = String(code || '').trim().toUpperCase();
+  if (!codeUp) return { ok: false, reason: 'invalid_code' };
+  const ref = db.doc(`coupons/${codeUp}`);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, reason: 'not_found' };
+  const c = snap.data() || {};
+  if (!isCouponActive(c)) return { ok: false, reason: 'inactive' };
+  const amountNum = Math.round(Number(amount) || 0);
+  const discount = computeCouponDiscount(c, amountNum);
+  if (!discount) return { ok: false, reason: 'amount_not_eligible' };
+  // Limits
+  const maxUses = Number(c.maxUses) || 0;
+  const totalUses = Number(c.totalUses) || 0;
+  if (maxUses && totalUses >= maxUses) return { ok: false, reason: 'max_uses_reached' };
+  const perUserLimit = Number(c.perUserLimit) || 1;
+  if (uid && perUserLimit) {
+    try {
+      const us = await db.doc(`coupons/${codeUp}/users/${uid}`).get();
+      const used = us.exists ? Number(us.data()?.count || 0) : 0;
+      if (used >= perUserLimit) return { ok: false, reason: 'user_limit_reached' };
+    } catch (_) {}
+  }
+  return { ok: true, code: codeUp, discount, coupon: c };
+}
+
 exports.sendOwnerEmailOnOrder = onDocumentCreated({
   document: 'orders/{orderId}',
   region: REGION,
+  secrets: [MAIL_USER, MAIL_PASS, MAIL_FROM],
 }, async (event) => {
   const snap = event.data;
   if (!snap) return;
@@ -108,9 +190,9 @@ exports.sendOwnerEmailOnOrder = onDocumentCreated({
   if (!data) return;
 
   const env = {
-    MAIL_USER: process.env.MAIL_USER || '',
-    MAIL_PASS: process.env.MAIL_PASS || '',
-    MAIL_FROM: process.env.MAIL_FROM || '',
+    MAIL_USER: MAIL_USER.value(),
+    MAIL_PASS: MAIL_PASS.value(),
+    MAIL_FROM: MAIL_FROM.value(),
     MAIL_HOST: process.env.MAIL_HOST || '',
     MAIL_PORT: process.env.MAIL_PORT || '',
   };
@@ -120,21 +202,60 @@ exports.sendOwnerEmailOnOrder = onDocumentCreated({
     return;
   }
 
+  // Enrich items with product images/descriptions
+  const db = admin.firestore();
+  const baseIds = new Map();
+  const items = Array.isArray(data.items) ? data.items : [];
+  for (const it of items) {
+    try {
+      const meta = it.meta || {};
+      let size = meta.size ? String(meta.size) : '';
+      let gender = meta.gender || null;
+      let id = String(it.id || '');
+      let base = id;
+      if (size) { const idx = base.lastIndexOf(`-s${size}`); base = idx !== -1 ? base.slice(0, idx) : base; }
+      if (gender && base.endsWith(`-${gender}`)) base = base.slice(0, -(`-${gender}`).length);
+      else if (!gender) {
+        if (base.endsWith('-men')) { base = base.slice(0, -4); }
+        else if (base.endsWith('-women')) { base = base.slice(0, -6); }
+      }
+      if (base && !baseIds.has(base)) baseIds.set(base, null);
+    } catch {}
+  }
+  const entries = Array.from(baseIds.keys());
+  for (const pid of entries) {
+    try { const ps = await db.doc(`products/${pid}`).get(); baseIds.set(pid, ps.exists ? (ps.data() || {}) : null); } catch { baseIds.set(pid, null); }
+  }
+  const enriched = items.map((it) => {
+    try {
+      const meta = it.meta || {};
+      let size = meta.size ? String(meta.size) : '';
+      let gender = meta.gender || null;
+      let id = String(it.id || '');
+      let base = id;
+      if (size) { const idx = base.lastIndexOf(`-s${size}`); base = idx !== -1 ? base.slice(0, idx) : base; }
+      if (gender && base.endsWith(`-${gender}`)) base = base.slice(0, -(`-${gender}`).length);
+      else if (!gender) {
+        if (base.endsWith('-men')) { base = base.slice(0, -4); }
+        else if (base.endsWith('-women')) { base = base.slice(0, -6); }
+      }
+      const pd = baseIds.get(base) || {};
+      return { ...it, imageUrl: pd.imageUrl || it.imageUrl || null, description: pd.description || it.description || '' };
+    } catch { return it; }
+  });
+
   const transporter = buildTransporter(env);
   const from = env.MAIL_FROM || env.MAIL_USER;
-  const { html, text } = renderOrderEmail({ orderId: event.params.orderId, data });
+  const { html, text, subject } = renderOrderEmail({ orderId: event.params.orderId, data, enrichedItems: enriched });
 
-  const subject = `New Order #${(event.params.orderId || '').toString().slice(0,6).toUpperCase()} – ₹ ${data.payable || 0}`;
-
-  await transporter.sendMail({
-    from,
-    to: OWNER_EMAIL,
-    subject,
-    text,
-    html,
-  });
+  // Send to owner
+  await transporter.sendMail({ from, to: OWNER_EMAIL, subject, text, html });
+  // Send to buyer if email present
+  const buyer = (data.billing && data.billing.email) ? String(data.billing.email).trim() : '';
+  if (buyer) {
+    try { await transporter.sendMail({ from, to: buyer, subject, text, html }); } catch (e) { console.warn('[sendOwnerEmailOnOrder] buyer email failed', e?.message || e); }
+  }
 });
-}
 
 // Decrement product stock when an order is created.
 // Idempotent via an order flag `stockDeducted` in the same transaction.
@@ -174,7 +295,6 @@ exports.decrementStockOnOrder = onDocumentCreated({
   await db.runTransaction(async (tx) => {
     const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists) { console.log('[decrementStockOnOrder] No order snapshot'); return; }
-    if (orderSnap.get('stockDeducted') === true) { console.log('[decrementStockOnOrder] Already deducted'); return; }
     // Proceed for typical success statuses; be lenient to support test flows
     const status = String(orderSnap.get('status') || '').toLowerCase();
     if (status && !['ordered', 'paid', 'completed', 'success'].includes(status)) {
@@ -183,6 +303,12 @@ exports.decrementStockOnOrder = onDocumentCreated({
     }
 
     const items = Array.isArray(orderSnap.get('items')) ? orderSnap.get('items') : [];
+    const uid = orderSnap.get('userId') || null;
+    const amount = Number(orderSnap.get('amount') || 0);
+    const couponCodeRaw = orderSnap.get('couponCode') || '';
+    const couponCode = String(couponCodeRaw || '').trim().toUpperCase();
+    const stockAlready = orderSnap.get('stockDeducted') === true;
+    const couponAlready = orderSnap.get('couponRedeemed') === true || (orderSnap.get('coupon')?.valid === true);
     const grouped = new Map();
     for (const it of items) {
       const p = parseItem(it);
@@ -191,88 +317,128 @@ exports.decrementStockOnOrder = onDocumentCreated({
       grouped.get(p.productId).push(p);
     }
 
-    for (const [productId, parts] of grouped.entries()) {
-      const ref = db.doc(`products/${productId}`);
-      const snap = await tx.get(ref);
-      if (!snap.exists) { console.log('[decrementStockOnOrder] Product missing:', productId); continue; }
-      const data = snap.data() || {};
+    if (!stockAlready) {
+      for (const [productId, parts] of grouped.entries()) {
+        const ref = db.doc(`products/${productId}`);
+        const snap = await tx.get(ref);
+        if (!snap.exists) { console.log('[decrementStockOnOrder] Product missing:', productId); continue; }
+        const data = snap.data() || {};
 
-      let updates = {};
-      let topQty = Number(data.quantity) || 0;
-      let applied = false;
+        let updates = {};
+        let topQty = Number(data.quantity) || 0;
+        let applied = false;
 
-      if (data.sizeQuantities && typeof data.sizeQuantities === 'object') {
-        const sq = { ...data.sizeQuantities };
-        for (const p of parts) {
-          if (!p.size || !p.gender) continue;
-          const gkey = findCaseInsensitiveKey(sq, p.gender);
-          const arr = gkey && Array.isArray(sq[gkey]) ? [...sq[gkey]] : [];
-          const idx = arr.findIndex((r) => String(r.size) === String(p.size));
-          if (idx !== -1) {
-            const cur = Number(arr[idx].quantity) || 0;
-            arr[idx] = { ...arr[idx], quantity: Math.max(0, cur - p.qty) };
-            if (gkey) sq[gkey] = arr;
+        if (data.sizeQuantities && typeof data.sizeQuantities === 'object') {
+          const sq = { ...data.sizeQuantities };
+          for (const p of parts) {
+            if (!p.size || !p.gender) continue;
+            const gkey = findCaseInsensitiveKey(sq, p.gender);
+            const arr = gkey && Array.isArray(sq[gkey]) ? [...sq[gkey]] : [];
+            const idx = arr.findIndex((r) => String(r.size) === String(p.size));
+            if (idx !== -1) {
+              const cur = Number(arr[idx].quantity) || 0;
+              arr[idx] = { ...arr[idx], quantity: Math.max(0, cur - p.qty) };
+              if (gkey) sq[gkey] = arr;
+            }
           }
-        }
-        updates.sizeQuantities = sq;
-        // recompute total
-        topQty = 0;
-        for (const g of Object.keys(sq)) {
-          const arr = Array.isArray(sq[g]) ? sq[g] : [];
-          topQty += arr.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
-        }
-        applied = true;
-      } else if (Array.isArray(data.sizes) && data.sizes.length && typeof data.sizes[0] === 'object') {
-        const sizes = [...data.sizes];
-        for (const p of parts) {
-          if (!p.size) continue;
-          const idx = sizes.findIndex((r) => String(r.size) === String(p.size));
-          if (idx !== -1) {
-            const cur = Number(sizes[idx].quantity) || 0;
-            sizes[idx] = { ...sizes[idx], quantity: Math.max(0, cur - p.qty) };
+          updates.sizeQuantities = sq;
+          // recompute total
+          topQty = 0;
+          for (const g of Object.keys(sq)) {
+            const arr = Array.isArray(sq[g]) ? sq[g] : [];
+            topQty += arr.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
           }
-        }
-        updates.sizes = sizes;
-        topQty = sizes.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
-        applied = true;
-      } else if (data.sizes && typeof data.sizes === 'object') {
-        const smap = { ...data.sizes };
-        for (const p of parts) {
-          if (!p.size) continue;
-          const gkey = findCaseInsensitiveKey(smap, p.gender || '');
-          const arr = gkey && Array.isArray(smap[gkey]) ? [...smap[gkey]] : [];
-          const objIdx = arr.findIndex((r) => r && typeof r === 'object' && String(r.size) === String(p.size));
-          if (objIdx !== -1) {
-            const cur = Number(arr[objIdx].quantity) || 0;
-            arr[objIdx] = { ...arr[objIdx], quantity: Math.max(0, cur - p.qty) };
-            if (gkey) smap[gkey] = arr;
+          applied = true;
+        } else if (Array.isArray(data.sizes) && data.sizes.length && typeof data.sizes[0] === 'object') {
+          const sizes = [...data.sizes];
+          for (const p of parts) {
+            if (!p.size) continue;
+            const idx = sizes.findIndex((r) => String(r.size) === String(p.size));
+            if (idx !== -1) {
+              const cur = Number(sizes[idx].quantity) || 0;
+              sizes[idx] = { ...sizes[idx], quantity: Math.max(0, cur - p.qty) };
+            }
           }
+          updates.sizes = sizes;
+          topQty = sizes.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+          applied = true;
+        } else if (data.sizes && typeof data.sizes === 'object') {
+          const smap = { ...data.sizes };
+          for (const p of parts) {
+            if (!p.size) continue;
+            const gkey = findCaseInsensitiveKey(smap, p.gender || '');
+            const arr = gkey && Array.isArray(smap[gkey]) ? [...smap[gkey]] : [];
+            const objIdx = arr.findIndex((r) => r && typeof r === 'object' && String(r.size) === String(p.size));
+            if (objIdx !== -1) {
+              const cur = Number(arr[objIdx].quantity) || 0;
+              arr[objIdx] = { ...arr[objIdx], quantity: Math.max(0, cur - p.qty) };
+              if (gkey) smap[gkey] = arr;
+            }
+          }
+          updates.sizes = smap;
+          topQty = 0;
+          for (const g of Object.keys(smap)) {
+            const arr = Array.isArray(smap[g]) ? smap[g] : [];
+            topQty += arr.reduce((a, b) => a + (b && typeof b === 'object' ? (Number(b.quantity) || 0) : 0), 0);
+          }
+          applied = true;
+        } else {
+          // Fallback: no per-size quantities present. Decrement top-level quantity only.
+          const totalQty = parts.reduce((a, b) => a + (Number(b.qty) || 0), 0);
+          topQty = Math.max(0, topQty - totalQty);
+          applied = true;
         }
-        updates.sizes = smap;
-        topQty = 0;
-        for (const g of Object.keys(smap)) {
-          const arr = Array.isArray(smap[g]) ? smap[g] : [];
-          topQty += arr.reduce((a, b) => a + (b && typeof b === 'object' ? (Number(b.quantity) || 0) : 0), 0);
-        }
-        applied = true;
-      } else {
-        // Fallback: no per-size quantities present. Decrement top-level quantity only.
-        const totalQty = parts.reduce((a, b) => a + (Number(b.qty) || 0), 0);
-        topQty = Math.max(0, topQty - totalQty);
-        applied = true;
-      }
 
-      if (applied) {
-        updates.quantity = topQty;
-        updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-        tx.update(ref, updates);
+        if (applied) {
+          updates.quantity = topQty;
+          updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+          tx.set(ref, updates, { merge: true });
+        }
       }
     }
 
-    tx.update(orderRef, {
-      stockDeducted: true,
-      stockDeductedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    // Coupon redemption (idempotent)
+    let couponApplied = null;
+    if (couponCode && uid && !couponAlready) {
+      try {
+        const refC = db.doc(`coupons/${couponCode}`);
+        const snapC = await tx.get(refC);
+        if (snapC.exists) {
+          const c = snapC.data() || {};
+          if (isCouponActive(c)) {
+            const discount = computeCouponDiscount(c, amount);
+            const maxUses = Number(c.maxUses) || 0;
+            const totalUses = Number(c.totalUses) || 0;
+            const perUserLimit = Number(c.perUserLimit) || 1;
+            let ok = discount > 0 && (!maxUses || totalUses < maxUses);
+            let usedByUser = 0;
+            const refU = db.doc(`coupons/${couponCode}/users/${uid}`);
+            const snapU = await tx.get(refU);
+            usedByUser = snapU.exists ? Number(snapU.data()?.count || 0) : 0;
+            if (perUserLimit && usedByUser >= perUserLimit) ok = false;
+            if (ok) {
+              tx.set(refC, { totalUses: (totalUses || 0) + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+              tx.set(refU, { count: usedByUser + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+              couponApplied = { code: couponCode, discount, valid: true };
+            } else {
+              couponApplied = { code: couponCode, discount: 0, valid: false };
+            }
+          } else {
+            couponApplied = { code: couponCode, discount: 0, valid: false };
+          }
+        } else {
+          couponApplied = { code: couponCode, discount: 0, valid: false };
+        }
+      } catch (_) {
+        couponApplied = { code: couponCode, discount: 0, valid: false };
+      }
+    }
+
+    tx.set(orderRef, {
+      ...(stockAlready ? {} : { stockDeducted: true, stockDeductedAt: admin.firestore.FieldValue.serverTimestamp() }),
+      ...(couponApplied ? { coupon: couponApplied, couponRedeemed: true } : {}),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
   });
 });
 
@@ -354,6 +520,164 @@ exports.verifyRazorpaySignature = onRequest({
   }
 });
 
+// Generate a simple invoice PDF for a given order (auth required)
+exports.getOrderInvoicePdf = onRequest({ region: REGION, cors: true }, async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const orderId = String(req.query.orderId || '').trim();
+    const token = String(req.query.token || (req.headers.authorization || '').replace(/^Bearer\s+/i, '')).trim();
+    if (!orderId || !token) { res.status(401).send('Unauthorized'); return; }
+    let decoded;
+    try { decoded = await admin.auth().verifyIdToken(token); } catch { res.status(401).send('Unauthorized'); return; }
+    const uid = decoded.uid;
+    const snap = await db.doc(`orders/${orderId}`).get();
+    if (!snap.exists) { res.status(404).send('Not found'); return; }
+    const data = snap.data() || {};
+    if (data.userId && data.userId !== uid && decoded.email !== OWNER_EMAIL) { res.status(403).send('Forbidden'); return; }
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    const billing = data.billing || {};
+    const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date();
+
+    res.setHeader('content-type', 'application/pdf');
+    res.setHeader('content-disposition', `inline; filename=invoice-${orderId}.pdf`);
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    doc.pipe(res);
+
+    doc.fontSize(18).text('Megance', { continued: true }).fontSize(12).text('  • Invoice', { align: 'left' });
+    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor('#666').text(`Order: #${orderId.slice(0,6).toUpperCase()}    Date: ${created.toLocaleString()}    Payment: ${(data.paymentMethod || (data.paymentId ? 'online' : 'cod')).toUpperCase()}`);
+    doc.moveDown(1);
+    doc.fillColor('#111').fontSize(12).text('Bill To:');
+    doc.fontSize(10).text(`${billing.name || ''}`);
+    doc.text(`${billing.email || ''}`);
+    doc.text(`${billing.phone || ''}`);
+    doc.text(`${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}`);
+
+    doc.moveDown(1);
+    // Table header
+    doc.fontSize(12).text('Item', 40, doc.y, { continued: true });
+    doc.text('Qty', 340, undefined, { continued: true });
+    doc.text('Amount', 420);
+    doc.moveTo(40, doc.y + 4).lineTo(555, doc.y + 4).strokeColor('#ddd').stroke();
+    doc.moveDown(0.5);
+
+    let total = 0;
+    items.forEach((it) => {
+      const unit = Number(it.price) || 0;
+      const qty = Number(it.qty) || 0;
+      const amt = unit * qty;
+      total += amt;
+      doc.fontSize(10).fillColor('#111').text(String(it.name || ''), 40, doc.y, { width: 280 });
+      doc.text(String(qty), 340, undefined);
+      doc.text(`₹ ${amt}`, 420, undefined);
+      if (it.description) { doc.fillColor('#666').fontSize(9).text(String(it.description).slice(0, 140), 40, doc.y, { width: 520 }); }
+      doc.moveDown(0.6);
+    });
+
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#ddd').stroke();
+    doc.moveDown(0.5);
+    const discount = Number(data.discount || 0);
+    const net = Math.max(0, total - discount);
+    const tax = typeof data.gst === 'number' ? Number(data.gst) : Math.round(net * 0.18);
+    const payable = Number(data.payable || (net + tax));
+    doc.fontSize(11).fillColor('#111').text(`Subtotal: ₹ ${total}`, { align: 'right' });
+    if (discount > 0) doc.text(`Discount: - ₹ ${discount}`, { align: 'right' });
+    doc.text(`GST (18%): ₹ ${tax}`, { align: 'right' });
+    doc.fontSize(12).text(`Total: ₹ ${payable}`, { align: 'right' });
+
+    doc.end();
+  } catch (e) {
+    try { console.error('getOrderInvoicePdf error', e?.message || e); } catch {}
+    res.status(500).send('Internal error');
+  }
+});
+
+// Callable variant that returns a base64 PDF (auth required)
+exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
+  const uid = req.auth?.uid;
+  const email = req.auth?.token?.email || '';
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
+  const db = admin.firestore();
+  const orderId = String(req.data?.orderId || '').trim();
+  if (!orderId) throw new HttpsError('invalid-argument', 'orderId is required');
+  const snap = await db.doc(`orders/${orderId}`).get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Order not found');
+  const data = snap.data() || {};
+  if (data.userId && data.userId !== uid && email !== OWNER_EMAIL) throw new HttpsError('permission-denied', 'Forbidden');
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const billing = data.billing || {};
+  const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date();
+
+  // Lazy load to avoid analyzer crash
+  let _PDF = PDFDocument; if (!_PDF) { try { _PDF = require('pdfkit'); } catch (e) { throw new HttpsError('internal', 'PDF engine missing'); } }
+  const doc = new _PDF({ size: 'A4', margin: 40 });
+  const chunks = [];
+  return await new Promise((resolve, reject) => {
+    doc.on('data', (c) => chunks.push(c));
+    doc.on('error', (e) => reject(new HttpsError('internal', e?.message || 'PDF error')));
+    doc.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+      const b64 = buffer.toString('base64');
+      resolve({ contentType: 'application/pdf', filename: `invoice-${orderId}.pdf`, data: b64 });
+    });
+
+    doc.fontSize(18).text('Megance', { continued: true }).fontSize(12).text('  • Invoice', { align: 'left' });
+    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor('#666').text(`Order: #${orderId.slice(0,6).toUpperCase()}    Date: ${created.toLocaleString()}    Payment: ${(data.paymentMethod || (data.paymentId ? 'online' : 'cod')).toUpperCase()}`);
+    doc.moveDown(1);
+    doc.fillColor('#111').fontSize(12).text('Bill To:');
+    doc.fontSize(10).text(`${billing.name || ''}`);
+    doc.text(`${billing.email || ''}`);
+    doc.text(`${billing.phone || ''}`);
+    doc.text(`${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}`);
+
+    doc.moveDown(1);
+    doc.fontSize(12).text('Item', 40, doc.y, { continued: true });
+    doc.text('Qty', 340, undefined, { continued: true });
+    doc.text('Amount', 420);
+    doc.moveTo(40, doc.y + 4).lineTo(555, doc.y + 4).strokeColor('#ddd').stroke();
+    doc.moveDown(0.5);
+
+    let total = 0;
+    items.forEach((it) => {
+      const unit = Number(it.price) || 0;
+      const qty = Number(it.qty) || 0;
+      const amt = unit * qty;
+      total += amt;
+      doc.fontSize(10).fillColor('#111').text(String(it.name || ''), 40, doc.y, { width: 280 });
+      doc.text(String(qty), 340, undefined);
+      doc.text(`₹ ${amt}`, 420, undefined);
+      if (it.description) { doc.fillColor('#666').fontSize(9).text(String(it.description).slice(0, 140), 40, doc.y, { width: 520 }); }
+      doc.moveDown(0.6);
+    });
+
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#ddd').stroke();
+    doc.moveDown(0.5);
+    const discount = Number(data.discount || 0);
+    const payable = Number(data.payable || (total - discount));
+    doc.fontSize(11).fillColor('#111').text(`Subtotal: ₹ ${total}`, { align: 'right' });
+    if (discount > 0) doc.text(`Discount: - ₹ ${discount}`, { align: 'right' });
+    doc.fontSize(12).text(`Total: ₹ ${payable}`, { align: 'right' });
+
+    doc.end();
+  });
+});
+// Preview a coupon (does not reserve). Requires auth.
+exports.previewCoupon = onCall({ region: REGION }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
+  const db = admin.firestore();
+  const code = req.data?.code;
+  const amount = Number(req.data?.amount) || 0;
+  const res = await validateCouponForUser({ db, code, uid, amount });
+  if (!res.ok) return res;
+  return { ok: true, code: res.code, discount: res.discount };
+});
+
 // Callable: decrement stock for a given order id (idempotent), owned by the caller
 exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
   const uid = req.auth?.uid;
@@ -367,7 +691,7 @@ exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
   if (!orderSnap.exists) throw new HttpsError('not-found', 'Order not found');
   const order = orderSnap.data() || {};
   if (order.userId && order.userId !== uid) throw new HttpsError('permission-denied', 'Not your order');
-  if (order.stockDeducted === true) return { ok: true, already: true };
+  // Proceed even if stock was already deducted to allow coupon redemption idempotently
 
   function parseItem(it) {
     try {
@@ -395,8 +719,10 @@ exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
   await db.runTransaction(async (tx) => {
     const fresh = await tx.get(orderRef);
     if (!fresh.exists) throw new HttpsError('not-found', 'Order missing');
-    if (fresh.get('stockDeducted') === true) return;
+    const alreadyStock = fresh.get('stockDeducted') === true;
     const items = Array.isArray(fresh.get('items')) ? fresh.get('items') : [];
+    const amount = Number(fresh.get('amount') || 0);
+    const couponCode = String(fresh.get('couponCode') || '').trim().toUpperCase();
     const grouped = new Map();
     for (const it of items) {
       const p = parseItem(it);
@@ -405,7 +731,7 @@ exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
       grouped.get(p.productId).push(p);
     }
 
-    for (const [productId, parts] of grouped.entries()) {
+    if (!alreadyStock) for (const [productId, parts] of grouped.entries()) {
       const ref = db.doc(`products/${productId}`);
       const snap = await tx.get(ref);
       if (!snap.exists) continue;
@@ -480,9 +806,47 @@ exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
       }
     }
 
+    // Coupon redemption (idempotent): validate again and increment counters
+    let couponApplied = null;
+    if (couponCode && uid) {
+      try {
+        const refC = db.doc(`coupons/${couponCode}`);
+        const snapC = await tx.get(refC);
+        if (snapC.exists) {
+          const c = snapC.data() || {};
+          if (isCouponActive(c)) {
+            const discount = computeCouponDiscount(c, amount);
+            const maxUses = Number(c.maxUses) || 0;
+            const totalUses = Number(c.totalUses) || 0;
+            const perUserLimit = Number(c.perUserLimit) || 1;
+            let ok = discount > 0 && (!maxUses || totalUses < maxUses);
+            let usedByUser = 0;
+            const refU = db.doc(`coupons/${couponCode}/users/${uid}`);
+            const snapU = await tx.get(refU);
+            usedByUser = snapU.exists ? Number(snapU.data()?.count || 0) : 0;
+            if (perUserLimit && usedByUser >= perUserLimit) ok = false;
+            if (ok) {
+              tx.set(refC, { totalUses: (totalUses || 0) + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+              tx.set(refU, { count: usedByUser + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+              couponApplied = { code: couponCode, discount, valid: true };
+            } else {
+              couponApplied = { code: couponCode, discount: 0, valid: false };
+            }
+          } else {
+            couponApplied = { code: couponCode, discount: 0, valid: false };
+          }
+        } else {
+          couponApplied = { code: couponCode, discount: 0, valid: false };
+        }
+      } catch (_) {
+        couponApplied = { code: couponCode, discount: 0, valid: false };
+      }
+    }
+
     tx.update(orderRef, {
-      stockDeducted: true,
-      stockDeductedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...(alreadyStock ? {} : { stockDeducted: true, stockDeductedAt: admin.firestore.FieldValue.serverTimestamp() }),
+      ...(couponApplied ? { coupon: couponApplied, couponRedeemed: true } : {}),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   });
 

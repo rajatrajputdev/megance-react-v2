@@ -44,3 +44,9 @@ Onboarding & Profiles
 - Phone verification is authoritative via Firebase Auth (we check `user.phoneNumber`). The client no longer sets `phoneVerified`; the server writes it based on the auth record.
 - User profile writes are routed to a Firebase Function `updateUserProfile` which validates the ID token and persists the profile on the server. Set `VITE_FUNCTIONS_BASE_URL` in your environment.
 - A server trigger `onUserCreated` initializes a `users/{uid}` document on first sign-in.
+
+Coupons
+
+- Server validates coupons through callable `previewCoupon` (auth required). It enforces active window, minimum amount, global `maxUses`, and per-user limits, and returns `{ ok, code, discount }`.
+- When an order is created, redemption finalizes server-side (in both the Firestore trigger and callable `decrementStockForOrder`). It increments `coupons/{code}.totalUses` and `coupons/{code}/users/{uid}.count`, and annotates the order with `coupon = { code, discount, valid }`.
+- Frontend calls `previewCoupon` on apply and includes `couponCode` in the order payload. The discount shown is the server’s computed value.

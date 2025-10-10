@@ -11,6 +11,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'megancetech@gmail.com'
+      );
+    }
+
     // Client must not create/update protected fields; server (Admin SDK) bypasses rules
     function notChangingProtected() {
       return !request.resource.data.keys().hasAny(["phone", "phoneVerified"]);
@@ -32,7 +39,7 @@ service cloud.firestore {
 
     // Top-level orders created by client and used by Cloud Functions
     match /orders/{orderId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if false; // Server (Admin SDK) bypasses rules
     }
@@ -40,7 +47,22 @@ service cloud.firestore {
     // Public catalog
     match /products/{productId} {
       allow read: if true;  // public catalog can be read by anyone
-      allow create, update, delete: if false; // edits only via server/admin
+      // Admins can manage products from the back office
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Coupons managed by admin; client reads via callables only
+    match /coupons/{code} {
+      allow read, write: if isAdmin();
+      match /users/{uid} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // Categories collection (public read, admin manage)
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     // Default: deny

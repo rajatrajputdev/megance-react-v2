@@ -1,5 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { fetchProductById } from "../services/products";
+import { db } from "../firebase.js";
+import { doc, onSnapshot } from "firebase/firestore";
 import { useCart } from "../context/CartContext.jsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import SEO from "../components/general_components/SEO.jsx";
@@ -12,23 +14,24 @@ export default function ProductPage() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const load = async () => {
-    let canceled = false;
-    try {
-      setError("");
-      setLoading(true);
-      const p = await fetchProductById(id);
-      if (canceled) return;
-      setProduct(p);
-    } catch (e) {
-      if (canceled) return;
+  useEffect(() => {
+    setError("");
+    setLoading(true);
+    const ref = doc(db, 'products', id);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        setProduct({ id: snap.id, ...snap.data() });
+        setLoading(false);
+      } else {
+        setProduct(null);
+        setLoading(false);
+      }
+    }, () => {
       setError("Failed to load product. Please try again.");
-    } finally {
-      if (!canceled) setLoading(false);
-    }
-    return () => { canceled = true; };
-  };
-  useEffect(() => { const c = load(); return () => { try { c?.(); } catch {} }; }, [id]);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [id]);
   const { addItem, items } = useCart();
   const { showToast } = useToast();
   const [qty, setQty] = useState(1);
@@ -319,10 +322,10 @@ export default function ProductPage() {
               {!size && sizes.length > 0 && (
                 <div className="inline-hint">Select the available size</div>
               )}
-              {size && Number.isFinite(remainingForSize) && remainingForSize !== Infinity && remainingForSize > 0 && (
-                <div className="inline-hint">Only {remainingForSize} left</div>
+              {size && Number.isFinite(maxQtyForSize) && maxQtyForSize !== Infinity && maxQtyForSize > 0 && (
+                <div className="inline-hint">Only {maxQtyForSize} available</div>
               )}
-              {size && Number.isFinite(remainingForSize) && remainingForSize === 0 && (
+              {size && Number.isFinite(maxQtyForSize) && maxQtyForSize === 0 && (
                 <div className="inline-error">Out of stock</div>
               )}
             </div>
