@@ -11,7 +11,7 @@ import { db } from "../firebase.js";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
 import { trackEvent } from "../utils/analytics.js";
 import { decrementStockForItems } from "../services/inventory.js";
-import { decrementStockForOrder } from "../services/orders.js";
+import { decrementStockForOrder, createRazorpayOrder, verifyRazorpaySignature } from "../services/orders.js";
 const USE_CLIENT_STOCK_DECREMENT = String(import.meta.env.VITE_USE_CLIENT_STOCK || '').toLowerCase() === 'true';
 
 export default function CheckoutPage() {
@@ -125,7 +125,15 @@ export default function CheckoutPage() {
     // Online path (Razorpay)
     try {
       setPaying(true);
+      // 1) Create server-side Razorpay order
+      // Short receipt (Razorpay requires <= 40 chars)
+      const receipt = `r-${Date.now().toString(36)}-${(user?.uid || 'anon').slice(0,8)}`;
+      const { order, keyId } = await createRazorpayOrder({ amount: payable, receipt });
+
+      // 2) Open checkout with server-provided key + order_id
       await openRazorpayCheckout({
+        key: keyId,
+        orderId: order?.id,
         amount: payable,
         name: "Megance",
         description: `Payment for ${items.length} item(s)`,
@@ -133,6 +141,7 @@ export default function CheckoutPage() {
         notes: { address: `${form.address}, ${form.city}, ${form.state} ${form.zip}` },
         onSuccess: async (resp) => {
           try {
+            // 3) Create order doc first (status: ordered)
             const payload = {
               userId: user?.uid || null,
               items: items.map(({ id, name, price, qty, meta }) => ({ id, name, price, qty, meta: meta || null })),
@@ -142,7 +151,8 @@ export default function CheckoutPage() {
               couponCode: appliedCoupon?.code || null,
               payable,
               status: "ordered",
-              paymentId: resp?.razorpay_payment_id || "test_payment",
+              paymentMethod: "online",
+              paymentId: resp?.razorpay_payment_id || "",
               billing: {
                 name: form.name,
                 email: form.email,
@@ -156,8 +166,22 @@ export default function CheckoutPage() {
               updatedAt: serverTimestamp(),
             };
             const oid = await createOrderDocs(payload);
-            // Ensure server-side stock decrement (idempotent)
+
+            // 4) Verify signature (marks as paid + triggers WhatsApp server-side)
+            try {
+              await verifyRazorpaySignature({
+                razorpay_order_id: resp?.razorpay_order_id || order?.id,
+                razorpay_payment_id: resp?.razorpay_payment_id,
+                razorpay_signature: resp?.razorpay_signature,
+                orderDocId: oid,
+              });
+            } catch (err) {
+              console.warn('[checkout] signature verify failed', err?.message || err);
+            }
+
+            // 5) Ensure server-side stock decrement (idempotent)
             try { await decrementStockForOrder(oid); } catch {}
+
             // Track purchase
             try {
               trackEvent('purchase', {
@@ -170,23 +194,22 @@ export default function CheckoutPage() {
             } catch {}
             clearCart();
             setPaying(false);
-            navigate(`/order-success?oid=${oid}&pid=${encodeURIComponent(resp.razorpay_payment_id || "test_payment")}`);
+            navigate(`/order-success?oid=${oid}&pid=${encodeURIComponent(resp?.razorpay_payment_id || "")}`);
           } catch (_) {
             // Fallback navigation if Firestore write fails
             clearCart();
             setPaying(false);
-            navigate(`/order-success?pid=${encodeURIComponent(resp.razorpay_payment_id || "test_payment")}`);
+            navigate(`/order-success?pid=${encodeURIComponent(resp?.razorpay_payment_id || "")}`);
           }
         },
         onDismiss: () => {
-          // just return to checkout
           setPaying(false);
           try { showToast("info", "Payment canceled"); } catch {}
         },
       });
       showToast("info", "Opening Razorpay checkout…");
     } catch (e) {
-      showToast("error", "Payment initiation failed. Please try again.");
+      showToast("error", e?.message || "Payment initiation failed. Please try again.");
       setPaying(false);
     }
   };

@@ -21,6 +21,12 @@ const MAIL_USER = defineSecret('MAIL_USER');
 const MAIL_PASS = defineSecret('MAIL_PASS');
 const MAIL_FROM = defineSecret('MAIL_FROM');
 
+// Twilio WhatsApp (use Firebase secrets; do NOT hardcode credentials)
+const TWILIO_ACCOUNT_SID = defineSecret('TWILIO_ACCOUNT_SID');
+const TWILIO_AUTH_TOKEN = defineSecret('TWILIO_AUTH_TOKEN');
+const TWILIO_WHATSAPP_FROM = defineSecret('TWILIO_WHATSAPP_FROM'); // e.g. whatsapp:+14155238886 or approved sender ID
+const TWILIO_TEMPLATE_SID = defineSecret('TWILIO_TEMPLATE_SID');   // e.g. HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
 function buildTransporter(env) {
   const user = env.MAIL_USER || '';
   const pass = env.MAIL_PASS || '';
@@ -117,6 +123,37 @@ function renderOrderEmail({ orderId, data, enrichedItems = [] }) {
     `Billing: ${billing.name || ''}, ${billing.phone || ''}, ${billing.email || ''}\n` +
     `${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}`;
   return { html, text, subject: `${title} – ${currencyINR(data.payable || 0)}` };
+}
+
+function formatWhatsappNumber(raw) {
+  try {
+    const s = String(raw || '').trim();
+    if (!s) return '';
+    if (s.startsWith('whatsapp:')) return s;
+    if (s.startsWith('+')) return `whatsapp:${s}`;
+    const digits = s.replace(/[^\d]/g, '');
+    if (!digits) return '';
+    // Assume India if 10-digit local number
+    if (digits.length === 10) return `whatsapp:+91${digits}`;
+    if (digits.length >= 11 && digits.length <= 15) return `whatsapp:+${digits}`;
+    return '';
+  } catch (_) { return ''; }
+}
+
+function summarizeItems(items) {
+  try {
+    const arr = Array.isArray(items) ? items : [];
+    if (!arr.length) return '-';
+    const parts = arr.slice(0, 3).map((it) => {
+      const name = (it?.name || '').toString();
+      const qty = Number(it?.qty) || 1;
+      const size = it?.meta?.size ? ` (Size ${String(it.meta.size)})` : '';
+      return `${name}${size} x${qty}`;
+    });
+    let txt = parts.join(', ');
+    if (arr.length > 3) txt += ` +${arr.length - 3} more`;
+    return txt;
+  } catch (_) { return '-'; }
 }
 
 function findCaseInsensitiveKey(obj, key) {
@@ -442,6 +479,119 @@ exports.decrementStockOnOrder = onDocumentCreated({
   });
 });
 
+// Send WhatsApp order confirmation via Twilio on order creation
+exports.sendWhatsappOnOrder = onDocumentCreated({
+  document: 'orders/{orderId}',
+  region: REGION,
+  secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_TEMPLATE_SID],
+}, async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const data = snap.data();
+  if (!data) return;
+
+  try {
+    const accountSid = TWILIO_ACCOUNT_SID.value() || process.env.TWILIO_ACCOUNT_SID || '';
+    const authToken = TWILIO_AUTH_TOKEN.value() || process.env.TWILIO_AUTH_TOKEN || '';
+    const from = TWILIO_WHATSAPP_FROM.value() || process.env.TWILIO_WHATSAPP_FROM || '';
+    const templateSid = TWILIO_TEMPLATE_SID.value() || process.env.TWILIO_TEMPLATE_SID || '';
+
+    if (!accountSid || !authToken || !from || !templateSid) {
+      console.warn('[sendWhatsappOnOrder] Twilio not configured; skipping');
+      return;
+    }
+
+    // Only send for COD immediately on creation, or if already verified
+    const status = String(data.status || '').toLowerCase();
+    const method = String(data.paymentMethod || (data.paymentId ? 'online' : '')).toLowerCase();
+    const isCOD = method === 'cod' || String(data.paymentId || '').toUpperCase() === 'COD';
+    const allowed = isCOD || data.paymentVerified === true || ['paid', 'completed', 'success'].includes(status);
+    if (!allowed) {
+      console.log('[sendWhatsappOnOrder] Skipping status:', status);
+      return;
+    }
+
+    const orderId = String(event.params.orderId || '');
+    const db = admin.firestore();
+    const ref = db.doc(`orders/${orderId}`);
+
+    // Idempotency: acquire a simple lock before sending
+    let proceed = false;
+    await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(ref);
+      const cur = fresh.exists ? (fresh.data() || {}) : {};
+      if (cur.waSent || cur.waLock) return; // another sender already acted or in progress
+      tx.set(ref, { waLock: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      proceed = true;
+    });
+    if (!proceed) { console.log('[sendWhatsappOnOrder] Locked or already sent; skipping'); return; }
+
+    const toPhone = (data.billing && data.billing.phone) || '';
+    const to = formatWhatsappNumber(toPhone);
+    if (!to) { console.warn('[sendWhatsappOnOrder] No valid recipient phone; skipping'); return; }
+
+    const nameRaw = (data.billing && data.billing.name) || '';
+    const firstName = String(nameRaw || 'there').split(/\s+/).filter(Boolean)[0] || 'there';
+    const orderLabel = `MGX${orderId.slice(0, 6).toUpperCase()}`;
+    const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date();
+    const dateStr = created.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+    const itemsSummary = summarizeItems(Array.isArray(data.items) ? data.items : []);
+    const amount = Math.round(Number(data.amount) || 0);
+    const discount = Math.round(Number(data.discount) || 0);
+    const base = Math.max(0, amount - discount);
+    const gst = Number.isFinite(Number(data.gst)) ? Math.round(Number(data.gst)) : Math.round(base * 0.18);
+    const payable = Math.round(Number(data.payable) || (base + gst));
+
+    const contentVariables = JSON.stringify({
+      '1': String(firstName),
+      '2': String(orderLabel),
+      '3': String(dateStr),
+      '4': String(itemsSummary),
+      '5': String(amount),
+      '6': String(discount),
+      '7': String(payable),
+    });
+
+    const body = new URLSearchParams({
+      From: from,
+      To: to,
+      ContentSid: templateSid,
+      ContentVariables: contentVariables,
+    }).toString();
+
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        'authorization': `Basic ${auth}`,
+      },
+      body,
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '');
+      console.warn('[sendWhatsappOnOrder] Twilio send failed', resp.status, txt);
+      // Clear lock so a future update can retry
+      try { await ref.set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
+      return;
+    }
+    const msg = await resp.json().catch(() => ({}));
+    await ref.set({ waSent: true, waMessageSid: msg?.sid || null, waSentAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+
+    console.log('[sendWhatsappOnOrder] WhatsApp message sent', msg?.sid || '(no sid)');
+  } catch (e) {
+    console.warn('[sendWhatsappOnOrder] error', e?.message || e);
+    // Clear lock on error to allow retry
+    try {
+      const db = admin.firestore();
+      const orderId = String(event.params.orderId || '');
+      await db.doc(`orders/${orderId}`).set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    } catch {}
+  }
+});
+
+
 // Razorpay Order endpoints (require secrets to be set)
 const RAZORPAY_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
 const RAZORPAY_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');
@@ -456,12 +606,24 @@ exports.createRazorpayOrder = onRequest({
     const rupees = Number(body.amount) || 0; // allow rupees for convenience
     const amount = Number.isFinite(rupees) ? Math.round(rupees * 100) : 0; // paise
     const currency = (body.currency || 'INR').toUpperCase();
-    const receipt = String(body.receipt || `rcpt_${Date.now()}`);
+    // Razorpay requires receipt length <= 40. Sanitize/truncate safely.
+    const rawReceipt = String(body.receipt || '').trim();
+    let receipt = rawReceipt && rawReceipt.length <= 40 ? rawReceipt : '';
+    if (!receipt) {
+      // Short unique fallback like r-k5yo9f-a1b2c3
+      receipt = `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    } else if (receipt.length > 40) {
+      receipt = receipt.slice(0, 40);
+    }
     if (!amount || amount < 100) { res.status(400).json({ error: 'Invalid amount' }); return; }
 
     const keyId = RAZORPAY_KEY_ID.value();
     const keySecret = RAZORPAY_KEY_SECRET.value();
-    if (!keyId || !keySecret) { res.status(500).json({ error: 'Razorpay secrets not configured' }); return; }
+    if (!keyId || !keySecret) {
+      console.warn('[createRazorpayOrder] Secrets missing');
+      res.status(500).json({ error: 'Razorpay secrets not configured' });
+      return;
+    }
 
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const rpRes = await fetch('https://api.razorpay.com/v1/orders', {
@@ -474,12 +636,14 @@ exports.createRazorpayOrder = onRequest({
     });
     if (!rpRes.ok) {
       const text = await rpRes.text();
-      res.status(502).json({ error: 'Failed to create order', details: text });
+      console.error('[createRazorpayOrder] Razorpay error', rpRes.status, text);
+      res.status(502).json({ error: 'Failed to create order', status: rpRes.status, details: text });
       return;
     }
     const data = await rpRes.json();
     res.status(200).json({ order: data, keyId }); // return public keyId to client
   } catch (e) {
+    console.error('[createRazorpayOrder] exception', e?.message || e);
     res.status(500).json({ error: e?.message || 'Internal error' });
   }
 });
@@ -488,7 +652,7 @@ exports.createRazorpayOrder = onRequest({
 exports.verifyRazorpaySignature = onRequest({
   region: REGION,
   cors: true,
-  secrets: [RAZORPAY_KEY_SECRET],
+  secrets: [RAZORPAY_KEY_SECRET, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_TEMPLATE_SID],
 }, async (req, res) => {
   try {
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method Not Allowed' }); return; }
@@ -514,6 +678,82 @@ exports.verifyRazorpaySignature = onRequest({
       razorpay: { orderId, paymentId, signature },
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // Attempt to send WhatsApp confirmation here (online payments only)
+    try {
+      const [accountSid, authToken, from, templateSid] = [
+        TWILIO_ACCOUNT_SID.value() || process.env.TWILIO_ACCOUNT_SID || '',
+        TWILIO_AUTH_TOKEN.value() || process.env.TWILIO_AUTH_TOKEN || '',
+        TWILIO_WHATSAPP_FROM.value() || process.env.TWILIO_WHATSAPP_FROM || '',
+        TWILIO_TEMPLATE_SID.value() || process.env.TWILIO_TEMPLATE_SID || '',
+      ];
+      if (accountSid && authToken && from && templateSid) {
+        // Idempotency lock for online send
+        let proceed = false;
+        await db.runTransaction(async (tx) => {
+          const fresh = await tx.get(ref);
+          const cur = fresh.exists ? (fresh.data() || {}) : {};
+          if (cur.waSent || cur.waLock) return;
+          tx.set(ref, { waLock: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          proceed = true;
+        });
+        if (proceed) {
+          const snap = await ref.get();
+          const data = snap.exists ? (snap.data() || {}) : {};
+          const to = formatWhatsappNumber(data?.billing?.phone || '');
+          if (to) {
+            const nameRaw = (data.billing && data.billing.name) || '';
+            const firstName = String(nameRaw || 'there').split(/\s+/).filter(Boolean)[0] || 'there';
+            const orderLabel = `MGX${orderDocId.slice(0, 6).toUpperCase()}`;
+            const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date();
+            const dateStr = created.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+            const itemsSummary = summarizeItems(Array.isArray(data.items) ? data.items : []);
+            const amount = Math.round(Number(data.amount) || 0);
+            const discount = Math.round(Number(data.discount) || 0);
+            const base = Math.max(0, amount - discount);
+            const gst = Number.isFinite(Number(data.gst)) ? Math.round(Number(data.gst)) : Math.round(base * 0.18);
+            const payable = Math.round(Number(data.payable) || (base + gst));
+
+            const contentVariables = JSON.stringify({
+              '1': String(firstName),
+              '2': String(orderLabel),
+              '3': String(dateStr),
+              '4': String(itemsSummary),
+              '5': String(amount),
+              '6': String(discount),
+              '7': String(payable),
+            });
+
+            const bodyForm = new URLSearchParams({ From: from, To: to, ContentSid: templateSid, ContentVariables: contentVariables }).toString();
+            const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+            const resp2 = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+              method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'authorization': `Basic ${auth}` }, body: bodyForm,
+            });
+            if (resp2.ok) {
+              const msg = await resp2.json().catch(() => ({}));
+              await ref.set({ waSent: true, waMessageSid: msg?.sid || null, waSentAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            } else {
+              const txt = await resp2.text().catch(() => '');
+              console.warn('[verifyRazorpaySignature] Twilio send failed', resp2.status, txt);
+              try { await ref.set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
+            }
+          } else {
+            console.warn('[verifyRazorpaySignature] No valid recipient phone; skipping WhatsApp');
+            try { await ref.set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
+          }
+        } else {
+          console.log('[verifyRazorpaySignature] Locked or already sent; skipping');
+        }
+      }
+    } catch (e2) {
+      console.warn('[verifyRazorpaySignature] WhatsApp send error', e2?.message || e2);
+      try {
+        const db = admin.firestore();
+        const ref = db.doc(`orders/${orderDocId}`);
+        await ref.set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      } catch {}
+    }
+
     res.status(200).json({ ok: true, valid: true });
   } catch (e) {
     res.status(500).json({ error: e?.message || 'Internal error' });

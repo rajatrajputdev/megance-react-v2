@@ -39,6 +39,29 @@ Security & Payments
 
   The existing Checkout flow still supports a simplified client-only payment for development. Transition to the server flow before going live.
 
+WhatsApp Order Confirmation (Twilio)
+
+- A Cloud Function `sendWhatsappOnOrder` sends a WhatsApp template message when an order is created (status `ordered`/`paid`/`completed`/`success`). It uses your approved Twilio Content Template and fills the following variables:
+  1. Customer first name
+  2. Order label (e.g., MGXABC123)
+  3. Order date (e.g., October 10, 2025)
+  4. Items summary (e.g., "Infinity Sneakers (Size 9) x1")
+  5. Amount (pre-discount)
+  6. Discount
+  7. Payable (net + GST)
+
+  Configure the following Firebase Functions secrets (replace with your values):
+
+  - `firebase functions:secrets:set TWILIO_ACCOUNT_SID`
+  - `firebase functions:secrets:set TWILIO_AUTH_TOKEN`
+  - `firebase functions:secrets:set TWILIO_WHATSAPP_FROM`  # e.g. whatsapp:+919311939989
+  - `firebase functions:secrets:set TWILIO_TEMPLATE_SID`   # e.g. HX056b7c53233e5b24148158d4d46c1679
+
+  Notes:
+  - The function formats the recipient using the order’s `billing.phone`. If a local 10‑digit Indian number is provided, it’s sent as `whatsapp:+91XXXXXXXXXX`.
+  - If any Twilio secret is missing, the function logs and skips sending.
+  - The order doc is annotated with `waSent`, `waMessageSid`, and `waSentAt` upon success.
+
 Onboarding & Profiles
 
 - Phone verification is authoritative via Firebase Auth (we check `user.phoneNumber`). The client no longer sets `phoneVerified`; the server writes it based on the auth record.

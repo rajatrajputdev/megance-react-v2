@@ -18,6 +18,18 @@ export function AuthProvider({ children }) {
   const phoneLinkConfirmRef = React.useRef(null);
   const phoneChangeVerificationIdRef = React.useRef(null);
 
+  function normalizePhone(raw) {
+    try {
+      const s = String(raw || "").trim();
+      if (!s) return "";
+      if (s.startsWith("+")) return s;
+      const digits = s.replace(/[^\d]/g, "");
+      if (digits.length === 10) return `+91${digits}`; // assume India when 10 digits
+      if (digits.length >= 11 && digits.length <= 15) return `+${digits}`;
+      return "";
+    } catch (_) { return ""; }
+  }
+
   useEffect(() => {
     // Ensure session persistence across reloads (production behavior)
     try { setPersistence(auth, browserLocalPersistence).catch(() => {}); } catch {}
@@ -97,8 +109,14 @@ export function AuthProvider({ children }) {
     if (!auth.currentUser) throw new Error("Sign in first");
     setError(null);
     try {
+      const e164 = normalizePhone(phoneNumber);
+      if (!e164) {
+        const err = new Error("Invalid phone number");
+        err.code = "auth/invalid-phone-number";
+        throw err;
+      }
       const verifier = await ensureRecaptcha(true); // always use a fresh instance
-      const confirmation = await linkWithPhoneNumber(auth.currentUser, phoneNumber, verifier);
+      const confirmation = await linkWithPhoneNumber(auth.currentUser, e164, verifier);
       phoneLinkConfirmRef.current = confirmation;
       await resetRecaptcha();
       return true;
@@ -123,9 +141,15 @@ export function AuthProvider({ children }) {
     if (!auth.currentUser) throw new Error("Sign in first");
     setError(null);
     try {
+      const e164 = normalizePhone(phoneNumber);
+      if (!e164) {
+        const err = new Error("Invalid phone number");
+        err.code = "auth/invalid-phone-number";
+        throw err;
+      }
       const verifier = await ensureRecaptcha(true); // always use a fresh instance
       const provider = new PhoneAuthProvider(auth);
-      const verificationId = await provider.verifyPhoneNumber(phoneNumber, verifier);
+      const verificationId = await provider.verifyPhoneNumber(e164, verifier);
       phoneChangeVerificationIdRef.current = verificationId;
       await resetRecaptcha();
       return true;
