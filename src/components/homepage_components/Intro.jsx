@@ -9,7 +9,7 @@ export default function Intro() {
   const navigate = useNavigate();
 
   const [slides, setSlides] = useState([]);
-  // Load featured items for homepage: bestseller, trending, hot, new
+  // Load featured items for homepage: trending, new-arrival, bestseller, featured
   useEffect(() => {
     let canceled = false;
     const fetchOne = async (label) => {
@@ -21,10 +21,10 @@ export default function Intro() {
     };
     (async () => {
       const labels = [
-        { badge: "BESTSELLER", key: "bestseller" },
         { badge: "TRENDING", key: "trending" },
-        { badge: "HOT", key: "hot" },
-        { badge: "NEW", key: "new" },
+        { badge: "NEW ARRIVAL", key: "new-arrival" },
+        { badge: "BESTSELLER", key: "bestseller" },
+        { badge: "FEATURED", key: "featured" },
       ];
       const res = [];
       for (const l of labels) {

@@ -275,12 +275,28 @@ const onMediaMove = (e) => {
     } catch {
       el.scrollLeft += delta;
     }
-    // Also move selection so arrows work even without overflow
+    // Move selection; wrap around so arrows always change image
     setImgIdx((i) => {
-      const next = Math.max(0, Math.min(i + dir, images.length - 1));
-      return next;
+      const n = images.length || 1;
+      return ((i + dir) % n + n) % n;
     });
   };
+
+  // Center active thumbnail in the strip
+  useEffect(() => {
+    const wrap = thumbStripRef.current;
+    if (!wrap) return;
+    const children = wrap.children || [];
+    const node = children[imgIdx];
+    if (!node || typeof node.offsetLeft !== 'number') return;
+    const target = node.offsetLeft - (wrap.clientWidth - node.clientWidth) / 2;
+    try {
+      if (typeof wrap.scrollTo === 'function') wrap.scrollTo({ left: target, behavior: 'smooth' });
+      else wrap.scrollLeft = target;
+    } catch {
+      wrap.scrollLeft = target;
+    }
+  }, [imgIdx, images.length]);
 
   const cartProduct = useMemo(() => {
     if (!product) return null;
@@ -541,7 +557,7 @@ const onMediaMove = (e) => {
                       aria-pressed={size === s}
                       aria-label={`Select size ${s}`}
                       disabled={disabled}
-                      title={disabled ? "Out of stock" : `Size ${s}`}
+                      title={`Size ${s}`}
                     >
                       {s}
                       {disabled && <span className="pill-badge">Out</span>}
@@ -558,12 +574,10 @@ const onMediaMove = (e) => {
               {size &&
                 Number.isFinite(maxQtyForSize) &&
                 maxQtyForSize !== Infinity &&
-                maxQtyForSize > 0 && (
+                maxQtyForSize > 0 &&
+                maxQtyForSize < 10 && (
                   <div className="inline-hint">Only {maxQtyForSize} available</div>
                 )}
-              {size && Number.isFinite(maxQtyForSize) && maxQtyForSize === 0 && (
-                <div className="inline-error">Out of stock</div>
-              )}
             </div>
 
             {/* Quantity + Add to cart */}
@@ -632,12 +646,7 @@ const onMediaMove = (e) => {
                   remainingForSize === 0
                 }
                 title={
-                  !size
-                    ? "Select a size"
-                    : (Number.isFinite(maxQtyForSize) && maxQtyForSize <= 0) ||
-                      remainingForSize === 0
-                    ? "Out of stock"
-                    : "Add to Cart"
+                  !size ? "Select a size" : "Add to Cart"
                 }
               >
                 Add to Cart

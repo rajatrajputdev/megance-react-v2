@@ -30,9 +30,12 @@
 }
 .shop-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.12); }
 
-.shop-image { display: block; width: 100%; overflow: hidden; border-radius: 0; }
-.shop-image img { display: block; width: 100%; height: auto; object-fit: contain; transition: transform .25s ease; }
-.shop-card:hover .shop-image img { transform: scale(1.05); }
+.shop-image { position: relative; display: block; width: 100%; overflow: hidden; border-radius: 0; }
+.shop-image .shop-img { display: block; width: 100%; height: auto; object-fit: contain; transition: transform .25s ease, opacity .25s ease; }
+.shop-image .shop-img--front { position: relative; opacity: 1; z-index: 1; }
+.shop-image .shop-img--hover { position: absolute; inset: 0; opacity: 0; z-index: 0; }
+.shop-card:hover .shop-image .shop-img--front { opacity: 0; transform: scale(1.02); }
+.shop-card:hover .shop-image .shop-img--hover { opacity: 1; transform: scale(1.02); }
 
 .shop-meta { margin-top: 8px; display: flex; align-items: baseline; justify-content: space-between; }
 .shop-name { font-weight: 600; color: #111; font-size: 15px; }

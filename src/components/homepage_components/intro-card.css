@@ -33,6 +33,7 @@
   position: relative;
   width: 100%;
   background: #fff; /* white behind transparent PNGs */
+  overflow: hidden; /* keep hover image within media area */
 }
 
 .intro-card__img {
@@ -61,7 +62,7 @@
 
 .intro-card__body {
   position: relative;
-  z-index: 2;
+  z-index: 3; /* above hover image */
   margin-top: 12px;
   transition: opacity 0.25s ease, transform 0.25s ease;
 }

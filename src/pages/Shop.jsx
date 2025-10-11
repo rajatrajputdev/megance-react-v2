@@ -11,7 +11,6 @@ export default function Shop() {
   const { addItem } = useCart();
   const location = useLocation();
   const { showToast } = useToast();
-  const [range, setRange] = useState('all');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -35,29 +34,12 @@ export default function Shop() {
 
   useEffect(() => { const c = load(); return () => { try { c?.(); } catch {} }; }, []);
 
-  // Support price filter via query param, e.g. ?price=lt3500
-  useEffect(() => {
-    const sp = new URLSearchParams(location.search);
-    const p = sp.get('price');
-    if (p && ['all','lt3500','3500to4500','gt4500'].includes(p)) {
-      setRange(p);
-    }
-  }, [location.search]);
-
-  const ranges = [
-    { id: 'all', label: 'All', test: () => true },
-    { id: 'lt3500', label: 'Under ₹3500', test: (p) => p.price < 3500 },
-    { id: '3500to4500', label: '₹3500–₹4500', test: (p) => p.price >= 3500 && p.price <= 4500 },
-    { id: 'gt4500', label: 'Above ₹4500', test: (p) => p.price > 4500 },
-  ];
+  // Price filter removed; only gender query param is used below.
 
   const gender = useMemo(() => new URLSearchParams(location.search).get('g') || 'all', [location.search]);
   const filtered = useMemo(() => {
-    const byPrice = ranges.find(r => r.id === range)?.test || (() => true);
-    return items
-      .filter((p) => gender === 'all' ? true : (p.genders || []).includes(gender))
-      .filter(byPrice);
-  }, [items, range, gender]);
+    return items.filter((p) => (gender === 'all' ? true : (p.genders || []).includes(gender)));
+  }, [items, gender]);
   return (
     <>
       <SEO title="Shop" description="Explore featured Megance products and find your perfect pair." image="/assets/logo.svg" type="website" twitterCard="summary" />
@@ -78,23 +60,6 @@ export default function Shop() {
       {/* Product list first */}
 
       <section className="container page-section shop-wrap">
-      <div className="row align-items-center mb-20">
-        <div className="col-12">
-          <div className="shop-filters">
-            {ranges.map(r => (
-              <button
-                key={r.id}
-                className={`shop-pill${range === r.id ? ' is-active' : ''}`}
-                onClick={() => setRange(r.id)}
-                type="button"
-                aria-pressed={range === r.id}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
       {error && (
         <div className="row"><div className="col-12">
           <div className="inline-hint" role="alert" aria-live="assertive">{error}</div>
@@ -119,8 +84,9 @@ export default function Shop() {
         {!loading && filtered.map((p) => (
           <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
             <div className="shop-card">
-              <Link to={`/product/${p.id}`} className="shop-image">
-                <img src={p.image} alt={p.name} />
+              <Link to={`/product/${p.id}`} className="shop-image" aria-label={p.name}>
+                <img className="shop-img shop-img--front" src={p.image} alt="" />
+                <img className="shop-img shop-img--hover" src={p.hover || p.image} alt="" />
               </Link>
               <div className="shop-meta">
                 <div className="shop-name">{p.name}</div>
