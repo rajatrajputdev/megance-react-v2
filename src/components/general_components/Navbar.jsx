@@ -170,7 +170,7 @@ export default function Navbar() {
               )}
             </ul>
           </div>
-          <div className="cont-info valign">
+          {/* <div className="cont-info valign">
             <div className="text-center full-width">
               <div className="logo">
                 <img src="/assets/imgs/megance_logo_w.png" alt="" />
@@ -203,7 +203,7 @@ export default function Navbar() {
                 </h5>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </>

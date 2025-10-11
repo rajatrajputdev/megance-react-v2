@@ -18,8 +18,8 @@ export default function Home() {
         <HeaderHero />
         <Intro />
         <USP />
-        <Marquee />
-        <ZellerSection />
+        <Marquee bgImage="/assets/imgs/banner/home2.png" />
+        <ZellerSection bgImage="/assets/imgs/banner/home.png" />
         {/* <GalleryYellow /> */}
         {/* <section className="container page-section">
           <div className="row mb-30 text-center">

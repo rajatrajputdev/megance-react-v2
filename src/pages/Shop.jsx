@@ -8,12 +8,30 @@ import "./shop.css";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
 
 export default function Shop() {
+  
   const { addItem } = useCart();
   const location = useLocation();
   const { showToast } = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+    const [bannerImage, setBannerImage] = useState("/assets/imgs/works/banner-desktop.png");
+
+  useEffect(() => {
+    const updateBanner = () => {
+      if (window.innerWidth <= 768) {
+        setBannerImage("/assets/imgs/works/3mob.png");
+      } else {
+        setBannerImage("/assets/imgs/works/3.png");
+      }
+    };
+
+    updateBanner(); // ✅ Runs immediately on mount
+    window.addEventListener("resize", updateBanner); // ✅ Updates on resize/swipe orientation
+
+    return () => window.removeEventListener("resize", updateBanner);
+  }, []);
 
   const load = async () => {
     let canceled = false;
@@ -32,7 +50,7 @@ export default function Shop() {
     return () => { canceled = true; };
   };
 
-  useEffect(() => { const c = load(); return () => { try { c?.(); } catch {} }; }, []);
+  useEffect(() => { const c = load(); return () => { try { c?.(); } catch { } }; }, []);
 
   // Price filter removed; only gender query param is used below.
 
@@ -43,10 +61,16 @@ export default function Shop() {
   return (
     <>
       <SEO title="Shop" description="Explore featured Megance products and find your perfect pair." image="/assets/logo.svg" type="website" twitterCard="summary" />
-      <section className="container page-section shop-page nav-offset">
+       <section className="shop-top-banner mt-10" style={{ backgroundImage: "url('/assets/imgs/works/topbanner.png')" }} aria-label="Megance full screen visual" />
+
+      <section className="container page-section shop-page mt-30">
         <div className="row align-items-end">
           <div className="col-lg-8">
-            <h1 className="section-title">Shop{gender !== 'all' ? ` — ${gender[0].toUpperCase()}${gender.slice(1)}` : ''}</h1>
+            <h1 className="section-title"><h1 className="section-title">{gender === 'men'
+              ? 'He Walks'
+              : gender === 'women'
+                ? 'She Walks'
+                : 'Shop'}</h1></h1>
             <p className="mt-10 opacity-7">Explore featured products</p>
           </div>
           <div className="col-lg-4 mt-20 d-flex justify-content-lg-end justify-content-start">
@@ -60,50 +84,50 @@ export default function Shop() {
       {/* Product list first */}
 
       <section className="container page-section shop-wrap">
-      {error && (
-        <div className="row"><div className="col-12">
-          <div className="inline-hint" role="alert" aria-live="assertive">{error}</div>
-          <button className="butn mt-10" onClick={load}>Retry</button>
-        </div></div>
-      )}
-      <div className="row">
-        {loading && Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="col-sm-6 col-md-4 col-lg-3 mb-30">
-            <div className="shop-card skeleton-card">
-              <div className="skeleton skeleton-image" />
-              <div className="shop-meta">
-                <div className="skeleton skeleton-line" style={{ width: '60%' }} />
-                <div className="skeleton skeleton-line" style={{ width: '30%' }} />
-              </div>
-              <div className="shop-actions">
-                <div className="skeleton skeleton-line" />
-              </div>
-            </div>
-          </div>
-        ))}
-        {!loading && filtered.map((p) => (
-          <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
-            <div className="shop-card">
-              <Link to={`/product/${p.id}`} className="shop-image" aria-label={p.name}>
-                <img className="shop-img shop-img--front" src={p.image} alt="" />
-                <img className="shop-img shop-img--hover" src={p.hover || p.image} alt="" />
-              </Link>
-              <div className="shop-meta">
-                <div className="shop-name">{p.name}</div>
-                <div className="shop-price">
-                  ₹ {p.price}
-                  {Number(p.quantity) === 0 && (
-                    <span className="stock-badge oos" title="Out of stock">Out of stock</span>
-                  )}
+        {error && (
+          <div className="row"><div className="col-12">
+            <div className="inline-hint" role="alert" aria-live="assertive">{error}</div>
+            <button className="butn mt-10" onClick={load}>Retry</button>
+          </div></div>
+        )}
+        <div className="row">
+          {loading && Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="col-sm-6 col-md-4 col-lg-3 mb-30">
+              <div className="shop-card skeleton-card">
+                <div className="skeleton skeleton-image" />
+                <div className="shop-meta">
+                  <div className="skeleton skeleton-line" style={{ width: '60%' }} />
+                  <div className="skeleton skeleton-line" style={{ width: '30%' }} />
+                </div>
+                <div className="shop-actions">
+                  <div className="skeleton skeleton-line" />
                 </div>
               </div>
-              <div className="shop-actions">
-                <Link to={`/product/${p.id}`} className="shop-btn shop-btn--primary">View</Link>
+            </div>
+          ))}
+          {!loading && filtered.map((p) => (
+            <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
+              <div className="shop-card">
+                <Link to={`/product/${p.id}`} className="shop-image" aria-label={p.name}>
+                  <img className="shop-img shop-img--front" src={p.image} alt="" />
+                  <img className="shop-img shop-img--hover" src={p.hover || p.image} alt="" />
+                </Link>
+                <div className="shop-meta">
+                  <div className="shop-name">{p.name}</div>
+                  <div className="shop-price">
+                    ₹ {p.price}
+                    {Number(p.quantity) === 0 && (
+                      <span className="stock-badge oos" title="Out of stock">Out of stock</span>
+                    )}
+                  </div>
+                </div>
+                <div className="shop-actions">
+                  <Link to={`/product/${p.id}`} className="shop-btn shop-btn--primary">View</Link>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
       </section>
 
       {/* Duo section: text left, image right */}
@@ -116,7 +140,17 @@ export default function Shop() {
               <p className="mt-10 opacity-7">Dialed-in fit. Breathable comfort. Reliable grip for every surface.</p>
             </div>
             <div className="col-lg-6 mb-30">
-              <img className="duo-img" src="/assets/imgs/works/1.jpg" alt="Product lifestyle" />
+              <img
+                className="duo-img"
+                src={
+                  gender === 'men'
+                    ? "/assets/imgs/works/mard1.png"
+                    : gender === 'women'
+                      ? "/assets/imgs/works/1.JPG"
+                      : "/assets/imgs/works/default.jpg"
+                }
+                alt="Product lifestyle"
+              />
             </div>
           </div>
         </div>
@@ -127,19 +161,34 @@ export default function Shop() {
         <div className="container">
           <div className="row align-items-center">
             <div className="col-lg-6 mb-30 order-lg-1">
-              <img className="duo-img" src="/assets/imgs/works/2.jpg" alt="City-ready shoes" />
+              <img
+                className="duo-img"
+                src={
+                  gender === 'men'
+                    ? "/assets/imgs/works/mard2.png"
+                    : gender === 'women'
+                      ? "/assets/imgs/works/2.JPG"
+                      : "/assets/imgs/works/default.jpg"
+                }
+                alt="Product lifestyle"
+              />
             </div>
             <div className="col-lg-6 mb-30 order-lg-2">
-              <h2 className="section-title">Built Light. Ready to Move.</h2>
-              <p className="mt-15">City-ready traction meets breathable comfort. Perfect for commutes and weekend wander.</p>
-              <p className="mt-10 opacity-7">Flexible uppers and locked-in stability keep you confident at pace.</p>
+              <h2 className="section-title ml-10">Built Light. Ready to Move.</h2>
+              <p className="mt-15 ml-10">City-ready traction meets breathable comfort. Perfect for commutes and weekend wander.</p>
+              <p className="mt-10 opacity-7 ml-10" >Flexible uppers and locked-in stability keep you confident at pace.</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Fullscreen edge-to-edge image */}
-      <section className="shop-hero-full" style={{backgroundImage: "url('/assets/imgs/works/3.jpg')"}} aria-label="Megance full screen visual" />
+      
+    <section
+      className="shop-hero-full mt-10"
+      style={{ backgroundImage: `url(${bannerImage})` }}
+      aria-label="Megance full screen visual"
+    />
 
       {/* Copy block with padding */}
       <section className="container page-section shop-copy">

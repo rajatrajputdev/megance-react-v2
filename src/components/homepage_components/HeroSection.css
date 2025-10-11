@@ -1,0 +1,64 @@
+.hero-wrapper {
+  width: 100%;
+  height: 45vh;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* ✅ Aligns content to RIGHT like your image */
+  padding: 0 5vw;
+}
+
+.hero-content {
+  text-align: right;
+  color: white;
+}
+
+.hero-title {
+  font-size: 64px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1.1;
+}
+
+.hero-buttons {
+  margin-top: 20px;
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+}
+
+.hero-btn {
+  padding: 10px 32px;
+  border: none;
+  outline: none;
+  font-weight: 600;
+  letter-spacing: 1px;
+  background: white;
+  color: black;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
+
+.hero-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* ✅ Mobile Responsive */
+@media (max-width: 768px) {
+  .hero-wrapper {
+    justify-content: center;
+    text-align: center;
+    padding: 0 20px;
+  }
+  .hero-title {
+    font-size: 38px;
+  }
+  .hero-content {
+    text-align: center;
+  }
+  .hero-buttons {
+    justify-content: center;
+  }
+}

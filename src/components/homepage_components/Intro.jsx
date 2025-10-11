@@ -138,7 +138,7 @@ export default function Intro() {
             </div>
           </div>
         </div>
-        <div className="row align-items-center  mob_only">
+        {/* <div className="row align-items-center  mob_only">
           <div className="col-lg-7">
             <div className="qoutes d-flex">
               <div>
@@ -165,7 +165,7 @@ export default function Intro() {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
     </section>
   );
