@@ -28,8 +28,13 @@ import { useEffect } from "react";
 import { loadRazorpay } from "./utils/razorpay";
 
 export default function App() {
-  // Preload Razorpay script early to avoid checkout delay/flicker
-  useEffect(() => { try { loadRazorpay().catch(() => {}); } catch {} }, []);
+  // Optionally preload Razorpay in production to reduce checkout delay
+  useEffect(() => {
+    try {
+      const shouldPreload = import.meta.env.MODE === 'production' && (import.meta.env.VITE_PRELOAD_RAZORPAY ?? 'true') !== 'false';
+      if (shouldPreload) loadRazorpay().catch(() => {});
+    } catch {}
+  }, []);
   return (
     <BrowserRouter>
       <AuthProvider>

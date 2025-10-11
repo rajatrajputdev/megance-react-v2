@@ -74,7 +74,7 @@ export default function Navbar() {
                     <NavLink className="nav-link" to="/">Home</NavLink>
                   </li>
                   <li className="nav-item dropdown">
-                    <a href="#0" className="nav-link">Shop</a>
+                    <a href="#" className="nav-link" onClick={(e) => e.preventDefault()}>Shop</a>
                     <div className="dropdown-menu">
                       <Link className={`dropdown-item${g === 'men' ? ' active' : ''}`} to="/shop?g=men">Men</Link>
                       <Link className={`dropdown-item${g === 'women' ? ' active' : ''}`} to="/shop?g=women">Women</Link>
@@ -132,7 +132,7 @@ export default function Navbar() {
               </li>
               <li>
                 <div className="o-hidden">
-                  <a href="#0" className="link dmenu">
+                  <a href="#" className="link dmenu" onClick={(e) => e.preventDefault()}>
                     <span className="fill-text" data-text="Shop">Shop</span>
                     <i></i>
                   </a>
@@ -176,16 +176,16 @@ export default function Navbar() {
                 <img src="/assets/imgs/megance_logo_w.png" alt="" />
               </div>
               <div className="social-icon mt-40">
-                <a href="#">
+                <a href="#" onClick={(e) => e.preventDefault()}>
                   <i className="fab fa-facebook-f"></i>
                 </a>
-                <a href="#">
+                <a href="#" onClick={(e) => e.preventDefault()}>
                   <i className="fab fa-x-twitter"></i>
                 </a>
-                <a href="#">
+                <a href="#" onClick={(e) => e.preventDefault()}>
                   <i className="fab fa-linkedin-in"></i>
                 </a>
-                <a href="#">
+                <a href="#" onClick={(e) => e.preventDefault()}>
                   <i className="fab fa-instagram"></i>
                 </a>
               </div>
@@ -196,10 +196,10 @@ export default function Navbar() {
               </div>
               <div className="item mt-10">
                 <h5>
-                  <a href="#0">Hello@email.com</a>
+                  <a href="mailto:Hello@email.com">Hello@email.com</a>
                 </h5>
                 <h5 className="underline">
-                  <a href="#0">+1 840 841 25 69</a>
+                  <a href="tel:+18408412569">+1 840 841 25 69</a>
                 </h5>
               </div>
             </div>

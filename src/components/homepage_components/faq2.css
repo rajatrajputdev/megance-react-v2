@@ -1,66 +1,73 @@
-/* Completely isolated FAQ 2.0 styles (no global class names) */
-
 .faq2-section {
   width: 100%;
-  margin: 0 auto; /* remove outer vertical margin to avoid beige strips */
-  padding: 60px 28px; /* replace previous margin with interior padding */
+  margin: 0 auto;
+  padding: 60px 28px;
   background: #fff;
   border: 1px solid rgba(0,0,0,0.06);
   border-radius: 14px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.04);
-  overflow-anchor: none; /* prevent browser scroll anchoring from jumping */
 }
 
-.faq2-grid { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
-
+.faq2-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .faq2-aside { text-align: left; }
-.faq2-title { margin: 0; color: #111; font-weight: 700; }
-.faq2-subtitle { margin: 8px 0 0 0; color: #555; font-size: 14px; }
+.faq2-title { margin: 0; font-weight: 700; color: #111; }
+.faq2-subtitle { margin-top: 8px; color: #666; font-size: 14px; }
 
-.faq2-list { display: grid; grid-template-columns: 1fr; gap: 14px; overflow-anchor: none; }
-
+.faq2-list { display: grid; gap: 14px; }
 .faq2-item {
   background: #fff;
   border: 1px solid rgba(0,0,0,0.08);
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-  overflow: hidden;
+  overflow-anchor: none; /* prevents scroll jump */
+  transition: box-shadow .3s ease;
+}
+
+.faq2-item.is-open {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
 }
 
 .faq2-question {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   padding: 16px 20px;
-  background: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   border: 0;
+  background: #fff;
+  font-size: 17px;
   cursor: pointer;
   text-align: left;
   color: #0d0d0d;
-  font-size: 18px;
 }
 
-.faq2-question:focus-visible { outline: 2px solid #000; outline-offset: 2px; }
+.faq2-arrow {
+  transition: transform .3s ease;
+}
 
-.faq2-arrow { transition: transform .25s ease; }
-.faq2-item.is-open .faq2-arrow { transform: rotate(180deg); }
+.faq2-item.is-open .faq2-arrow {
+  transform: rotate(180deg);
+}
 
-/* CSS-only height transition without JS measurements */
-.faq2-collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease; }
-.faq2-item.is-open .faq2-collapse { grid-template-rows: 1fr; }
+/* Smooth collapse */
+.faq2-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .28s ease;
+}
+.faq2-item.is-open .faq2-collapse {
+  grid-template-rows: 1fr;
+}
+
 .faq2-content { overflow: hidden; }
-
 .faq2-content p {
+  padding: 12px 20px 18px;
   margin: 0;
-  padding: 12px 20px 18px 20px; /* vertical padding only when open */
   color: #333;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 @media (min-width: 992px) {
   .faq2-section { padding: 72px 32px; }
   .faq2-grid { grid-template-columns: 0.9fr 1.4fr; gap: 28px; }
-  .faq2-aside { position: sticky; top: 100px; }
 }

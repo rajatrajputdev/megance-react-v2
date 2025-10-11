@@ -106,6 +106,8 @@
           await loadScript('/common/js/lib/jquery-3.6.0.min.js');
           await loadScript('/common/js/lib/jquery-migrate-3.4.0.min.js');
           await loadScript('/common/js/lib/plugins.js');
+          // Silence GSAP warnings for missing targets used by vendor scripts
+          try { if (window.gsap && window.gsap.config) window.gsap.config({ nullTargetWarn: false }); } catch(_) {}
           await loadScript('https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js');
           await loadScript('/common/js/gsap_lib/ScrollSmoother.min.js');
           await loadScript('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js');
