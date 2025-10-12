@@ -312,23 +312,6 @@ const onMediaMove = (e) => {
     };
   }, [product, size, gender, hasGenders]);
 
-  // Centralized Add to Cart handler (used by main and hover button)
-  const handleAddToCart = () => {
-    if (!size) return;
-    const currentInCart = (() => {
-      const cid = cartProduct?.id;
-      if (!cid) return 0;
-      const found = (items || []).find((x) => x.id === cid);
-      return Number(found?.qty) || 0;
-    })();
-    const max = Number.isFinite(maxQtyForSize) ? maxQtyForSize : Infinity;
-    const remaining = Math.max(0, max - currentInCart);
-    const clamped = Math.min(remaining, qty);
-    if (clamped <= 0) return;
-    addItem(cartProduct, clamped);
-    try { showToast("success", "Added to cart"); } catch {}
-  };
-
   // ---- Error / Not found / Loading ----
   if (!loading && error) {
     return (
@@ -458,25 +441,6 @@ const onMediaMove = (e) => {
                 {/* Square keeper for fallback */}
                 <div className="pd-media-keeper" aria-hidden="true" />
                 <img ref={imgElRef} src={mainImage} alt={product.name} className="pd-main-img" />
-                {/* Hover overlay: name + quick action */}
-                <div className="pd-hover-overlay" aria-hidden={!canHover}>
-                  <div className="pd-hover-inner">
-                    <div className="pd-hover-title">{product.name}</div>
-                    <button
-                      type="button"
-                      className="pd-hover-btn"
-                      onClick={handleAddToCart}
-                      disabled={
-                        !size ||
-                        (Number.isFinite(maxQtyForSize) && maxQtyForSize <= 0) ||
-                        remainingForSize === 0
-                      }
-                      title={!size ? "Select a size" : "Buy Now"}
-                    >
-                      Buy Now
-                    </button>
-                  </div>
-                </div>
                 {lensVisible && (
                   <>
                     <div
@@ -657,7 +621,25 @@ const onMediaMove = (e) => {
               </div>
               <button
                 className="pp-primary-btn"
-                onClick={handleAddToCart}
+                onClick={() => {
+                  if (!size) return;
+                  const currentInCart = (() => {
+                    const cid = cartProduct?.id;
+                    if (!cid) return 0;
+                    const found = (items || []).find((x) => x.id === cid);
+                    return Number(found?.qty) || 0;
+                  })();
+                  const max = Number.isFinite(maxQtyForSize)
+                    ? maxQtyForSize
+                    : Infinity;
+                  const remaining = Math.max(0, max - currentInCart);
+                  const clamped = Math.min(remaining, qty);
+                  if (clamped <= 0) return;
+                  addItem(cartProduct, clamped);
+                  try {
+                    showToast("success", "Added to cart");
+                  } catch {}
+                }}
                 disabled={
                   !size ||
                   (Number.isFinite(maxQtyForSize) && maxQtyForSize <= 0) ||

@@ -14,6 +14,7 @@ import TermsPage from "./pages/Terms.jsx";
 import PrivacyPage from "./pages/Privacy.jsx";
 import TermsOfUsePage from "./pages/TermsOfUse.jsx";
 import About from "./pages/About.jsx";
+import ReturnsPage from "./pages/Returns.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./components/general_components/RequireAuth.jsx";
@@ -84,6 +85,14 @@ export default function App() {
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms-of-use" element={<TermsOfUsePage />} />
                 <Route path="/about-us" element={<About />} />
+                <Route
+                  path="/returns"
+                  element={
+                    <RequireAuth>
+                      <ReturnsPage />
+                    </RequireAuth>
+                  }
+                />
                 <Route
                   path="/account"
                   element={
