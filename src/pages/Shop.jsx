@@ -108,6 +108,13 @@ export default function Shop() {
           {!loading && filtered.map((p) => (
             <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
               <div className="shop-card">
+                {/* Full-card hover cover image */}
+                <img
+                  className="shop-card-cover"
+                  src={p.hover || p.image}
+                  alt=""
+                  aria-hidden="true"
+                />
                 <Link to={`/product/${p.id}`} className="shop-image" aria-label={p.name}>
                   <img className="shop-img shop-img--front" src={p.image} alt="" />
                   <img className="shop-img shop-img--hover" src={p.hover || p.image} alt="" />

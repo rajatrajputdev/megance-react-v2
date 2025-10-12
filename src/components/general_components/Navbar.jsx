@@ -73,6 +73,9 @@ export default function Navbar() {
                   <li className="nav-item mr-20">
                     <NavLink className="nav-link" to="/">Home</NavLink>
                   </li>
+                  <li className="nav-item mr-20">
+                    <NavLink className="nav-link" to="/returns">Returns</NavLink>
+                  </li>
                   <li className="nav-item dropdown">
                     <a href="#" className="nav-link" onClick={(e) => e.preventDefault()}>Shop</a>
                     <div className="dropdown-menu">
@@ -168,6 +171,15 @@ export default function Navbar() {
                   </div>
                 </li>
               )}
+              <li>
+                <div className="o-hidden">
+                  <NavLink to="/returns" className="link" onClick={closeMenu}>
+                    <span className="fill-text" data-text="Returns">
+                      Returns
+                    </span>
+                  </NavLink>
+                </div>
+              </li>
             </ul>
           </div>
           {/* <div className="cont-info valign">
