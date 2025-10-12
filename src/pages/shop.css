@@ -27,6 +27,8 @@
   padding: 12px;
   box-shadow: 0 6px 16px rgba(0,0,0,0.06);
   transition: transform .2s ease, box-shadow .2s ease;
+  position: relative;
+  overflow: hidden;
 }
 .shop-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.12); }
 
@@ -36,6 +38,32 @@
 .shop-image .shop-img--hover { position: absolute; inset: 0; opacity: 0; z-index: 0; }
 .shop-card:hover .shop-image .shop-img--front { opacity: 0; transform: scale(1.02); }
 .shop-card:hover .shop-image .shop-img--hover { opacity: 1; transform: scale(1.02); }
+
+/* Full-card hover cover */
+.shop-card .shop-card-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #fff; /* keep white around contained image */
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity .25s ease, transform .25s ease;
+  pointer-events: none; /* don't block clicks on links/buttons */
+  z-index: 2; /* above meta and actions */
+}
+.shop-card:hover .shop-card-cover { opacity: 1; }
+
+/* Disable inner hover image to avoid duplicate loading; using full-card cover instead */
+.shop-image .shop-img--hover { display: none; }
+
+/* Keep name, price and buttons visible above the cover image */
+.shop-card .shop-meta,
+.shop-card .shop-actions {
+  position: relative;
+  z-index: 3;
+}
 
 .shop-meta { margin-top: 8px; display: flex; align-items: baseline; justify-content: space-between; }
 .shop-name { font-weight: 600; color: #111; font-size: 15px; }
