@@ -1,16 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; 
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation } from "react-router-dom";
 import SEO from "../components/general_components/SEO.jsx";
 import { fetchSignInMethodsForEmail } from "firebase/auth";
 import { auth } from "../firebase";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
+import "./login-page.css";
 
 export default function LoginPage() {
   const {
     user,
-    profile,
-    profileLoading,
     signInWithGoogle,
     logout,
   } = useAuth();
@@ -20,35 +19,30 @@ export default function LoginPage() {
   const location = useLocation();
   const from = new URLSearchParams(location.search).get("from") || "/";
 
+  // ✅ Desktop & Mobile image logic
+  const desktopImage = "/assets/imgs/login/l1.png"; // 🔁 Replace later
+  const mobileImage = "/assets/imgs/login/l1mob.png"; // 🔁 Replace later
+  const [bgImage, setBgImage] = useState(desktopImage);
+
+  useEffect(() => {
+    const updateImage = () => {
+      if (window.innerWidth <= 768) {
+        setBgImage(mobileImage);
+      } else {
+        setBgImage(desktopImage);
+      }
+    };
+    updateImage();
+    window.addEventListener("resize", updateImage);
+    return () => window.removeEventListener("resize", updateImage);
+  }, []);
+
   const onGoogle = async () => {
     setErr("");
     try {
       await signInWithGoogle();
-      // Always go to setup to complete onboarding (production flow)
       navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
     } catch (e) {
-      // Handle account-exists-with-different-credential gracefully
-      if (e?.code === "auth/account-exists-with-different-credential") {
-        const email = e?.customData?.email;
-        if (email) {
-          try {
-            const methods = await fetchSignInMethodsForEmail(auth, email);
-            const pretty = (methods || []).map((m) => {
-              if (m === 'password') return 'email + password';
-              if (m === 'google.com') return 'Google';
-              if (m === 'facebook.com') return 'Facebook';
-              if (m === 'apple.com') return 'Apple';
-              return m;
-            }).join(', ');
-            const msg = pretty
-              ? `An account with ${email} exists using ${pretty}. Please sign in with that method, then link Google from Account.`
-              : `An account with ${email} exists using a different method. Please sign in with that method, then link Google from Account.`;
-            setErr(msg);
-            showToast("error", msg);
-            return;
-          } catch {}
-        }
-      }
       const msg = e?.message || "Unable to sign in with Google";
       setErr(msg);
       showToast("error", msg);
@@ -58,10 +52,10 @@ export default function LoginPage() {
   if (user) {
     return (
       <>
-        <SEO title="Account" description="You are logged in to Megance." image="/assets/logo.svg" type="website" twitterCard="summary" />
+        <SEO title="Account" />
         <section className="container page-section text-center">
           <h3>You are logged in as {user.displayName || user.email}</h3>
-          <button className="butn butn-md butn-rounded mt-20" onClick={() => logout()}>Logout</button>
+          <button className="butn butn-md butn-rounded mt-20" onClick={logout}>Logout</button>
         </section>
       </>
     );
@@ -69,19 +63,31 @@ export default function LoginPage() {
 
   return (
     <>
-      <SEO title="Login" description="Login to Megance to continue to checkout." image="/assets/logo.svg" type="website" twitterCard="summary" />
-    <section className="container page-section white-navbar-page">
-      <div className="row justify-content-center">
-        <div className="col-md-6">
-          <div className="p-20 card-like text-center">
-            <h3 className="mb-20">Login</h3>
-            <p className="inline-hint" style={{marginTop: 0}}>You’ll verify phone in the next step.</p>
-            <button className="butn butn-md butn-rounded mt-10" onClick={onGoogle}>Continue with Google</button>
-            {err && <div className="mt-15" style={{ color: '#c62828' }}>{err}</div>}
-          </div>
+      <SEO title="Login" />
+      <div className="auth-wrapper">
+        <div
+          className="auth-image"
+          style={{ backgroundImage: `url(${bgImage})` }} // ✅ Dynamic Image Here
+        ></div>
+        <div className="auth-card">
+          <h2 className="auth-title">Welcome Back</h2>
+          <p className="auth-subtext">Sign in to continue your journey.</p>
+
+          <button className="google-btn" onClick={onGoogle}>
+            <span className="google-icon">
+              <svg width="18" height="18" viewBox="0 0 533.5 544.3">
+                <path fill="#4285F4" d="M533.5,278.4c0-17.4-1.5-34.1-4.3-50.3H272v95.3h147c-6.3,33.7-25,62.1-53.5,81.2l86.4,67.1 c50.4-46.5,81.6-115,81.6-193.3z"/>
+                <path fill="#34A853" d="M272,544.3c72.9,0,134.1-24.1,178.8-65.3l-86.4-67.1c-24.1,16.2-55,25.8-92.4,25.8 c-70.9,0-130.9-47.9-152.4-112.3l-89.2,69.1C71.7,486.3,164.6,544.3,272,544.3z"/>
+                <path fill="#FBBC05" d="M119.6,325.4c-4.5-13.3-7-27.5-7-42.4c0-14.9,2.5-29.1,7-42.4l-89.2-69.1C10.7,203.3,0,239.3,0,283 c0,43.7,10.7,79.7,30.4,111.5L119.6,325.4z"/>
+                <path fill="#EA4335" d="M272,109.7c39.7,0,75.3,13.7,103.4,40.6l77.5-77.5C406.1,24.1,344.9,0,272,0C164.6,0,71.7,57.9,30.4,141.5 l89.2,69.1C141.1,157.6,201.1,109.7,272,109.7z"/>
+              </svg>
+            </span>
+            Continue with Google
+          </button>
+
+          {err && <div className="auth-error">{err}</div>}
         </div>
       </div>
-    </section>
     </>
   );
 }

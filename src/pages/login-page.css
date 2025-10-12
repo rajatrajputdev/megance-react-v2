@@ -1,0 +1,86 @@
+.auth-wrapper {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+/* ✅ Image container - background now controlled via inline JSX */
+.auth-image {
+  flex: 1;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* ✅ Login Card – 450px width */
+.auth-card {
+  width: 450px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 50px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.auth-title {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.auth-subtext {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 25px;
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+  background: #000;
+  color: #fff;
+  border: none;
+  padding: 14px 18px;
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.google-btn:hover {
+  background: #222;
+}
+
+.google-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-error {
+  margin-top: 15px;
+  color: #c62828;
+  font-size: 13px;
+}
+
+/* ✅ Responsive Mobile Layout */
+@media (max-width: 768px) {
+  .auth-wrapper {
+    flex-direction: column;
+  }
+
+  .auth-image {
+    height: 40vh;
+    width: 100%;
+  }
+
+  .auth-card {
+    width: 100%;
+    padding: 35px;
+    box-shadow: none;
+  }
+}
