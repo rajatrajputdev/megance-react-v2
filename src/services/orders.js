@@ -54,3 +54,19 @@ export async function decrementStockForOrder(orderId) {
   const res = await call({ orderId });
   return res.data || { ok: true };
 }
+
+export async function requestReturn(orderId) {
+  const region = (import.meta.env.VITE_FUNCTIONS_REGION || "").trim() || undefined;
+  const fns = getFunctions(app, region);
+  const call = httpsCallable(fns, "requestReturnForOrder");
+  const res = await call({ orderId });
+  return res.data || { ok: true };
+}
+
+export async function getOrderShipmentStatus({ orderId, awb, prefer }) {
+  const region = (import.meta.env.VITE_FUNCTIONS_REGION || "").trim() || undefined;
+  const fns = getFunctions(app, region);
+  const call = httpsCallable(fns, "getOrderShipmentStatus");
+  const res = await call({ orderId, awb, prefer });
+  return res.data || { ok: false };
+}

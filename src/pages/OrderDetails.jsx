@@ -6,6 +6,7 @@ import { collection, doc, getDoc, onSnapshot, query, where, limit, getDocs } fro
 import SEO from "../components/general_components/SEO.jsx";
 import { auth, app } from "../firebase.js";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { getOrderShipmentStatus } from "../services/orders.js";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -13,10 +14,13 @@ export default function OrderDetails() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [returnBusy, setReturnBusy] = useState(false);
+  const [liveStatus, setLiveStatus] = useState(null);
+  const [liveBusy, setLiveBusy] = useState(false);
 
   useEffect(() => {
     if (!user || !id) return;
-    setLoading(true);
+    // Do not show a preloader; keep existing content if present
     setErr("");
 
     // Prefer user subcollection doc by id
@@ -54,6 +58,23 @@ export default function OrderDetails() {
     });
     return () => unsub();
   }, [user, id]);
+
+  // Fetch latest live shipment status from XpressBees (forward or return AWB)
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!order) return;
+        const awb = order?.returnAwb || order?.xbAwb;
+        if (!awb) return;
+        setLiveBusy(true);
+        const res = await getOrderShipmentStatus({ orderId: order?.orderId || order?.id || id, prefer: order?.returnAwb ? 'return' : 'forward' });
+        if (res?.ok) setLiveStatus(res.summary || "");
+      } catch {}
+      finally { setLiveBusy(false); }
+    };
+    run();
+    // Refresh when order updates (e.g., after creating return)
+  }, [order, id]);
 
   const totals = useMemo(() => {
     if (!order) return { items: 0, amount: 0, discount: 0, payable: 0 };
@@ -99,9 +120,7 @@ export default function OrderDetails() {
                 <h3 className="mb-0">Order Details</h3>
                 <Link to="/account" className="underline">Back to Orders</Link>
               </div>
-              {loading ? (
-                <p className="opacity-7 mt-10">Loading…</p>
-              ) : err ? (
+              {err ? (
                 <div className="alert error mt-10">{err}</div>
               ) : order ? (
                 <div className="mt-10">
@@ -116,6 +135,32 @@ export default function OrderDetails() {
                   </div>
 
                   <hr className="mt-15 mb-15" />
+
+                  {(order?.xbAwb || order?.returnAwb || order?.razorpay?.orderId || order?.razorpay?.paymentId) && (
+                    <div className="mb-10">
+                      <div className="small opacity-7">Shipment / Payment</div>
+                      {order?.xbAwb && (
+                        <div className="small">
+                          Forward AWB: <strong>{order.xbAwb}</strong>
+                          {" "}
+                          <a className="underline ml-6" href={`https://www.xpressbees.com/track?awb=${encodeURIComponent(order.xbAwb)}`} target="_blank" rel="noreferrer">Track</a>
+                        </div>
+                      )}
+                      {order?.returnAwb && (
+                        <div className="small">
+                          Return AWB: <strong>{order.returnAwb}</strong>
+                          {" "}
+                          <a className="underline ml-6" href={`https://www.xpressbees.com/track?awb=${encodeURIComponent(order.returnAwb)}`} target="_blank" rel="noreferrer">Track</a>
+                        </div>
+                      )}
+                      {(order?.razorpay?.orderId || order?.razorpay?.paymentId) && (
+                        <div className="small">Razorpay: {(order.razorpay.orderId || "").toString()} {order.razorpay.paymentId ? `• ${order.razorpay.paymentId}` : ""}</div>
+                      )}
+                      {(order?.xbAwb || order?.returnAwb) && (
+                        <div className="small">Live Status: {liveBusy ? 'Fetching…' : (liveStatus || '—')}</div>
+                      )}
+                    </div>
+                  )}
 
                   <h6>Items</h6>
                   <ul className="mt-10" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -157,6 +202,14 @@ export default function OrderDetails() {
 
                   <div className="mt-15">
                     <button className="butn" onClick={openInvoicePdf}>Download Invoice PDF</button>
+                    {(!order.returnAwb && !order.returnRequested) && (
+                      <Link className="butn ml-10" to={`/returns?orderId=${encodeURIComponent(order?.orderId || order?.id || id)}`}>
+                        Request Return / Refund
+                      </Link>
+                    )}
+                    {(order.returnAwb || order.returnRequested) && (
+                      <span className="small ml-10">Return {order.returnAwb ? `AWB: ${order.returnAwb}` : '(requested)'} </span>
+                    )}
                   </div>
 
                   <hr className="mt-15 mb-15" />

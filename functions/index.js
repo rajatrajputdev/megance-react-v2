@@ -239,6 +239,117 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
   };
 }
 
+// Build a reverse-pickup shipment payload: pickup from buyer, deliver back to warehouse
+function buildXbReversePayload({ orderLabel, data }) {
+  const billing = data.billing || {};
+  const items = Array.isArray(data.items) ? data.items : [];
+  const amount = Math.round(Number(data.amount) || 0);
+  const discount = Math.round(Number(data.discount) || 0);
+  const base = Math.max(0, amount - discount);
+  const gst = Number.isFinite(Number(data.gst))
+    ? Math.round(Number(data.gst))
+    : Math.round(base * 0.18);
+  const payable = Math.round(Number(data.payable) || base + gst);
+
+  const dwKg = Number(process.env.XPRESSBEES_DEFAULT_WEIGHT || 0.7);
+  const grams = kgToGrams(dwKg);
+  const dl = Number(process.env.XPRESSBEES_DEFAULT_LENGTH || 30);
+  const dbt = Number(process.env.XPRESSBEES_DEFAULT_BREADTH || 20);
+  const dh = Number(process.env.XPRESSBEES_DEFAULT_HEIGHT || 10);
+
+  // In reverse, pickup is buyer
+  const pickupPhone = phone10(billing.phone || "");
+  const pickupPin = pin6(billing.zip || "");
+  const { address: pickupAddr1, address_2: pickupAddr2 } = splitAddress(
+    billing.address || ""
+  );
+
+  // Consignee is warehouse (where it originally came from)
+  const whNameRaw = (
+    process.env.XPRESSBEES_PICKUP_WAREHOUSE ||
+    process.env.XPRESSBEES_PICKUP_NAME ||
+    "Megance WH"
+  ).trim();
+  const warehouse_name =
+    trunc(whNameRaw.replace(/\s+/g, " ").slice(0, 20), 20) || "MeganceWH1";
+  const { address: consAddr1, address_2: consAddr2 } = splitAddress(
+    process.env.XPRESSBEES_PICKUP_ADDRESS || ""
+  );
+  const consigneePin = pin6(process.env.XPRESSBEES_PICKUP_PINCODE || "");
+  const consigneePhone = phone10(process.env.XPRESSBEES_PICKUP_PHONE || "");
+  const gstNo = (
+    process.env.XPRESSBEES_PICKUP_GST ||
+    process.env.XPRESSBEES_GST_NUMBER ||
+    ""
+  ).trim();
+
+  const order_items = items.map((it) => ({
+    name: String(it.name || ""),
+    qty: String(Number(it.qty) || 1),
+    price: String(Number(it.price) || 0),
+    sku: String(it.id || ""),
+  }));
+
+  // Return shipments are prepaid by us; buyer pays nothing on pickup
+  const collectable = 0;
+  const payment_type = "prepaid";
+  const autoPickup =
+    (process.env.XPRESSBEES_AUTO_PICKUP || "yes").toLowerCase() === "yes"
+      ? "yes"
+      : "no";
+
+  return {
+    order_number: trunc(orderLabel, 20),
+    payment_type,
+    order_amount: payable,
+    discount: discount || 0,
+    shipping_charges: Number(process.env.XPRESSBEES_SHIPPING_CHARGES || 0),
+    cod_charges: 0,
+    ...(process.env.XPRESSBEES_COURIER_ID
+      ? { courier_id: String(process.env.XPRESSBEES_COURIER_ID).trim() }
+      : {}),
+    package_weight: grams,
+    package_length: dl,
+    package_breadth: dbt,
+    package_height: dh,
+    request_auto_pickup: autoPickup,
+    // Swap roles: buyer as pickup, our warehouse as consignee
+    pickup: {
+      warehouse_name: trunc((billing.name || "Buyer").toString(), 20),
+      name: trunc(billing.name || "", 200),
+      address: pickupAddr1,
+      address_2: pickupAddr2,
+      city: trunc(billing.city || "", 40),
+      state: trunc(billing.state || "", 40),
+      pincode: pickupPin,
+      phone: pickupPhone,
+    },
+    consignee: {
+      name: trunc(
+        process.env.XPRESSBEES_PICKUP_CONTACT ||
+          process.env.XPRESSBEES_PICKUP_NAME ||
+          "Megance",
+        200
+      ),
+      company_name: trunc(
+        process.env.XPRESSBEES_CONSIGNEE_COMPANY || warehouse_name,
+        200
+      ),
+      address: consAddr1,
+      address_2: consAddr2,
+      city: trunc(process.env.XPRESSBEES_PICKUP_CITY || "", 40),
+      state: trunc(process.env.XPRESSBEES_PICKUP_STATE || "", 40),
+      pincode: consigneePin,
+      phone: consigneePhone,
+      ...(gstNo ? { gst_number: gstNo, gst_umber: gstNo } : {}),
+    },
+    order_items,
+    collectable_amount: collectable,
+    // Some integrations require a hint for reverse
+    is_reverse: true,
+  };
+}
+
 function buildTransporter(env) {
   const user = env.MAIL_USER || "";
   const pass = env.MAIL_PASS || "";
@@ -2348,3 +2459,156 @@ function xbOrigin(rawBase) {
     }
   }
 }
+
+// Try to fetch live shipment status from XpressBees for a given AWB
+async function fetchXbStatus({ token, base, awb }) {
+  const origin = xbOrigin(base || XB_ORIGIN);
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'content-type': 'application/json',
+  };
+  // Try multiple plausible endpoints to maximize compatibility
+  const attempts = [
+    { method: 'GET', path: `/api/track/${encodeURIComponent(awb)}` },
+    { method: 'GET', path: `/api/track/awb/${encodeURIComponent(awb)}` },
+    { method: 'GET', path: `/api/shipments/track/${encodeURIComponent(awb)}` },
+    { method: 'POST', path: `/api/track`, body: { awb_number: String(awb) } },
+    { method: 'POST', path: `/api/shipments/track`, body: { awb: String(awb) } },
+    { method: 'GET', path: `/api/shipments2/${encodeURIComponent(awb)}` },
+  ];
+  for (const att of attempts) {
+    try {
+      const url = `${origin}${att.path}`;
+      const resp = await fetch(url, {
+        method: att.method,
+        headers,
+        ...(att.body ? { body: JSON.stringify(att.body) } : {}),
+      });
+      let data = null;
+      try { data = await resp.json(); } catch { try { data = await resp.text(); } catch { data = null; } }
+      if (resp.ok && data) {
+        return { ok: true, data };
+      }
+    } catch (_) {
+      // try next
+    }
+  }
+  return { ok: false, error: 'tracking_unavailable' };
+}
+
+// Request a reverse pickup (return) for an order. Auth required (owner of order).
+exports.requestReturnForOrder = onCall(
+  { region: REGION, secrets: [XPRESSBEES_USERNAME, XPRESSBEES_PASSWORD] },
+  async (req) => {
+    const uid = req.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
+    const orderId = String(req.data?.orderId || '').trim();
+    if (!orderId) throw new HttpsError('invalid-argument', 'orderId is required');
+
+    const db = admin.firestore();
+    const ref = db.doc(`orders/${orderId}`);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpsError('not-found', 'Order not found');
+    const data = snap.data() || {};
+    if (data.userId && data.userId !== uid && (data.user?.id && data.user.id !== uid)) {
+      throw new HttpsError('permission-denied', 'Not your order');
+    }
+
+    // Idempotency: if return already created, do not recreate
+    if (data.returnAwb || data.returnShipmentId) {
+      return { ok: true, already: true, awb: data.returnAwb || null, shipmentId: data.returnShipmentId || null };
+    }
+
+    const username = XPRESSBEES_USERNAME.value() || process.env.XPRESSBEES_USERNAME || '';
+    const password = XPRESSBEES_PASSWORD.value() || process.env.XPRESSBEES_PASSWORD || '';
+    if (!username || !password) throw new HttpsError('failed-precondition', 'XpressBees not configured');
+
+    try {
+      const token = await getXpressbeesToken({ username, password });
+      const orderLabel = `RET${orderId.slice(0,6).toUpperCase()}`;
+      const payload = buildXbReversePayload({ orderLabel, data });
+      const url = `${xbOrigin()}/api/shipments2`;
+      let resp = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
+      if (resp.status === 401 || resp.status === 403) {
+        const fresh = await getXpressbeesToken({ username, password });
+        resp = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${fresh}` }, body: JSON.stringify(payload) });
+      }
+      let raw = null; try { raw = await resp.json(); } catch { try { raw = await resp.text(); } catch { raw = null; } }
+      if (!resp.ok) {
+        const msg = (raw && (raw.message || raw.error)) || `HTTP ${resp.status}`;
+        throw new HttpsError('internal', String(msg));
+      }
+      let awb = null, shipmentId = null;
+      try {
+        const s = raw && typeof raw === 'object' ? (raw.data || raw || {}) : {};
+        awb = s?.awb_number || s?.awb || s?.awbno || null;
+        shipmentId = s?.shipment_id || s?.order_id || s?.id || null;
+      } catch {}
+
+      await ref.set({
+        returnRequested: true,
+        returnRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+        returnAwb: awb || null,
+        returnShipmentId: shipmentId || null,
+        returnRaw: raw || null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return { ok: true, awb, shipmentId };
+    } catch (e) {
+      if (e instanceof HttpsError) throw e;
+      throw new HttpsError('internal', e?.message || 'Return failed');
+    }
+  }
+);
+
+// Get latest live shipment status from XpressBees for an order or AWB
+exports.getOrderShipmentStatus = onCall(
+  { region: REGION, secrets: [XPRESSBEES_USERNAME, XPRESSBEES_PASSWORD] },
+  async (req) => {
+    const uid = req.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
+    const orderId = String(req.data?.orderId || '').trim();
+    const awbInput = String(req.data?.awb || '').trim();
+    const prefer = String(req.data?.prefer || '').trim().toLowerCase(); // 'return' | 'forward'
+    if (!orderId && !awbInput) throw new HttpsError('invalid-argument', 'orderId or awb is required');
+
+    const db = admin.firestore();
+    let awb = awbInput || '';
+    if (orderId) {
+      const ref = db.doc(`orders/${orderId}`);
+      const snap = await ref.get();
+      if (!snap.exists) throw new HttpsError('not-found', 'Order not found');
+      const data = snap.data() || {};
+      if (data.userId && data.userId !== uid && (data.user?.id && data.user.id !== uid)) {
+        throw new HttpsError('permission-denied', 'Not your order');
+      }
+      if (!awb) {
+        awb = prefer === 'return' ? (data.returnAwb || data.xbAwb || '') : (data.xbAwb || data.returnAwb || '');
+      }
+    }
+    if (!awb) throw new HttpsError('not-found', 'No AWB on order');
+
+    const username = XPRESSBEES_USERNAME.value() || process.env.XPRESSBEES_USERNAME || '';
+    const password = XPRESSBEES_PASSWORD.value() || process.env.XPRESSBEES_PASSWORD || '';
+    if (!username || !password) throw new HttpsError('failed-precondition', 'XpressBees not configured');
+
+    try {
+      const token = await getXpressbeesToken({ username, password });
+      const out = await fetchXbStatus({ token, base: XB_ORIGIN, awb });
+      if (!out.ok) return { ok: false, error: out.error || 'unavailable' };
+      // Try to extract a compact summary
+      let summary = null;
+      const data = out.data;
+      try {
+        const obj = typeof data === 'object' ? data : {};
+        const s = obj.status || obj.current_status || obj.currentStatus || obj.shipment_status || obj.message || null;
+        summary = s || null;
+      } catch {}
+      return { ok: true, awb, summary, raw: out.data };
+    } catch (e) {
+      if (e instanceof HttpsError) throw e;
+      throw new HttpsError('internal', e?.message || 'Tracking failed');
+    }
+  }
+);

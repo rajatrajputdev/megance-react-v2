@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { collection, onSnapshot, orderBy, query, addDoc, serverTimestamp } from "firebase/firestore";
-import { db, storage } from "../firebase.js";
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { db } from "../firebase.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import SEO from "../components/general_components/SEO.jsx";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
+import { requestReturn, getOrderShipmentStatus } from "../services/orders.js";
+import { supabaseUploadFile, supabaseGetSignedUrl } from "../utils/supabase.js";
 
 export default function ReturnsPage() {
   const { user, profile } = useAuth();
@@ -13,6 +15,9 @@ export default function ReturnsPage() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [selectedItemIndex, setSelectedItemIndex] = useState(0);
+  const [liveStatus, setLiveStatus] = useState("");
+  const [liveBusy, setLiveBusy] = useState(false);
+  const location = useLocation();
 
   // Prefillable info
   const [form, setForm] = useState({
@@ -60,10 +65,16 @@ export default function ReturnsPage() {
       list.sort((a,b)=>((b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0)));
       setOrders(list);
       setLoadingOrders(false);
-      if (!selectedOrderId && list.length) setSelectedOrderId(list[0].id);
+      const params = new URLSearchParams(location.search || "");
+      const qid = (params.get('orderId') || '').trim();
+      if (qid) {
+        const found = list.find(o => (o.orderId === qid) || (o.id === qid));
+        if (found) setSelectedOrderId(found.id);
+        else if (!selectedOrderId && list.length) setSelectedOrderId(list[0].id);
+      } else if (!selectedOrderId && list.length) setSelectedOrderId(list[0].id);
     }, () => setLoadingOrders(false));
     return () => unsub();
-  }, [user]);
+  }, [user, location.search]);
 
   const selectedOrder = useMemo(() => orders.find(o => o.id === selectedOrderId) || null, [orders, selectedOrderId]);
   const selectedItem = useMemo(() => {
@@ -92,11 +103,31 @@ export default function ReturnsPage() {
     }));
   }, [selectedOrderId, selectedItemIndex, profile?.name, profile?.email, profile?.phone]);
 
+  // Fetch latest live shipment status for the selected order (XpressBees)
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const o = selectedOrder;
+        if (!o) { setLiveStatus(""); return; }
+        const awb = o?.returnAwb || o?.xbAwb;
+        if (!awb) { setLiveStatus(""); return; }
+        setLiveBusy(true);
+        const res = await getOrderShipmentStatus({ orderId: o.orderId || o.id, prefer: o?.returnAwb ? 'return' : 'forward' });
+        if (res?.ok) setLiveStatus(res.summary || "");
+      } catch {
+        setLiveStatus("");
+      } finally {
+        setLiveBusy(false);
+      }
+    };
+    run();
+  }, [selectedOrder]);
+
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   const onReasonChange = (e) => setForm((f) => ({ ...f, reason: { ...f.reason, [e.target.name]: e.target.checked } }));
   const onOtherText = (e) => setForm((f) => ({ ...f, reason: { ...f.reason, otherText: e.target.value } }));
   const onCondition = (e) => setForm((f) => ({ ...f, condition: e.target.value }));
-  const onResolution = (e) => setForm((f) => ({ ...f, resolution: e.target.value }));
+  // Resolution is fixed to refund; no exchange option
   const onRefundMethod = (e) => setForm((f) => ({ ...f, refundMethod: e.target.value }));
   const onBankChange = (e) => setForm((f) => ({ ...f, bank: { ...f.bank, [e.target.name]: e.target.value } }));
   const onDecChange = (e) => setForm((f) => ({ ...f, declarations: { ...f.declarations, [e.target.name]: e.target.checked } }));
@@ -122,7 +153,7 @@ export default function ReturnsPage() {
     if (!form.reason.wrongSize && !form.reason.damaged && !form.reason.differentItem && !form.reason.qualityIssue && !form.reason.other) return "Select a reason";
     if (form.reason.other && !form.reason.otherText.trim()) return "Please specify other reason";
     if (!form.condition) return "Select product condition";
-    if (!form.resolution) return "Select preferred resolution";
+    // resolution fixed to refund
     if (!form.refundMethod) return "Select refund method";
     if (form.refundMethod === 'cod') {
       const b = form.bank;
@@ -139,32 +170,24 @@ export default function ReturnsPage() {
     if (err) { showToast("error", err); return; }
     setSubmitting(true);
     try {
-      // Upload images if any with progress
+      // Upload images to Supabase Storage
       const uploads = [];
       const files = Array.from(form.images || []);
-      let bytesTotal = files.reduce((a, f) => a + (f.size || 0), 0);
-      let bytesSent = 0;
-      const updateProgress = () => {
-        if (!bytesTotal) { setUploadProgress(0); return; }
-        setUploadProgress(Math.round((bytesSent / bytesTotal) * 100));
-      };
+      const total = files.length || 0;
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
-        const path = `refundRequests/${user.uid}/${Date.now()}_${i}_${(f.name||'file').replace(/[^a-zA-Z0-9_.-]/g,'_')}`;
-        const r = storageRef(storage, path);
-        await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: f.type || undefined });
-          task.on('state_changed', (snap) => {
-            try { bytesSent += (snap.bytesTransferred - (task._lastBytes || 0)); task._lastBytes = snap.bytesTransferred; } catch {}
-            updateProgress();
-          }, (e) => reject(e), async () => {
-            try {
-              const url = await getDownloadURL(task.snapshot.ref);
-              uploads.push({ path, url, name: f.name, size: f.size, type: f.type });
-              resolve();
-            } catch (e) { reject(e); }
-          });
-        });
+        const clean = (f.name || 'file').replace(/[^a-zA-Z0-9_.-]/g, '_');
+        const path = `refundRequests/${user.uid}/${Date.now()}_${i}_${clean}`;
+        const res = await supabaseUploadFile({ file: f, path });
+        // Try public URL first; fallback to signed url
+        let url = res.publicUrl;
+        try {
+          // quick HEAD check could be added; instead generate signed URL in case bucket is private
+          const signed = await supabaseGetSignedUrl({ path, expiresIn: 60 * 60 * 24 });
+          if (signed) url = signed;
+        } catch {}
+        uploads.push({ path, url, name: f.name, size: f.size, type: f.type });
+        setUploadProgress(Math.round(((i + 1) / total) * 100));
       }
       const payload = {
         userId: user.uid,
@@ -189,6 +212,29 @@ export default function ReturnsPage() {
       // Store in a common top-level collection for ops and under user for easy access
       await addDoc(collection(db, "refundRequests"), payload);
       await addDoc(collection(db, "users", user.uid, "refundRequests"), payload);
+      // Also schedule reverse pickup with XpressBees
+      try {
+        const orderDocId = selectedOrder.orderId || selectedOrder.id;
+        const reasonLabel = (() => {
+          if (form.reason.wrongSize) return 'size_issue';
+          if (form.reason.damaged) return 'defective';
+          if (form.reason.differentItem) return 'wrong_item';
+          if (form.reason.qualityIssue) return 'quality';
+          if (form.reason.other) return 'other';
+          return 'other';
+        })();
+        const notes = [form.reason.other ? form.reason.otherText : '', form.comments].filter(Boolean).join(' | ');
+        const rr = await requestReturn(orderDocId, { reason: reasonLabel, notes });
+        if (rr?.ok) {
+          const awb = rr.awb;
+          showToast("success", `Pickup scheduled.${awb ? ` AWB ${awb}` : ''}`);
+        } else if (rr?.error) {
+          showToast("error", rr.error);
+        }
+      } catch (e) {
+        showToast("error", e.message || 'Failed to schedule pickup');
+      }
+
       showToast("success", "Request submitted. We’ll contact you in 24–48 hours.");
       // Reset only optional fields
       setForm((f) => ({
@@ -214,13 +260,13 @@ export default function ReturnsPage() {
 
   return (
     <>
-      <SEO title="Return / Refund" description="Initiate a return or refund for your order." image="/assets/logo.svg" type="website" twitterCard="summary" />
+      <SEO title="Returns" description="Initiate a return for your order." image="/assets/logo.svg" type="website" twitterCard="summary" />
       <section className="container page-section white-navbar-page">
         <div className="row justify-content-center">
           <div className="col-lg-9">
             <div className="p-20 card-like">
-              <h3 className="mb-6">RETURN/REFUND REQUEST FORM</h3>
-              <p className="opacity-7">Please fill in the details below to initiate your return or refund. Our support team will review your request within 24–48 hours and get in touch via WhatsApp or email.</p>
+              <h3 className="mb-6">RETURN REQUEST</h3>
+              <p className="opacity-7">Please fill in the details below to initiate a return. No exchanges are offered at this time. Our support team will review your request within 24–48 hours and get in touch via WhatsApp or email.</p>
 
               {/* Order selection */}
               <div className="mt-15">
@@ -237,6 +283,24 @@ export default function ReturnsPage() {
                   </select>
                 )}
               </div>
+
+              {/* Shipment info and tracking */}
+              {selectedOrder && (selectedOrder.xbAwb || selectedOrder.returnAwb) && (
+                <div className="mt-10">
+                  <div className="small opacity-7">Shipment</div>
+                  {selectedOrder.xbAwb && (
+                    <div className="small">Forward AWB: <strong>{selectedOrder.xbAwb}</strong> {" "}
+                      <a className="underline ml-6" href={`https://www.xpressbees.com/track?awb=${encodeURIComponent(selectedOrder.xbAwb)}`} target="_blank" rel="noreferrer">Track</a>
+                    </div>
+                  )}
+                  {selectedOrder.returnAwb && (
+                    <div className="small">Return AWB: <strong>{selectedOrder.returnAwb}</strong> {" "}
+                      <a className="underline ml-6" href={`https://www.xpressbees.com/track?awb=${encodeURIComponent(selectedOrder.returnAwb)}`} target="_blank" rel="noreferrer">Track</a>
+                    </div>
+                  )}
+                  <div className="small">Live Status: {liveBusy ? 'Fetching…' : (liveStatus || '—')}</div>
+                </div>
+              )}
 
               {/* Item selection within order */}
               {selectedOrder && (
@@ -337,15 +401,12 @@ export default function ReturnsPage() {
                 )}
               </div>
 
-              {/* Resolution */}
+              {/* Resolution: refund only */}
               <div className="row mt-10">
                 <div className="col-md-6 mb-10">
-                  <label className="fw-600">Preferred Resolution</label>
+                  <label className="fw-600">Refund</label>
                   <div className="mt-6">
-                    <label className="radio-inline mr-10"><input type="radio" name="resolution" value="refund" checked={form.resolution === 'refund'} onChange={onResolution} /> Refund (₹450 deduction applies; refund ₹ {refundEstimate})</label>
-                    <div className="mt-6">
-                      <label className="radio-inline"><input type="radio" name="resolution" value="exchange" checked={form.resolution === 'exchange'} onChange={onResolution} /> Exchange (size or color – subject to availability)</label>
-                    </div>
+                    <div className="inline-hint">A logistics & handling fee of ₹450 will be deducted. Estimated refund: ₹ {refundEstimate}</div>
                   </div>
                 </div>
                 <div className="col-md-6 mb-10">
