@@ -50,7 +50,7 @@ export default function Footer() {
               <li><a href="#faq2">FAQs</a></li>
               <li><Link to="/terms">Shipping</Link></li>
               <li><Link to="/terms">Returns</Link></li>
-              <li><a href="mailto:hello@megance.in">Contact</a></li>
+              <li><a href="mailto:support@megance.in">Contact</a></li>
             </ul>
           </div>
           <div className="rh-col">

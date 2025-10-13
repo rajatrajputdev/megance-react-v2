@@ -1,10 +1,12 @@
+// ===== File: src/pages/CartPage.jsx =====
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { fetchProductById } from "../services/products";
+import "./cart-page.css";
 
 export default function CartPage() {
   const { items, updateQty, removeItem, amount } = useCart();
@@ -13,29 +15,36 @@ export default function CartPage() {
   const isEmpty = items.length === 0;
 
   // Availability map per cart item id
-  const [limits, setLimits] = useState({}); // { [cartItemId]: availableNumber|Infinity }
+  const [limits, setLimits] = useState({});
 
-  // Helper to parse cart id and extract base product id and size/gender.
-  const parseCartId = (id) => {
-    // We append "-s<size>" and optionally "-men" or "-women" before it.
-    // Safer parsing using meta if available.
-    const item = items.find((x) => x.id === id);
-    const size = item?.meta?.size || (id.includes("-s") ? id.split("-s").pop() : "");
-    const gender = item?.meta?.gender || (/-men-?s|\-men\-s/.test(id) ? "men" : (/-women-?s|\-women\-s/.test(id) ? "women" : null));
-    const baseId = (() => {
-      if (!size) return id; // fallback
-      const idx = id.lastIndexOf(`-s${size}`);
-      if (idx === -1) return id;
-      return id.slice(0, idx);
-    })();
-    return { baseId, size, gender };
-  };
+  // Parse cart id (old logic preserved)
+  const parseCartId = useCallback(
+    (id) => {
+      const item = items.find((x) => x.id === id);
+      const size = item?.meta?.size || (id.includes("-s") ? id.split("-s").pop() : "");
+      const gender =
+        item?.meta?.gender ||
+        (/-men-?s|\-men\-s/.test(id)
+          ? "men"
+          : /-women-?s|\-women\-s/.test(id)
+          ? "women"
+          : null);
+      const baseId = (() => {
+        if (!size) return id;
+        const idx = id.lastIndexOf(`-s${size}`);
+        if (idx === -1) return id;
+        return id.slice(0, idx);
+      })();
+      return { baseId, size, gender };
+    },
+    [items]
+  );
 
+  // Stock loading (grouped fetch; old logic preserved)
   useEffect(() => {
     let disposed = false;
     const load = async () => {
       const map = {};
-      // Group items by base id to avoid duplicate fetches
       const byBase = new Map();
       for (const it of items) {
         const parsed = parseCartId(it.id);
@@ -49,9 +58,11 @@ export default function CartPage() {
             let available = Infinity;
             if (parsed.size) {
               if (parsed.gender && Array.isArray(p?.sizeQuantities?.[parsed.gender])) {
-                const row = p.sizeQuantities[parsed.gender].find((r) => String(r.size) === String(parsed.size));
+                const row = p.sizeQuantities[parsed.gender].find(
+                  (r) => String(r.size) === String(parsed.size)
+                );
                 available = Number(row?.quantity) || 0;
-              } else if (Array.isArray(p?.sizes) && p.sizes.length && typeof p.sizes[0] === 'object') {
+              } else if (Array.isArray(p?.sizes) && p.sizes.length && typeof p.sizes[0] === "object") {
                 const row = p.sizes.find((r) => String(r.size) === String(parsed.size));
                 available = Number(row?.quantity) || 0;
               }
@@ -65,113 +76,330 @@ export default function CartPage() {
       if (!disposed) setLimits(map);
     };
     load();
-    return () => { disposed = true; };
-  }, [items]);
+    return () => {
+      disposed = true;
+    };
+  }, [items, parseCartId]);
 
-  const clamp = (id, val) => {
-    const lim = limits[id];
-    if (!Number.isFinite(lim)) return Math.max(1, val);
-    return Math.max(1, Math.min(lim, val));
+  // Clamp qty (old logic preserved)
+  const clamp = useCallback(
+    (id, val) => {
+      const lim = limits[id];
+      if (!Number.isFinite(lim)) return Math.max(1, val);
+      return Math.max(1, Math.min(lim, val));
+    },
+    [limits]
+  );
+
+  // Totals
+  const subtotal = amount;
+  const shippingFee = 0;
+  const total = useMemo(() => Math.max(0, subtotal + shippingFee), [subtotal, shippingFee]);
+
+  // Strict login gating
+  const handleCheckout = () => {
+    if (user) {
+      navigate("/checkout");
+    } else {
+      navigate("/login?from=/checkout");
+    }
   };
+
+  // Drawer helpers (CSS-driven)
+  const closeDrawer = () => document.body.classList.remove("show-cart-drawer");
+
+  useEffect(() => {
+    const onEsc = (e) => e.key === "Escape" && closeDrawer();
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, []);
 
   return (
     <>
-      <SEO title="Your Cart" description="Review items and proceed to checkout on Megance." image="/assets/logo.svg" type="website" twitterCard="summary" />
-      
-      <section className="container page-section">
-        <div className="row mb-40">
-          <div className="col-lg-8">
-            <h1 className="section-title">Your Cart</h1>
+      <SEO
+        title="Your Cart"
+        description="Review items and proceed to checkout on Megance."
+        image="/assets/logo.svg"
+        type="website"
+        twitterCard="summary"
+      />
+
+      <section className="cart-page container-narrow">
+        <header className="cart-header" style={{paddingTop:"80px"
+        }}>
+          <div className="cart-title-wrap">
+            <h1 className="cart-title">My Cart ({items.length})</h1>
+            <div className="reserve-note">Items in your cart are reserved temporarily</div>
           </div>
-          <div className="col-lg-4 text-lg-right mt-20 mt-lg-0">
-            <Link to="/shop" className="butn butn-md butn-rounded butn-light">Continue shopping</Link>
-          </div>
-        </div>
-      
+          {/* Continue Shopping (optional)
+          <Link to="/shop" className="link-underline">Continue shopping</Link>
+          */}
+        </header>
+
         {isEmpty ? (
-          <div className="row">
-            <div className="col-12 text-center">
-              <p>Your cart is empty.</p>
-              <Link to="/shop" className="butn mt-10">Browse products</Link>
-              <div className="mt-10">
-                <Link to="/shop?price=lt3500" className="underline">See Under ₹3500</Link>
-              </div>
+          <div className="empty-state">
+            <p className="empty-title">Your cart is empty.</p>
+            <Link to="/shop" className="btn btn-dark mt-10">
+              Browse products
+            </Link>
+            <div className="mt-10">
+              <Link to="/shop?price=lt3500" className="link-underline">
+                See Under ₹3500
+              </Link>
             </div>
           </div>
         ) : (
-          <div className="row">
-            <div className="col-lg-8">
+          <div className="cart-grid">
+            {/* LEFT: Items */}
+            <div className="cart-items">
               {items.map((it) => (
-                <div key={it.id} className="cart-item mb-20">
-                  <div className="thumb">
-                    <img src={it.image} alt={it.name} />
+                <div key={it.id} className="cart-item-card glass-surface">
+                  <button
+                    className="item-remove"
+                    aria-label="Remove item"
+                    onClick={() => removeItem(it.id)}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+
+                  <div className="item-thumb" style={{height:"100px", width:"150px"}}>
+                    <img src={it.image} alt={it.name}  />
                   </div>
-                  <div className="flex-fill">
-                    <div className="d-flex justify-content-between">
+
+                  <div className="item-info">
+                    <div className="item-name-row">
                       <div>
-                        <div className="fw-600">{it.name}</div>
-                        <div className="mt-5 text-muted">₹ {it.price}</div>
+                        <div className="item-name">{it.name}</div>
+                        <div className="variant-row">
+                          {it?.meta?.color && (
+                            <span className="variant-pill glow-on-hover">{it.meta.color}</span>
+                          )}
+                          {it?.meta?.size && (
+                            <span className="variant-pill glow-on-hover">Size {it.meta.size}</span>
+                          )}
+                        </div>
                       </div>
-                      <button className="remove-link" onClick={() => removeItem(it.id)}>Remove</button>
+                      <div className="item-price">₹ {it.price}</div>
                     </div>
-                    <div className="d-flex align-items-center mt-20">
-                      <label className="mr-15">Quantity</label>
-                      <div className="qty-control">
-                        <button onClick={() => updateQty(it.id, Math.max(1, it.qty - 1))} aria-label="Decrease">-</button>
+
+                    <div className="qty-row">
+                      <div className="qty-label">Quantity</div>
+                      <div className="qty-control large glow-on-hover">
+                        <button style={{color:"#111"}}
+                          onClick={() => updateQty(it.id, Math.max(1, it.qty - 1))}
+                          aria-label="Decrease"
+                        >
+                          –
+                        </button>
                         <input
                           type="number"
                           min={1}
                           value={clamp(it.id, it.qty)}
-                          onChange={(e) => updateQty(it.id, clamp(it.id, parseInt(e.target.value || 1)))}
+                          onChange={(e) =>
+                            updateQty(it.id, clamp(it.id, parseInt(e.target.value || 1)))
+                          }
                         />
-                        <button
+                        <button style={{color:"#111"}}
                           onClick={() => updateQty(it.id, clamp(it.id, it.qty + 1))}
                           aria-label="Increase"
                           disabled={Number.isFinite(limits[it.id]) && it.qty >= limits[it.id]}
-                          title={Number.isFinite(limits[it.id]) && it.qty >= limits[it.id] ? "Reached available stock" : "Increase"}
+                          title={
+                            Number.isFinite(limits[it.id]) && it.qty >= limits[it.id]
+                              ? "Reached available stock"
+                              : "Increase"
+                          }
                         >
                           +
                         </button>
                       </div>
+
                       {Number.isFinite(limits[it.id]) && (
-                        <span className="ml-10 inline-hint">Only {Math.max(0, limits[it.id] - (it.qty - 0))} left</span>
+                        <span className="stock-hint">
+                          Only {Math.max(0, limits[it.id] - (it.qty - 0))} left
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="col-lg-4">
-              <div className="p-20 card-like summary-box">
-                <h5 className="section-title">Summary</h5>
-                <div className="d-flex justify-content-between mt-20">
+
+            {/* RIGHT: Sticky Summary */}
+            <aside className="summary">
+              <div className="summary-box glass-surface strong-elevation">
+                <div className="summary-title">Summary</div>
+
+                <div className="summary-line">
                   <span>Subtotal</span>
-                  <span>₹ {amount}</span>
+                  <span>₹ {subtotal}</span>
                 </div>
-                <div className="d-flex justify-content-between mt-10">
+
+                <div className="summary-line">
                   <span>Shipping</span>
                   <span className="text-success">FREE</span>
                 </div>
-                <hr className="my-20" />
-                <div className="d-flex justify-content-between fw-600">
+
+                <hr className="summary-divider" />
+
+                <div className="summary-total">
                   <span>Total</span>
-                  <span>₹ {amount}</span>
+                  <span>₹ {total}</span>
                 </div>
-                {user ? (
-                  <Link to="/checkout" className="butn butn-md butn-rounded d-block mt-20 text-center">Proceed to Checkout</Link>
-                ) : (
-                  <button
-                    className="butn butn-md butn-rounded d-block mt-20 w-100"
-                    onClick={() => navigate("/login?from=/checkout")}
-                  >
-                    Login to Checkout
-                  </button>
-                )}
+
+                <button className="checkout-btn glow-primary" onClick={handleCheckout}>
+                  Place Order
+                </button>
               </div>
-            </div>
+
+              {/* Benefits */}
+              <div className="benefit-cards">
+                <div className="benefit-card glass-surface">
+                  <div className="benefit-img">
+                    <img src="/assets/imgs/cart/free-shipping.jpg" alt="Free shipping" />
+                  </div>
+                  <div className="benefit-content">
+                    <div className="benefit-title">Free Shipping</div>
+                    <div className="benefit-text">Enjoy complimentary delivery on all orders.</div>
+                  </div>
+                </div>
+
+                <div className="benefit-card glass-surface">
+                  <div className="benefit-img">
+                    <img src="/assets/imgs/cart/bundle-discount.jpg" alt="Bundle discount" />
+                  </div>
+                  <div className="benefit-content">
+                    <div className="benefit-title">Bundle & Save</div>
+                    <div className="benefit-text">Buy 2 or more pairs and save more.</div>
+                  </div>
+                </div>
+              </div>
+            </aside>
           </div>
         )}
       </section>
+
+      {/* Mini Cart Drawer (light glass 400px) */}
+      <div className="cart-drawer">
+        <div className="cart-drawer__overlay" onClick={closeDrawer} />
+        <div
+          className="cart-drawer__panel glass-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cart"
+        >
+          <div className="cart-drawer__header">
+            <div className="cart-drawer__title">My Cart ({items.length})</div>
+            <button className="cart-drawer__close" onClick={closeDrawer} aria-label="Close">
+              ×
+            </button>
+          </div>
+
+          {isEmpty ? (
+            <div className="cart-drawer__empty">
+              <p>Your cart is empty.</p>
+              <Link to="/shop" onClick={closeDrawer} className="btn btn-dark mt-10">
+                Browse products
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="cart-drawer__items">
+                {items.map((it) => (
+                  <div key={it.id} className="drawer-item glass-surface">
+                    <div className="drawer-thumb">
+                      <img src={it.image} alt={it.name} />
+                    </div>
+                    <div className="drawer-info">
+                      <div className="drawer-top">
+                        <div className="drawer-name">{it.name}</div>
+                        <button
+                          className="drawer-remove"
+                          onClick={() => removeItem(it.id)}
+                          aria-label="Remove"
+                          title="Remove"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="drawer-variant">
+                        {it?.meta?.color && (
+                          <span className="variant-pill glow-on-hover">{it.meta.color}</span>
+                        )}
+                        {it?.meta?.size && (
+                          <span className="variant-pill glow-on-hover">Size {it.meta.size}</span>
+                        )}
+                      </div>
+                      <div className="drawer-bottom">
+                        <div className="qty-control glow-on-hover">
+                          <button
+                            onClick={() => updateQty(it.id, Math.max(1, it.qty - 1))}
+                            aria-label="Decrease"
+                          >
+                            –
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            value={clamp(it.id, it.qty)}
+                            onChange={(e) =>
+                              updateQty(it.id, clamp(it.id, parseInt(e.target.value || 1)))
+                            }
+                          />
+                          <button
+                            onClick={() => updateQty(it.id, clamp(it.id, it.qty + 1))}
+                            aria-label="Increase"
+                            disabled={Number.isFinite(limits[it.id]) && it.qty >= limits[it.id]}
+                            title={
+                              Number.isFinite(limits[it.id]) && it.qty >= limits[it.id]
+                                ? "Reached available stock"
+                                : "Increase"
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="drawer-price">₹ {it.price}</div>
+                      </div>
+                      {Number.isFinite(limits[it.id]) && (
+                        <div className="drawer-stock-hint">
+                          Only {Math.max(0, limits[it.id] - (it.qty - 0))} left
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="cart-drawer__footer glass-surface">
+                <div className="drawer-line">
+                  <span>Subtotal</span>
+                  <span>₹ {subtotal}</span>
+                </div>
+                <div className="drawer-line">
+                  <span>Shipping</span>
+                  <span className="text-success">FREE</span>
+                </div>
+                <div className="drawer-total">
+                  <span>Total</span>
+                  <span>₹ {total}</span>
+                </div>
+
+                <button
+                  className="drawer-checkout glow-primary"
+                  onClick={() => {
+                    closeDrawer();
+                    handleCheckout();
+                  }}
+                >
+                  Place Order
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       <Footer />
     </>
   );

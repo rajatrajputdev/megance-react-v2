@@ -314,6 +314,11 @@ $(function () {
 ============================================================================= */
 
 (function () {
+      if (window.innerWidth <= 768) {
+    const cursorEl = document.querySelector(".cursor");
+    if (cursorEl) cursorEl.style.display = "none";
+    return; // Stop executing for mobile
+  }
     const link = document.querySelectorAll('.hover-this');
     const cursor = document.querySelector('.cursor');
     const animateit = function (e) {

@@ -280,3 +280,24 @@
   .product-page-wrap .pd-thumb { width: 64px; height: 64px; }
   .product-page-wrap .pd-zoom-container { width: 150px; height: 150px; }
 }
+
+/* Append to product.css — Luxury 3D swipe gallery (ONLY swipe mode) */
+.product-page-wrap .pd-gallery.luxury3d {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  gap: 12px;
+  padding-bottom: 6px;
+}
+.product-page-wrap .pd-gallery.luxury3d .pd-gallery-item {
+  flex: 0 0 95%;
+  scroll-snap-align: center;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+  opacity: 0.6;
+}
+.product-page-wrap .pd-gallery.luxury3d .pd-gallery-item.active {
+  transform: scale(1.03);
+  opacity: 1;
+}
+/* Optional: ensure media remains square and responsive (already in your CSS) */

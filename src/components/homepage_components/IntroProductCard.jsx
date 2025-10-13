@@ -1,47 +1,47 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import "./intro-card.css";
 
 export default function IntroProductCard({ badge, product, onBuy }) {
   const [hovered, setHovered] = useState(false);
 
+  // Resolve primary & hover image from backend data
+  const { frontImg, hoverImg } = useMemo(() => {
+    const main = product?.image || product?.images?.[0] || product?.gallery?.[0] || "";
+    const secondary =
+      product?.hover ||
+      product?.images?.[1] ||
+      product?.gallery?.[1] ||
+      product?.altImage ||
+      main;
+    return { frontImg: main, hoverImg: secondary };
+  }, [product]);
+
   return (
     <div
-      className={`intro-card${hovered ? " is-hovered" : ""}`}
+      className={`intro-card-flat${hovered ? " is-hovered" : ""}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {badge ? <div className="intro-card__badge">{badge}</div> : null}
+      <div className="intro-media-flat">
+        {/* Badge sits on the image top-left like your reference */}
+        {badge ? <div className="intro-badge-flat">{badge}</div> : null}
 
-      <div className="intro-card__media" aria-hidden>
-        <img
-          className="intro-card__img intro-card__img--front"
-          src={product.image}
-          alt=""
-        />
-        <img
-          className="intro-card__img intro-card__img--hover"
-          src={product.hover}
-          alt=""
-        />
+        <img className="img-front" src={frontImg} alt={product?.name || "Sneaker"} />
+        <img className="img-hover" src={hoverImg} alt={product?.name || "Sneaker Alt"} />
       </div>
 
-      <div className="intro-card__body">
-        <div className="intro-card__name">{product.name}</div>
-        <div className="intro-card__price">₹ {product.price}</div>
+      <div className="intro-text-block">
+        <div className="intro-name-flat">{product?.name}</div>
+        <div className="intro-price-flat">₹ {product?.price}</div>
       </div>
 
       <button
         type="button"
-        className="intro-card__cta"
-        title="Buy now"
+        className="intro-buy-btn-flat"
         onClick={() => onBuy?.(product)}
       >
-        <span className="intro-card__cta-text">Buy Now</span>
-        <svg className="intro-card__cta-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="currentColor" d="M21 3v13.475h-1.492V5.536L4.044 21 3 19.906 18.414 4.492H7.475V3H21z"/>
-        </svg>
+        Buy Now
       </button>
     </div>
   );
 }
-

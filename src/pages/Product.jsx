@@ -501,8 +501,9 @@ const onMediaMove = (e) => {
           {/* ---------- DETAILS COLUMN ---------- */}
           <div className="col-md-6">
             <h2 className="section-title">{product.name}</h2>
-            <div className="h4 mt-10">₹ {product.price}</div>
-
+            <div className="h4 mt-10">₹ {product.price}  <span style={{fontWeight:'300', fontSize:"12px"}}>Inclusive of GST* and free shipping. COD available on eligible pin codes</span>
+</div>
+            
             {hasGenders && (
               <div className="mt-20">
                 <div className="label-sm">Select Gender</div>
@@ -525,7 +526,13 @@ const onMediaMove = (e) => {
                 </div>
               </div>
             )}
-
+<div className="mt-20">
+                <div className="filter-pills">
+                 <div>
+                  <img src="/assets/imgs/size.jpg" alt="Size Chart" />
+                 </div>
+                </div>
+              </div>
             {/* Sizes */}
             <div className="mt-20">
               <div className="label-sm">Select Size</div>
