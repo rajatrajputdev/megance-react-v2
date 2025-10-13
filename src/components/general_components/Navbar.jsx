@@ -73,9 +73,9 @@ export default function Navbar() {
                   <li className="nav-item mr-20">
                     <NavLink className="nav-link" to="/">Home</NavLink>
                   </li>
-                  <li className="nav-item mr-20">
+                  {/* <li className="nav-item mr-20">
                     <NavLink className="nav-link" to="/returns">Returns</NavLink>
-                  </li>
+                  </li> */}
                   <li className="nav-item dropdown">
                     <a href="#" className="nav-link" onClick={(e) => e.preventDefault()}>Shop</a>
                     <div className="dropdown-menu">
