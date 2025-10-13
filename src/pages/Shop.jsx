@@ -6,6 +6,7 @@ import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
 import "./shop.css";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
+import Intro from "../components/homepage_components/Intro.jsx";
 
 export default function Shop() {
   
@@ -83,7 +84,7 @@ export default function Shop() {
 
       {/* Product list first */}
 
-      <section className="container page-section shop-wrap">
+      {/* <section className="container page-section shop-wrap">
         {error && (
           <div className="row"><div className="col-12">
             <div className="inline-hint" role="alert" aria-live="assertive">{error}</div>
@@ -108,7 +109,6 @@ export default function Shop() {
           {!loading && filtered.map((p) => (
             <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
               <div className="shop-card">
-                {/* Full-card hover cover image */}
                 <img
                   className="shop-card-cover"
                   src={p.hover || p.image}
@@ -135,8 +135,8 @@ export default function Shop() {
             </div>
           ))}
         </div>
-      </section>
-
+      </section> */}
+<Intro/>
       {/* Duo section: text left, image right */}
       <section className="shop-duo">
         <div className="container">

@@ -24,11 +24,34 @@ const About = () => {
             <div className="row">
               <div className="col-12">
                 <p>
-                  At Megance, we craft more than sneakers — we create statements of identity. Born from a vision to merge artistry with motion, every Megance piece reflects precision, innovation, and effortless luxury.
+Megance is a premium sneaker label from India built around the idea of calm streetwear design.
 <br/><br/>
-                  Our designs transcend trends, blending cutting-edge craftsmanship with timeless aesthetics. Each silhouette is engineered for performance yet shaped with elegance — a balance between movement and meaning.
+We believe footwear should feel like an extension of identity and movement, not just a seasonal trend.
 <br/><br/>
-                  From our studio to your stride, Megance represents modern sophistication for those who dare to define their own rhythm. We don’t follow footsteps — we design the future of them.
+Every release from Megance is created in controlled volumes using premium suede and a design language focused on minimal styling and long-term wear. Instead of following hype-driven sneaker cycles, we release in structured drops that build a story over time.
+<br/><br/>
+The Infinity Collection marks our first chapter. Each sneaker in this drop is influenced by the mood of a different city - not through direct prints or graphics, but through tone, finish, and movement. The intention is simple: to create sneakers that carry atmosphere.
+<br/><br/>
+Megance stands for:
+<strong>
+<ul style={{listStyleType:"disc"}}>
+<li>
+Premium suede craftsmanship with controlled production</li>
+<li>
+Minimal streetwear styling designed to age well</li>
+<li>City-inspired creative direction to give each drop purpose
+</li>
+<li>
+A calm approach to sneaker culture focused on presence instead of noise</li>
+</ul>
+</strong>
+
+
+This is not mass manufacturing.
+This is Drop 01 of a new sneaker story from India.
+
+<br/><br/>
+Welcome inside.
                 </p>
                 {/* Add more lorem ipsum paragraphs here */}
               </div>
@@ -37,7 +60,7 @@ const About = () => {
         </section>
 
         {/* Services Section */}
-        <section className="services-section py-5 bg-light">
+        {/* <section className="services-section py-5 bg-light">
           <div className="container">
             <h2 className="text-center mb-5">Our Services</h2>
             <div className="row">
@@ -64,10 +87,10 @@ const About = () => {
               </div>
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* Our Work Section */}
-        <section className="work-section py-5">
+        {/* <section className="work-section py-5">
           <div className="container">
             <h2 className="text-center mb-5">Our Work</h2>
             <div className="row">
@@ -85,7 +108,7 @@ const About = () => {
               ))}
             </div>
           </div>
-        </section>
+        </section> */}
 
         <Footer />
       </div>

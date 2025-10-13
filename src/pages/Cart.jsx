@@ -142,11 +142,11 @@ export default function CartPage() {
             <Link to="/shop" className="btn btn-dark mt-10">
               Browse products
             </Link>
-            <div className="mt-10">
+            {/* <div className="mt-10">
               <Link to="/shop?price=lt3500" className="link-underline">
                 See Under ₹3500
               </Link>
-            </div>
+            </div> */}
           </div>
         ) : (
           <div className="cart-grid">

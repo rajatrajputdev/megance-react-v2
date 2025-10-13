@@ -51,7 +51,7 @@ export default function Home() {
         {/* <Testimonials /> */}
         <FAQ2 />
       </main>
-      <Newsletter />
+      {/* <Newsletter /> */}
       <hr />
       <Footer />
     </>

@@ -9,7 +9,7 @@ export default function PrivacyPage() {
         <section className="container page-section">
           <div className="row">
             <div className="col-lg-10 col-xl-8">
-              <h1 className="section-title">Privacy Policy</h1>
+              <h1 className="section-title mt-75">Privacy Policy</h1>
               <p className="mt-10 opacity-7">Last updated: September 2025</p>
 
               <h4 className="mt-30">1. Information We Collect</h4>

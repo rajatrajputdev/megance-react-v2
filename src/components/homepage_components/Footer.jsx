@@ -40,8 +40,6 @@ export default function Footer() {
               <li><Link to="/shop">All</Link></li>
               <li><Link to="/shop?g=men">Men</Link></li>
               <li><Link to="/shop?g=women">Women</Link></li>
-              <li><Link to="/shop">New Arrivals</Link></li>
-              <li><Link to="/shop">Best Sellers</Link></li>
             </ul>
           </div>
           <div className="rh-col">
@@ -50,24 +48,29 @@ export default function Footer() {
               <li><a href="#faq2">FAQs</a></li>
               <li><Link to="/terms">Shipping</Link></li>
               <li><Link to="/terms">Returns</Link></li>
-              <li><a href="mailto:support@megance.in">Contact</a></li>
+              <li><a href="mailto:support@megance.in">Contact (support@megance.in)</a></li>
             </ul>
           </div>
           <div className="rh-col">
             <h6>Company</h6>
             <ul>
               <li><Link to="/about-us">About</Link></li>
-              <li><Link to="/terms-of-use">Terms of Use</Link></li>
+              <li><Link to="/terms">Terms of Use</Link></li>
               <li><Link to="/privacy">Privacy Policy</Link></li>
             </ul>
           </div>
           <div className="rh-col rh-social">
             <h6>Follow</h6>
             <div className="rh-social-row">
-              <a href="https://www.instagram.com/megance_official" target="_blank" onClick={(e) => e.preventDefault()} aria-label="Instagram"><i className="fab fa-instagram"></i></a>
-              <a href="https://www.facebook.com/share/1C2xE3PYgh/" target="_blank" onClick={(e) => e.preventDefault()} aria-label="Facebook"><i className="fab fa-facebook-f"></i></a>
-              <a href="https://www.instagram.com/megance_official" target="_blank" onClick={(e) => e.preventDefault()} aria-label="Twitter"><i className="fab fa-x-twitter"></i></a>
-              <a href="https://pin.it/1gcfbasEq" target="_blank" onClick={(e) => e.preventDefault()} aria-label="Pinterest"><i className="fab fa-pinterest"></i></a>
+              <Link to="https://www.instagram.com/megance_official"><a href="https://www.instagram.com/megance_official" target="_blank" aria-label="Instagram"><i className="fab fa-instagram"></i></a></Link>
+              <Link to="https://www.facebook.com/share/1C2xE3PYgh/"> <a href="https://www.facebook.com/share/1C2xE3PYgh/" target="_blank" aria-label="Facebook"><i className="fab fa-facebook-f"></i></a>
+             </Link>
+              <Link to="https://www.instagram.com/megance_official"> <a href="https://www.instagram.com/megance_official" target="_blank" aria-label="Twitter"><i className="fab fa-x-twitter"></i></a></Link>
+              <Link to="https://pin.it/1gcfbasEq"><a href="https://pin.it/1gcfbasEq" target="_blank" aria-label="Pinterest"><i className="fab fa-pinterest"></i></a></Link>
+          
+              
+             
+              
             </div>
           </div>
         </div>
@@ -78,7 +81,7 @@ export default function Footer() {
             <span>© {year} Megance</span>
           </div>
           <div className="rh-right">
-            <Link to="/terms-of-use">Terms</Link>
+            <Link to="/terms">Terms</Link>
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Returns</Link>
           </div>

@@ -83,7 +83,7 @@ export default function App() {
                 <Route path="/order-success" element={<OrderSuccess />} />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
-                <Route path="/terms-of-use" element={<TermsOfUsePage />} />
+                <Route path="/terms-of-use" element={<TermsPage />} />
                 <Route path="/about-us" element={<About />} />
                 <Route
                   path="/returns"
