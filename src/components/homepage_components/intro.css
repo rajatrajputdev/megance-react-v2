@@ -14,7 +14,7 @@
 .intro-media-flat {
   position: relative;
   width: 100%;
-  padding-top: 66%;           /* ~3:2 aspect similar to your shots */
+  padding-top: 96%;           /* ~3:2 aspect similar to your shots */
   overflow: hidden;
 }
 
@@ -22,7 +22,7 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 86%;
+  width: 100%;
   height: auto;
   transform: translate(-50%, -50%);
   object-fit: contain;
@@ -34,7 +34,7 @@
 .img-hover { opacity: 0; }
 
 .intro-card-flat.is-hovered .img-front { opacity: 0; }
-.intro-card-flat.is-hovered .img-hover { opacity: 1; }
+.intro-card-flat.is-hovered .img-hover { opacity: 1;  }
 
 /* ===== Badge (tight to image, small pill) ===== */
 .intro-badge-flat {
