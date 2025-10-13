@@ -164,7 +164,7 @@ export default function CartPage() {
                   </button>
 
                   <div className="item-thumb" style={{height:"100px", width:"150px"}}>
-                    <img src={it.image} alt={it.name}  />
+                    <img src={it.image || it.imageUrl || "/assets/logo.svg"} alt={it.name} />
                   </div>
 
                   <div className="item-info">
@@ -308,7 +308,7 @@ export default function CartPage() {
                 {items.map((it) => (
                   <div key={it.id} className="drawer-item glass-surface">
                     <div className="drawer-thumb">
-                      <img src={it.image} alt={it.name} />
+                      <img src={it.image || it.imageUrl || "/assets/logo.svg"} alt={it.name} />
                     </div>
                     <div className="drawer-info">
                       <div className="drawer-top">

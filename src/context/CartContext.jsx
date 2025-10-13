@@ -36,7 +36,7 @@ export function CartProvider({ children }) {
           id: product.id,
           name: product.name,
           price: product.price,
-          image: product.image,
+          image: product.image || product.imageUrl || product.hover || "/assets/logo.svg",
           meta: product.meta || null,
           qty,
         },

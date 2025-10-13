@@ -308,6 +308,8 @@ const onMediaMove = (e) => {
       name: hasGenders
         ? `${product.name} (${gender === "men" ? "Men" : "Women"} Size ${size})`
         : `${product.name} (Size ${size})`,
+      // Ensure cart always carries an image for display
+      image: product.image || product.imageUrl || mainImage || "/assets/logo.svg",
       meta: hasGenders ? { gender, size } : { size },
     };
   }, [product, size, gender, hasGenders]);
