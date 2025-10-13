@@ -62,6 +62,48 @@ WhatsApp Order Confirmation (Twilio)
   - If any Twilio secret is missing, the function logs and skips sending.
   - The order doc is annotated with `waSent`, `waMessageSid`, and `waSentAt` upon success.
 
+Shipments (XpressBees)
+
+- A Cloud Function `createXpressbeesShipmentOnOrder` creates a shipment on XpressBees when an order is created. It mirrors Twilio’s idempotent lock pattern and only fires for:
+  - COD orders immediately, or
+  - Online orders after payment verification (`paymentVerified = true` or status in `paid/completed/success`).
+
+  Configure credentials/secrets via Firebase (do not hardcode):
+
+  - `firebase functions:secrets:set XPRESSBEES_USERNAME`  # your XpressBees login (e.g., support@megance.com)
+  - `firebase functions:secrets:set XPRESSBEES_PASSWORD`  # your XpressBees password (e.g., Megance@2025)
+
+  Optional environment variables for tuning and pickup details (set in your Functions environment):
+
+  - `XPRESSBEES_BASE_URL`            # default: https://shipment.xpressbees.com
+  - `XPRESSBEES_AUTH_URL`            # optional explicit login URL if account differs; by default tries /api/auth/login, /api/users/login
+  - `XPRESSBEES_ENABLED`             # set to `false` to disable (default: true)
+  - `XPRESSBEES_PICKUP_CODE`         # use saved pickup location code (preferred)
+  - `XPRESSBEES_PICKUP_NAME`         # fallback explicit pickup address fields
+  - `XPRESSBEES_PICKUP_PHONE`
+  - `XPRESSBEES_PICKUP_EMAIL`
+  - `XPRESSBEES_PICKUP_ADDRESS`
+  - `XPRESSBEES_PICKUP_CITY`
+  - `XPRESSBEES_PICKUP_STATE`
+  - `XPRESSBEES_PICKUP_PINCODE`
+  - `XPRESSBEES_DEFAULT_WEIGHT`      # kg, default: 0.7
+  - `XPRESSBEES_DEFAULT_LENGTH`      # cm, default: 30
+  - `XPRESSBEES_DEFAULT_BREADTH`     # cm, default: 20
+  - `XPRESSBEES_DEFAULT_HEIGHT`      # cm, default: 10
+
+  Notes:
+  - The function writes shipment metadata back to the order: `xbCreated`, `xbStatus`, `xbAwb`, `xbTrackingNo`, `xbShipmentId`, and the raw provider response `xbRaw`.
+  - The function logs in to XpressBees using your username/password to obtain a token, caches it (document `integrations/xpressbees`), and sends both `Authorization: Bearer <token>` and `token: <token>` headers to `shipments2`.
+  - Idempotency is handled via `xbLock`; if a previous attempt is in progress or completed, re-entry is skipped.
+  - The payload uses a generic `shipments2` structure. If your XpressBees account expects slightly different field names, set `XPRESSBEES_PICKUP_CODE` or we can adapt mappings.
+
+Admin repair endpoint
+
+- HTTP: `createXpressbeesShipment` (admin only)
+  - POST with JSON `{ orderId, force?: boolean }`
+  - Authorization: `Bearer <Firebase ID token>`; allowed for `OWNER_EMAIL` or users with custom claim `admin: true`.
+  - Returns `{ ok, awb, tracking, shipmentId, raw }` and updates the order with `xb*` fields. `force=true` overrides an existing `xbCreated` or `xbLock`.
+
 Onboarding & Profiles
 
 - Phone verification is authoritative via Firebase Auth (we check `user.phoneNumber`). The client no longer sets `phoneVerified`; the server writes it based on the auth record.

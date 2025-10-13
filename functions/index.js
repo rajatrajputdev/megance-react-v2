@@ -1,37 +1,249 @@
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
-const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
-const functions = require('firebase-functions');
-const { defineSecret } = require('firebase-functions/params');
-const admin = require('firebase-admin');
-const nodemailer = require('nodemailer');
-const crypto = require('crypto');
+const {
+  onDocumentCreated,
+  onDocumentUpdated,
+} = require("firebase-functions/v2/firestore");
+const {
+  onRequest,
+  onCall,
+  HttpsError,
+} = require("firebase-functions/v2/https");
+const functions = require("firebase-functions");
+const { defineSecret } = require("firebase-functions/params");
+const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 // Lazy/guarded import to avoid local analyzer crash if deps not installed yet
 let PDFDocument;
-try { PDFDocument = require('pdfkit'); } catch (_) { /* will load inside handler */ }
+try {
+  PDFDocument = require("pdfkit");
+} catch (_) {
+  /* will load inside handler */
+}
 
-try { admin.initializeApp(); } catch (_) {}
+try {
+  admin.initializeApp();
+} catch (_) {}
 
-const REGION = process.env.FUNCTIONS_REGION || 'asia-south2';
+const REGION = process.env.FUNCTIONS_REGION || "asia-south2";
 
 // Owner email to receive order copies
-const OWNER_EMAIL = 'megancetech@gmail.com';
+const OWNER_EMAIL = "megancetech@gmail.com";
 
 // Secrets
-const MAIL_USER = defineSecret('MAIL_USER');
-const MAIL_PASS = defineSecret('MAIL_PASS');
-const MAIL_FROM = defineSecret('MAIL_FROM');
+const MAIL_USER = defineSecret("MAIL_USER");
+const MAIL_PASS = defineSecret("MAIL_PASS");
+const MAIL_FROM = defineSecret("MAIL_FROM");
 
 // Twilio WhatsApp (use Firebase secrets; do NOT hardcode credentials)
-const TWILIO_ACCOUNT_SID = defineSecret('TWILIO_ACCOUNT_SID');
-const TWILIO_AUTH_TOKEN = defineSecret('TWILIO_AUTH_TOKEN');
-const TWILIO_WHATSAPP_FROM = defineSecret('TWILIO_WHATSAPP_FROM'); // e.g. whatsapp:+14155238886 or approved sender ID
-const TWILIO_TEMPLATE_SID = defineSecret('TWILIO_TEMPLATE_SID');   // e.g. HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+const TWILIO_ACCOUNT_SID = defineSecret("TWILIO_ACCOUNT_SID");
+const TWILIO_AUTH_TOKEN = defineSecret("TWILIO_AUTH_TOKEN");
+const TWILIO_WHATSAPP_FROM = defineSecret("TWILIO_WHATSAPP_FROM"); // e.g. whatsapp:+14155238886 or approved sender ID
+const TWILIO_TEMPLATE_SID = defineSecret("TWILIO_TEMPLATE_SID"); // e.g. HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+// XpressBees shipment creation (use secrets; do NOT hardcode credentials)
+const XPRESSBEES_USERNAME = defineSecret("XPRESSBEES_USERNAME");
+const XPRESSBEES_PASSWORD = defineSecret("XPRESSBEES_PASSWORD");
+
+// Helper: robust env boolean
+function envBool(name, def = true) {
+  const v = String(process.env[name] || "")
+    .trim()
+    .toLowerCase();
+  if (!v) return !!def;
+  return ["1", "true", "yes", "y", "on"].includes(v);
+}
+
+// Hardcoded XpressBees configuration (requested)
+const XB_ORIGIN = 'https://shipment.xpressbees.com';
+const XB_LOGIN_URL = 'https://shipment.xpressbees.com/api/users/login';
+const XB_HC_EMAIL = 'support@megance.com';
+const XB_HC_PASSWORD = 'Megance@2025';
+
+// Always login and return a fresh XpressBees token (no caching)
+async function getXpressbeesToken({ username, password }) {
+  const resp = await fetch(XB_LOGIN_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: XB_HC_EMAIL, password: XB_HC_PASSWORD }),
+  });
+  let json = null;
+  try { json = await resp.json(); } catch { json = null; }
+  if (!resp.ok) {
+    const err = (json && (json.message || json.error)) || `HTTP ${resp.status}`;
+    throw new Error(err);
+  }
+  let tok = null;
+  if (json) {
+    // Handle 'data' as a raw token string
+    if (typeof json.data === 'string') tok = json.data;
+    if (!tok) tok = json.token || json.access_token || (json.data && (json.data.token || json.data.access_token)) || null;
+  }
+  if (!tok) throw new Error('Login ok but no token');
+  return tok;
+}
+
+function pickEmail(...candidates) {
+  const isValid = (s) => {
+    try {
+      const v = String(s || "").trim();
+      return !!v && v.includes("@") && v.length <= 190;
+    } catch {
+      return false;
+    }
+  };
+  for (const c of candidates) {
+    if (isValid(c)) return String(c).trim();
+  }
+  return "support@megance.com";
+}
+
+function onlyDigits(s) {
+  try {
+    return String(s || "").replace(/[^\d]/g, "");
+  } catch {
+    return "";
+  }
+}
+function phone10(s) {
+  const d = onlyDigits(s);
+  if (d.length >= 10) return d.slice(-10);
+  return d;
+}
+function pin6(s) {
+  const d = onlyDigits(s);
+  return d.length >= 6 ? d.slice(0, 6) : d;
+}
+function trunc(str, n) {
+  try {
+    const s = String(str || "");
+    return s.length > n ? s.slice(0, n) : s;
+  } catch {
+    return "";
+  }
+}
+function splitAddress(addr) {
+  try {
+    const s = String(addr || "").trim();
+    if (!s) return { address: "", address_2: "" };
+    const parts = s.split(/,\s*/);
+    const a1 = trunc(parts.slice(0, 2).join(", "), 200) || trunc(s, 200);
+    const a2 = trunc(parts.slice(2).join(", "), 200);
+    return { address: a1, address_2: a2 };
+  } catch {
+    return { address: "", address_2: "" };
+  }
+}
+function kgToGrams(kg) {
+  const n = Number(kg);
+  if (!Number.isFinite(n)) return 500;
+  return Math.max(1, Math.round(n * 1000));
+}
+
+function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
+  const billing = data.billing || {};
+  const items = Array.isArray(data.items) ? data.items : [];
+  const amount = Math.round(Number(data.amount) || 0);
+  const discount = Math.round(Number(data.discount) || 0);
+  const base = Math.max(0, amount - discount);
+  const gst = Number.isFinite(Number(data.gst))
+    ? Math.round(Number(data.gst))
+    : Math.round(base * 0.18);
+  const payable = Math.round(Number(data.payable) || base + gst);
+
+  const dwKg = Number(process.env.XPRESSBEES_DEFAULT_WEIGHT || 0.7);
+  const grams = kgToGrams(dwKg);
+  const dl = Number(process.env.XPRESSBEES_DEFAULT_LENGTH || 30);
+  const dbt = Number(process.env.XPRESSBEES_DEFAULT_BREADTH || 20);
+  const dh = Number(process.env.XPRESSBEES_DEFAULT_HEIGHT || 10);
+
+  const pickupPhone = phone10(process.env.XPRESSBEES_PICKUP_PHONE || "");
+  const shipPhone = phone10(billing.phone || "");
+  const shipPin = pin6(billing.zip || "");
+  const pickupPin = pin6(process.env.XPRESSBEES_PICKUP_PINCODE || "");
+  const whNameRaw = (
+    process.env.XPRESSBEES_PICKUP_WAREHOUSE ||
+    process.env.XPRESSBEES_PICKUP_NAME ||
+    "Megance WH"
+  ).trim();
+  const warehouse_name =
+    trunc(whNameRaw.replace(/\s+/g, " ").slice(0, 20), 20) || "MeganceWH1";
+  const { address: pickupAddr1, address_2: pickupAddr2 } = splitAddress(
+    process.env.XPRESSBEES_PICKUP_ADDRESS || ""
+  );
+  const { address: shipAddr1, address_2: shipAddr2 } = splitAddress(
+    billing.address || ""
+  );
+  const gstNo = (
+    process.env.XPRESSBEES_PICKUP_GST ||
+    process.env.XPRESSBEES_GST_NUMBER ||
+    ""
+  ).trim();
+
+  const order_items = items.map((it) => ({
+    name: String(it.name || ""),
+    qty: String(Number(it.qty) || 1),
+    price: String(Number(it.price) || 0),
+    sku: String(it.id || ""),
+  }));
+
+  const collectable = isCOD ? payable : 0;
+  const payment_type = isCOD ? "cod" : "prepaid";
+  const autoPickup =
+    (process.env.XPRESSBEES_AUTO_PICKUP || "yes").toLowerCase() === "yes"
+      ? "yes"
+      : "no";
+
+  return {
+    order_number: trunc(orderLabel, 20),
+    payment_type,
+    order_amount: payable,
+    discount: discount || 0,
+    shipping_charges: Number(process.env.XPRESSBEES_SHIPPING_CHARGES || 0),
+    cod_charges: Number(process.env.XPRESSBEES_COD_CHARGES || 0),
+    ...(process.env.XPRESSBEES_COURIER_ID
+      ? { courier_id: String(process.env.XPRESSBEES_COURIER_ID).trim() }
+      : {}),
+    package_weight: grams,
+    package_length: dl,
+    package_breadth: dbt,
+    package_height: dh,
+    request_auto_pickup: autoPickup,
+    consignee: {
+      name: trunc(billing.name || "", 200),
+      company_name: trunc(process.env.XPRESSBEES_CONSIGNEE_COMPANY || "", 200),
+      address: shipAddr1,
+      address_2: shipAddr2,
+      city: trunc(billing.city || "", 40),
+      state: trunc(billing.state || "", 40),
+      pincode: shipPin,
+      phone: shipPhone,
+    },
+    pickup: {
+      warehouse_name,
+      name: trunc(
+        process.env.XPRESSBEES_PICKUP_CONTACT ||
+          process.env.XPRESSBEES_PICKUP_NAME ||
+          "Megance",
+        200
+      ),
+      address: pickupAddr1,
+      address_2: pickupAddr2,
+      city: trunc(process.env.XPRESSBEES_PICKUP_CITY || "", 40),
+      state: trunc(process.env.XPRESSBEES_PICKUP_STATE || "", 40),
+      pincode: pickupPin,
+      phone: pickupPhone,
+      ...(gstNo ? { gst_number: gstNo, gst_umber: gstNo } : {}),
+    },
+    order_items,
+    collectable_amount: collectable,
+  };
+}
 
 function buildTransporter(env) {
-  const user = env.MAIL_USER || '';
-  const pass = env.MAIL_PASS || '';
-  const host = env.MAIL_HOST || '';
-  const port = parseInt(env.MAIL_PORT || '0', 10);
+  const user = env.MAIL_USER || "";
+  const pass = env.MAIL_PASS || "";
+  const host = env.MAIL_HOST || "";
+  const port = parseInt(env.MAIL_PORT || "0", 10);
 
   if (host && port) {
     return nodemailer.createTransport({
@@ -43,30 +255,55 @@ function buildTransporter(env) {
   }
   // Default to Gmail service via app password
   return nodemailer.createTransport({
-    service: 'gmail',
+    service: "gmail",
     auth: { user, pass },
   });
 }
 
-function currencyINR(n) { try { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(n)||0); } catch { return `₹ ${n||0}`; } }
+function currencyINR(n) {
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(Number(n) || 0);
+  } catch {
+    return `₹ ${n || 0}`;
+  }
+}
 
 function renderOrderEmail({ orderId, data, enrichedItems = [] }) {
-  const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate().toLocaleString() : '';
-  const items = Array.isArray(enrichedItems) && enrichedItems.length ? enrichedItems : (Array.isArray(data.items) ? data.items : []);
+  const created =
+    data.createdAt && data.createdAt.toDate
+      ? data.createdAt.toDate().toLocaleString()
+      : "";
+  const items =
+    Array.isArray(enrichedItems) && enrichedItems.length
+      ? enrichedItems
+      : Array.isArray(data.items)
+      ? data.items
+      : [];
   const totalQty = items.reduce((a, b) => a + (b.qty || 0), 0);
-  const rows = items.map((it) => {
-    const unit = Number(it.price) || 0;
-    const qty = Number(it.qty) || 0;
-    const amount = unit * qty;
-    const img = it.imageUrl ? `<img src="${it.imageUrl}" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #eee;margin-right:10px" />` : '';
-    const desc = it.description ? `<div style="color:#555;font-size:12px;margin-top:2px;max-width:520px">${String(it.description).slice(0,140)}</div>` : '';
-    return `
+  const rows = items
+    .map((it) => {
+      const unit = Number(it.price) || 0;
+      const qty = Number(it.qty) || 0;
+      const amount = unit * qty;
+      const img = it.imageUrl
+        ? `<img src="${it.imageUrl}" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #eee;margin-right:10px" />`
+        : "";
+      const desc = it.description
+        ? `<div style="color:#555;font-size:12px;margin-top:2px;max-width:520px">${String(
+            it.description
+          ).slice(0, 140)}</div>`
+        : "";
+      return `
       <tr>
         <td style="padding:8px 0">
           <div style="display:flex;align-items:center">
             ${img}
             <div>
-              <div style="font-weight:600">${(it.name || '').toString()}</div>
+              <div style="font-weight:600">${(it.name || "").toString()}</div>
               ${desc}
             </div>
           </div>
@@ -74,15 +311,27 @@ function renderOrderEmail({ orderId, data, enrichedItems = [] }) {
         <td align="right" style="padding:8px 0">${qty}</td>
         <td align="right" style="padding:8px 0">${currencyINR(amount)}</td>
       </tr>`;
-  }).join('');
+    })
+    .join("");
   const billing = data.billing || {};
-  const paymentMethod = (data.paymentMethod || (data.paymentId ? 'online' : 'cod')).toString().toUpperCase();
-  const title = `Order #${(orderId || '').toString().slice(0,6).toUpperCase()}`;
+  const paymentMethod = (
+    data.paymentMethod || (data.paymentId ? "online" : "cod")
+  )
+    .toString()
+    .toUpperCase();
+  const title = `Order #${(orderId || "")
+    .toString()
+    .slice(0, 6)
+    .toUpperCase()}`;
 
   const html = `
     <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.6; color:#111">
       <h2 style="margin:0 0 4px">${title}</h2>
-      <div style="opacity:.7; font-size:13px;">Placed: ${created} · Payment: ${paymentMethod}${data.paymentId ? ` · <span style=\"opacity:.9\">${data.paymentId}</span>` : ''}</div>
+      <div style="opacity:.7; font-size:13px;">Placed: ${created} · Payment: ${paymentMethod}${
+    data.paymentId
+      ? ` · <span style=\"opacity:.9\">${data.paymentId}</span>`
+      : ""
+  }</div>
       <div style="margin:16px 0;">
         <table width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
           <thead>
@@ -93,73 +342,124 @@ function renderOrderEmail({ orderId, data, enrichedItems = [] }) {
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="3" style="opacity:.7;padding:8px 0">No items</td></tr>'}
+            ${
+              rows ||
+              '<tr><td colspan="3" style="opacity:.7;padding:8px 0">No items</td></tr>'
+            }
           </tbody>
         </table>
       </div>
       <div style="margin-top:6px">
         <div><strong>Total items:</strong> ${totalQty}</div>
         <div><strong>Total:</strong> ${currencyINR(data.amount || 0)}</div>
-        ${data.discount ? `<div><strong>Discount:</strong> - ${currencyINR(data.discount)}</div>` : ''}
-        <div><strong>GST (18%):</strong> ${currencyINR(typeof data.gst === 'number' ? data.gst : Math.round(Math.max(0, (Number(data.amount||0) - Number(data.discount||0))) * 0.18))}</div>
-        <div style="font-size:16px;margin-top:4px"><strong>Payable:</strong> ${currencyINR(data.payable || 0)}</div>
+        ${
+          data.discount
+            ? `<div><strong>Discount:</strong> - ${currencyINR(
+                data.discount
+              )}</div>`
+            : ""
+        }
+        <div><strong>GST (18%):</strong> ${currencyINR(
+          typeof data.gst === "number"
+            ? data.gst
+            : Math.round(
+                Math.max(
+                  0,
+                  Number(data.amount || 0) - Number(data.discount || 0)
+                ) * 0.18
+              )
+        )}</div>
+        <div style="font-size:16px;margin-top:4px"><strong>Payable:</strong> ${currencyINR(
+          data.payable || 0
+        )}</div>
       </div>
       <hr style="margin:16px 0; border:none; border-top:1px solid #eee" />
       <div>
         <h3 style="margin:0 0 6px; font-size:16px">Billing</h3>
-        <div>${billing.name || ''}</div>
-        <div>${billing.email || ''}</div>
-        <div>${billing.phone || ''}</div>
-        <div style="margin-top:6px;max-width:560px">${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}</div>
+        <div>${billing.name || ""}</div>
+        <div>${billing.email || ""}</div>
+        <div>${billing.phone || ""}</div>
+        <div style="margin-top:6px;max-width:560px">${[
+          billing.address,
+          billing.city,
+          billing.state,
+          billing.zip,
+        ]
+          .filter(Boolean)
+          .join(", ")}</div>
       </div>
     </div>
   `;
-  const text = `${title}\n` +
-    `Placed: ${created}\nPayment: ${paymentMethod}${data.paymentId ? ` (${data.paymentId})` : ''}\n` +
-    items.map((it) => ` - ${it.name} x ${it.qty} = ${Number(it.price||0) * Number(it.qty||0)}`).join('\n') + '\n' +
+  const text =
+    `${title}\n` +
+    `Placed: ${created}\nPayment: ${paymentMethod}${
+      data.paymentId ? ` (${data.paymentId})` : ""
+    }\n` +
+    items
+      .map(
+        (it) =>
+          ` - ${it.name} x ${it.qty} = ${
+            Number(it.price || 0) * Number(it.qty || 0)
+          }`
+      )
+      .join("\n") +
+    "\n" +
     `Total: ${data.amount || 0}\n` +
-    (data.discount ? `Discount: ${data.discount}\n` : '') +
+    (data.discount ? `Discount: ${data.discount}\n` : "") +
     `Payable: ${data.payable || 0}\n` +
-    `Billing: ${billing.name || ''}, ${billing.phone || ''}, ${billing.email || ''}\n` +
-    `${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}`;
-  return { html, text, subject: `${title} – ${currencyINR(data.payable || 0)}` };
+    `Billing: ${billing.name || ""}, ${billing.phone || ""}, ${
+      billing.email || ""
+    }\n` +
+    `${[billing.address, billing.city, billing.state, billing.zip]
+      .filter(Boolean)
+      .join(", ")}`;
+  return {
+    html,
+    text,
+    subject: `${title} – ${currencyINR(data.payable || 0)}`,
+  };
 }
 
 function formatWhatsappNumber(raw) {
   try {
-    const s = String(raw || '').trim();
-    if (!s) return '';
-    if (s.startsWith('whatsapp:')) return s;
-    if (s.startsWith('+')) return `whatsapp:${s}`;
-    const digits = s.replace(/[^\d]/g, '');
-    if (!digits) return '';
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    if (s.startsWith("whatsapp:")) return s;
+    if (s.startsWith("+")) return `whatsapp:${s}`;
+    const digits = s.replace(/[^\d]/g, "");
+    if (!digits) return "";
     // Assume India if 10-digit local number
     if (digits.length === 10) return `whatsapp:+91${digits}`;
-    if (digits.length >= 11 && digits.length <= 15) return `whatsapp:+${digits}`;
-    return '';
-  } catch (_) { return ''; }
+    if (digits.length >= 11 && digits.length <= 15)
+      return `whatsapp:+${digits}`;
+    return "";
+  } catch (_) {
+    return "";
+  }
 }
 
 function summarizeItems(items) {
   try {
     const arr = Array.isArray(items) ? items : [];
-    if (!arr.length) return '-';
+    if (!arr.length) return "-";
     const parts = arr.slice(0, 3).map((it) => {
-      const name = (it?.name || '').toString();
+      const name = (it?.name || "").toString();
       const qty = Number(it?.qty) || 1;
-      const size = it?.meta?.size ? ` (Size ${String(it.meta.size)})` : '';
+      const size = it?.meta?.size ? ` (Size ${String(it.meta.size)})` : "";
       return `${name}${size} x${qty}`;
     });
-    let txt = parts.join(', ');
+    let txt = parts.join(", ");
     if (arr.length > 3) txt += ` +${arr.length - 3} more`;
     return txt;
-  } catch (_) { return '-'; }
+  } catch (_) {
+    return "-";
+  }
 }
 
 function findCaseInsensitiveKey(obj, key) {
-  if (!obj || typeof obj !== 'object') return null;
+  if (!obj || typeof obj !== "object") return null;
   if (Object.prototype.hasOwnProperty.call(obj, key)) return key;
-  const low = String(key || '').toLowerCase();
+  const low = String(key || "").toLowerCase();
   for (const k of Object.keys(obj)) {
     if (String(k).toLowerCase() === low) return k;
   }
@@ -169,8 +469,18 @@ function findCaseInsensitiveKey(obj, key) {
 function isCouponActive(c, now = Date.now()) {
   if (!c) return false;
   if (c.isActive === false) return false;
-  const start = c.startAt && c.startAt.toDate ? c.startAt.toDate().getTime() : (c.startAt ? new Date(c.startAt).getTime() : 0);
-  const end = c.endAt && c.endAt.toDate ? c.endAt.toDate().getTime() : (c.endAt ? new Date(c.endAt).getTime() : 0);
+  const start =
+    c.startAt && c.startAt.toDate
+      ? c.startAt.toDate().getTime()
+      : c.startAt
+      ? new Date(c.startAt).getTime()
+      : 0;
+  const end =
+    c.endAt && c.endAt.toDate
+      ? c.endAt.toDate().getTime()
+      : c.endAt
+      ? new Date(c.endAt).getTime()
+      : 0;
   if (start && now < start) return false;
   if (end && now > end) return false;
   return true;
@@ -180,148 +490,1523 @@ function computeCouponDiscount(coupon, amount) {
   if (!coupon || !amount || amount <= 0) return 0;
   const minAmount = Number(coupon.minAmount) || 0;
   if (minAmount && amount < minAmount) return 0;
-  const type = String(coupon.type || '').toLowerCase();
+  const type = String(coupon.type || "").toLowerCase();
   const value = Number(coupon.value) || 0;
   let d = 0;
-  if (type === 'flat') d = Math.min(amount, value);
-  else if (type === 'percent') d = Math.floor((amount * value) / 100);
+  if (type === "flat") d = Math.min(amount, value);
+  else if (type === "percent") d = Math.floor((amount * value) / 100);
   const cap = Number(coupon.maxDiscount) || 0;
   if (cap && d > cap) d = cap;
   return Math.max(0, Math.min(amount, d));
 }
 
 async function validateCouponForUser({ db, code, uid, amount }) {
-  const codeUp = String(code || '').trim().toUpperCase();
-  if (!codeUp) return { ok: false, reason: 'invalid_code' };
+  const codeUp = String(code || "")
+    .trim()
+    .toUpperCase();
+  if (!codeUp) return { ok: false, reason: "invalid_code" };
   const ref = db.doc(`coupons/${codeUp}`);
   const snap = await ref.get();
-  if (!snap.exists) return { ok: false, reason: 'not_found' };
+  if (!snap.exists) return { ok: false, reason: "not_found" };
   const c = snap.data() || {};
-  if (!isCouponActive(c)) return { ok: false, reason: 'inactive' };
+  if (!isCouponActive(c)) return { ok: false, reason: "inactive" };
   const amountNum = Math.round(Number(amount) || 0);
   const discount = computeCouponDiscount(c, amountNum);
-  if (!discount) return { ok: false, reason: 'amount_not_eligible' };
+  if (!discount) return { ok: false, reason: "amount_not_eligible" };
   // Limits
   const maxUses = Number(c.maxUses) || 0;
   const totalUses = Number(c.totalUses) || 0;
-  if (maxUses && totalUses >= maxUses) return { ok: false, reason: 'max_uses_reached' };
+  if (maxUses && totalUses >= maxUses)
+    return { ok: false, reason: "max_uses_reached" };
   const perUserLimit = Number(c.perUserLimit) || 1;
   if (uid && perUserLimit) {
     try {
       const us = await db.doc(`coupons/${codeUp}/users/${uid}`).get();
       const used = us.exists ? Number(us.data()?.count || 0) : 0;
-      if (used >= perUserLimit) return { ok: false, reason: 'user_limit_reached' };
+      if (used >= perUserLimit)
+        return { ok: false, reason: "user_limit_reached" };
     } catch (_) {}
   }
   return { ok: true, code: codeUp, discount, coupon: c };
 }
 
-exports.sendOwnerEmailOnOrder = onDocumentCreated({
-  document: 'orders/{orderId}',
+exports.sendOwnerEmailOnOrder = onDocumentCreated(
+  {
+    document: "orders/{orderId}",
+    region: REGION,
+    secrets: [MAIL_USER, MAIL_PASS, MAIL_FROM],
+  },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data();
+    if (!data) return;
+
+    const env = {
+      MAIL_USER: MAIL_USER.value(),
+      MAIL_PASS: MAIL_PASS.value(),
+      MAIL_FROM: MAIL_FROM.value(),
+      MAIL_HOST: process.env.MAIL_HOST || "",
+      MAIL_PORT: process.env.MAIL_PORT || "",
+    };
+
+    if (!env.MAIL_USER || !env.MAIL_PASS) {
+      console.warn(
+        "[sendOwnerEmailOnOrder] MAIL_USER/MAIL_PASS not set; skipping email"
+      );
+      return;
+    }
+
+    // Enrich items with product images/descriptions
+    const db = admin.firestore();
+    const baseIds = new Map();
+    const items = Array.isArray(data.items) ? data.items : [];
+    for (const it of items) {
+      try {
+        const meta = it.meta || {};
+        let size = meta.size ? String(meta.size) : "";
+        let gender = meta.gender || null;
+        let id = String(it.id || "");
+        let base = id;
+        if (size) {
+          const idx = base.lastIndexOf(`-s${size}`);
+          base = idx !== -1 ? base.slice(0, idx) : base;
+        }
+        if (gender && base.endsWith(`-${gender}`))
+          base = base.slice(0, -`-${gender}`.length);
+        else if (!gender) {
+          if (base.endsWith("-men")) {
+            base = base.slice(0, -4);
+          } else if (base.endsWith("-women")) {
+            base = base.slice(0, -6);
+          }
+        }
+        if (base && !baseIds.has(base)) baseIds.set(base, null);
+      } catch {}
+    }
+    const entries = Array.from(baseIds.keys());
+    for (const pid of entries) {
+      try {
+        const ps = await db.doc(`products/${pid}`).get();
+        baseIds.set(pid, ps.exists ? ps.data() || {} : null);
+      } catch {
+        baseIds.set(pid, null);
+      }
+    }
+    const enriched = items.map((it) => {
+      try {
+        const meta = it.meta || {};
+        let size = meta.size ? String(meta.size) : "";
+        let gender = meta.gender || null;
+        let id = String(it.id || "");
+        let base = id;
+        if (size) {
+          const idx = base.lastIndexOf(`-s${size}`);
+          base = idx !== -1 ? base.slice(0, idx) : base;
+        }
+        if (gender && base.endsWith(`-${gender}`))
+          base = base.slice(0, -`-${gender}`.length);
+        else if (!gender) {
+          if (base.endsWith("-men")) {
+            base = base.slice(0, -4);
+          } else if (base.endsWith("-women")) {
+            base = base.slice(0, -6);
+          }
+        }
+        const pd = baseIds.get(base) || {};
+        return {
+          ...it,
+          imageUrl: pd.imageUrl || it.imageUrl || null,
+          description: pd.description || it.description || "",
+        };
+      } catch {
+        return it;
+      }
+    });
+
+    const transporter = buildTransporter(env);
+    const from = env.MAIL_FROM || env.MAIL_USER;
+    const { html, text, subject } = renderOrderEmail({
+      orderId: event.params.orderId,
+      data,
+      enrichedItems: enriched,
+    });
+
+    // Send to owner
+    await transporter.sendMail({ from, to: OWNER_EMAIL, subject, text, html });
+    // Send to buyer if email present
+    const buyer =
+      data.billing && data.billing.email
+        ? String(data.billing.email).trim()
+        : "";
+    if (buyer) {
+      try {
+        await transporter.sendMail({ from, to: buyer, subject, text, html });
+      } catch (e) {
+        console.warn(
+          "[sendOwnerEmailOnOrder] buyer email failed",
+          e?.message || e
+        );
+      }
+    }
+  }
+);
+
+// HTTP: Fulfill order (WhatsApp first, then XpressBees), and persist order
+exports.fulfillOrder = onRequest({
   region: REGION,
-  secrets: [MAIL_USER, MAIL_PASS, MAIL_FROM],
-}, async (event) => {
-  const snap = event.data;
-  if (!snap) return;
-  const data = snap.data();
-  if (!data) return;
+  cors: true,
+  secrets: [XPRESSBEES_USERNAME, XPRESSBEES_PASSWORD, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_TEMPLATE_SID],
+}, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'Method Not Allowed' }); return; }
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
-  const env = {
-    MAIL_USER: MAIL_USER.value(),
-    MAIL_PASS: MAIL_PASS.value(),
-    MAIL_FROM: MAIL_FROM.value(),
-    MAIL_HOST: process.env.MAIL_HOST || '',
-    MAIL_PORT: process.env.MAIL_PORT || '',
-  };
+    // Validate payload
+    const errors = [];
+    const billing = body.billing || {};
+    const items = Array.isArray(body.items) ? body.items : [];
+    const pm = String(body.paymentMethod || '').toLowerCase();
+    const paymentMethod = pm === 'cod' ? 'cod' : (pm === 'prepaid' || pm === 'online' ? 'online' : '');
+    if (!paymentMethod) errors.push('paymentMethod must be "cod" or "prepaid"');
+    if (!billing || !billing.name) errors.push('billing.name required');
+    if (!billing || !billing.phone) errors.push('billing.phone required');
+    if (!billing || !billing.address) errors.push('billing.address required');
+    if (!billing || !billing.city) errors.push('billing.city required');
+    if (!billing || !billing.state) errors.push('billing.state required');
+    if (!billing || !billing.zip) errors.push('billing.zip required');
+    if (!items.length) errors.push('items array required');
+    for (const [i, it] of items.entries()) {
+      if (!it || typeof it !== 'object') { errors.push(`items[${i}] invalid`); continue; }
+      if (!it.id) errors.push(`items[${i}].id required`);
+      if (!it.name) errors.push(`items[${i}].name required`);
+      if (!(Number(it.price) >= 0)) errors.push(`items[${i}].price required`);
+      if (!(Number(it.qty) > 0)) errors.push(`items[${i}].qty required`);
+    }
+    if (errors.length) { res.status(400).json({ error: 'invalid_payload', details: errors }); return; }
 
-  if (!env.MAIL_USER || !env.MAIL_PASS) {
-    console.warn('[sendOwnerEmailOnOrder] MAIL_USER/MAIL_PASS not set; skipping email');
-    return;
-  }
+    // Compute amounts
+    const amount = items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.qty) || 0), 0);
+    const discount = Math.max(0, Number(body.discount || 0));
+    const net = Math.max(0, amount - discount);
+    const gst = Number.isFinite(Number(body.gst)) ? Math.round(Number(body.gst)) : Math.round(net * 0.18);
+    const payable = Math.round(Number(body.payable || (net + gst)));
 
-  // Enrich items with product images/descriptions
-  const db = admin.firestore();
-  const baseIds = new Map();
-  const items = Array.isArray(data.items) ? data.items : [];
-  for (const it of items) {
+    const db = admin.firestore();
+    // Create order doc first (authoritative record)
+    const orderData = {
+      userId: String(body.userId || '' ) || null,
+      items: items.map((x) => ({ id: String(x.id), name: String(x.name), price: Number(x.price), qty: Number(x.qty), meta: x.meta || null })),
+      amount, discount, gst, payable,
+      couponCode: body.couponCode ? String(body.couponCode).toUpperCase() : null,
+      status: 'ordered',
+      paymentMethod,
+      paymentId: paymentMethod === 'cod' ? 'COD' : String(body.paymentId || ''),
+      billing: {
+        name: String(billing.name), email: String(billing.email || ''), phone: String(billing.phone),
+        address: String(billing.address), city: String(billing.city), state: String(billing.state), zip: String(billing.zip),
+      },
+      fulfillmentLock: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      via: 'http-fulfill',
+    };
+    const ref = await db.collection('orders').add(orderData);
+    const orderId = ref.id;
+    const orderLabel = `MGX${orderId.slice(0,6).toUpperCase()}`;
+
+    // Send WhatsApp
+    let twilioResult = { ok: false, sid: null, error: null };
     try {
-      const meta = it.meta || {};
-      let size = meta.size ? String(meta.size) : '';
-      let gender = meta.gender || null;
-      let id = String(it.id || '');
-      let base = id;
-      if (size) { const idx = base.lastIndexOf(`-s${size}`); base = idx !== -1 ? base.slice(0, idx) : base; }
-      if (gender && base.endsWith(`-${gender}`)) base = base.slice(0, -(`-${gender}`).length);
-      else if (!gender) {
-        if (base.endsWith('-men')) { base = base.slice(0, -4); }
-        else if (base.endsWith('-women')) { base = base.slice(0, -6); }
-      }
-      if (base && !baseIds.has(base)) baseIds.set(base, null);
+      const accountSid = TWILIO_ACCOUNT_SID.value() || process.env.TWILIO_ACCOUNT_SID || '';
+      const authToken = TWILIO_AUTH_TOKEN.value() || process.env.TWILIO_AUTH_TOKEN || '';
+      const from = TWILIO_WHATSAPP_FROM.value() || process.env.TWILIO_WHATSAPP_FROM || '';
+      const templateSid = TWILIO_TEMPLATE_SID.value() || process.env.TWILIO_TEMPLATE_SID || '';
+      const to = formatWhatsappNumber(billing.phone);
+      if (accountSid && authToken && from && templateSid && to) {
+        const dateStr = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+        const itemsSummary = summarizeItems(items);
+        const contentVariables = JSON.stringify({ '1': String(billing.name).split(/\s+/)[0] || 'there', '2': String(orderLabel), '3': String(dateStr), '4': String(itemsSummary), '5': String(amount), '6': String(discount), '7': String(payable) });
+        const bodyForm = new URLSearchParams({ From: from, To: to, ContentSid: templateSid, ContentVariables: contentVariables }).toString();
+        const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: `Basic ${auth}` }, body: bodyForm });
+        if (resp.ok) { const msg = await resp.json().catch(()=>({})); twilioResult = { ok: true, sid: msg?.sid || null, error: null }; await ref.set({ waSent: true, waMessageSid: msg?.sid || null, waSentAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); }
+        else { const txt = await resp.text().catch(()=> ''); twilioResult = { ok: false, sid: null, error: txt || `HTTP ${resp.status}` }; }
+      } else { twilioResult = { ok: false, sid: null, error: 'Twilio not configured or invalid phone' }; }
+    } catch (e) { twilioResult = { ok: false, sid: null, error: e?.message || String(e) }; }
+
+    // Create shipment
+    let xbResult = { ok: false, awb: null, shipmentId: null, error: null };
+    try {
+      const username = XPRESSBEES_USERNAME.value() || process.env.XPRESSBEES_USERNAME || '';
+      const password = XPRESSBEES_PASSWORD.value() || process.env.XPRESSBEES_PASSWORD || '';
+      if (!username || !password) throw new Error('XpressBees credentials not configured');
+      if (String(process.env.XPRESSBEES_ENABLED || 'true').toLowerCase() === 'false') throw new Error('XpressBees disabled');
+      const token = await getXpressbeesToken({ username, password });
+      const payload = buildXbShipmentPayload({ orderId, orderLabel, data: orderData, isCOD: paymentMethod === 'cod' });
+      const url = `${XB_ORIGIN}/api/shipments2`;
+      let resp = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(payload) });
+      if (resp.status === 401 || resp.status === 403) { const fresh = await getXpressbeesToken({ username, password }); resp = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${fresh}` }, body: JSON.stringify(payload) }); }
+      const ok = resp.ok; let raw = null; try { raw = await resp.json(); } catch { try { raw = await resp.text(); } catch { raw = null; } }
+      let awb = null, shipmentId = null; try { const s = raw && typeof raw === 'object' ? (raw.data || raw || {}) : {}; awb = s?.awb_number || s?.awb || s?.awbno || null; shipmentId = s?.shipment_id || s?.order_id || s?.id || null; } catch {}
+      xbResult = { ok, awb, shipmentId, error: ok ? null : (typeof raw === 'string' ? raw : (raw?.message || `HTTP ${resp.status}`)) };
+      await ref.set({ xbCreated: !!ok, xbStatus: ok ? 'created' : 'failed', xbAwb: awb || null, xbShipmentId: shipmentId || null, xbRaw: raw || null, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    } catch (e) { xbResult = { ok: false, awb: null, shipmentId: null, error: e?.message || String(e) }; }
+
+    // Discord log
+    try {
+      const webhook = (process.env.DISCORD_WEBHOOK_URL || 'https://discordapp.com/api/webhooks/1427366532794810488/A8ixxfB6YTIRjnY4cTMiVVxm9bOq33biY3E3NhYMhjytAmP89_y_S_9s28NTPJ5GxFX1').trim();
+      const content = `Order ${orderLabel} (${paymentMethod==='cod'?'COD':'Prepaid'})\nTwilio: ${twilioResult.ok ? 'OK' : 'ERR'}${twilioResult.sid ? ' sid=' + twilioResult.sid : ''}${twilioResult.error ? ' • ' + twilioResult.error : ''}\nXpressBees: ${xbResult.ok ? 'OK' : 'ERR'}${xbResult.awb ? ' awb=' + xbResult.awb : ''}${xbResult.error ? ' • ' + xbResult.error : ''}`;
+      await fetch(webhook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content }) });
     } catch {}
-  }
-  const entries = Array.from(baseIds.keys());
-  for (const pid of entries) {
-    try { const ps = await db.doc(`products/${pid}`).get(); baseIds.set(pid, ps.exists ? (ps.data() || {}) : null); } catch { baseIds.set(pid, null); }
-  }
-  const enriched = items.map((it) => {
-    try {
-      const meta = it.meta || {};
-      let size = meta.size ? String(meta.size) : '';
-      let gender = meta.gender || null;
-      let id = String(it.id || '');
-      let base = id;
-      if (size) { const idx = base.lastIndexOf(`-s${size}`); base = idx !== -1 ? base.slice(0, idx) : base; }
-      if (gender && base.endsWith(`-${gender}`)) base = base.slice(0, -(`-${gender}`).length);
-      else if (!gender) {
-        if (base.endsWith('-men')) { base = base.slice(0, -4); }
-        else if (base.endsWith('-women')) { base = base.slice(0, -6); }
-      }
-      const pd = baseIds.get(base) || {};
-      return { ...it, imageUrl: pd.imageUrl || it.imageUrl || null, description: pd.description || it.description || '' };
-    } catch { return it; }
-  });
 
-  const transporter = buildTransporter(env);
-  const from = env.MAIL_FROM || env.MAIL_USER;
-  const { html, text, subject } = renderOrderEmail({ orderId: event.params.orderId, data, enrichedItems: enriched });
-
-  // Send to owner
-  await transporter.sendMail({ from, to: OWNER_EMAIL, subject, text, html });
-  // Send to buyer if email present
-  const buyer = (data.billing && data.billing.email) ? String(data.billing.email).trim() : '';
-  if (buyer) {
-    try { await transporter.sendMail({ from, to: buyer, subject, text, html }); } catch (e) { console.warn('[sendOwnerEmailOnOrder] buyer email failed', e?.message || e); }
+    await ref.set({ fulfillmentDone: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    res.status(200).json({ ok: true, orderId, amounts: { amount, discount, gst, payable }, wa: twilioResult, xb: xbResult });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || 'Internal error' });
   }
 });
-
 // Decrement product stock when an order is created.
 // Idempotent via an order flag `stockDeducted` in the same transaction.
-exports.decrementStockOnOrder = onDocumentCreated({
-  document: 'orders/{orderId}',
-  region: REGION,
-}, async (event) => {
+exports.decrementStockOnOrder = onDocumentCreated(
+  {
+    document: "orders/{orderId}",
+    region: REGION,
+  },
+  async (event) => {
+    const db = admin.firestore();
+    const orderId = event.params.orderId;
+    const orderRef = db.doc(`orders/${orderId}`);
+    console.log("[decrementStockOnOrder] Triggered for order", orderId);
+
+    function parseItem(it) {
+      try {
+        const meta = it.meta || {};
+        let size = meta.size ? String(meta.size) : "";
+        let gender = meta.gender || null;
+        let id = String(it.id || "");
+        let base = id;
+        if (size) {
+          const idx = base.lastIndexOf(`-s${size}`);
+          base = idx !== -1 ? base.slice(0, idx) : base;
+        }
+        // Strip gender suffix from base id if present (regardless of whether meta.gender exists)
+        if (gender && base.endsWith(`-${gender}`)) {
+          base = base.slice(0, -`-${gender}`.length);
+        } else if (!gender) {
+          if (base.endsWith("-men")) {
+            gender = "men";
+            base = base.slice(0, -4);
+          } else if (base.endsWith("-women")) {
+            gender = "women";
+            base = base.slice(0, -6);
+          }
+        }
+        return { productId: base, size, gender, qty: Number(it.qty) || 0 };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    await db.runTransaction(async (tx) => {
+      const orderSnap = await tx.get(orderRef);
+      if (!orderSnap.exists) {
+        console.log("[decrementStockOnOrder] No order snapshot");
+        return;
+      }
+      // Proceed for typical success statuses; be lenient to support test flows
+      const status = String(orderSnap.get("status") || "").toLowerCase();
+      if (
+        status &&
+        !["ordered", "paid", "completed", "success"].includes(status)
+      ) {
+        console.log("[decrementStockOnOrder] Ignoring status", status);
+        return;
+      }
+
+      const items = Array.isArray(orderSnap.get("items"))
+        ? orderSnap.get("items")
+        : [];
+      const uid = orderSnap.get("userId") || null;
+      const amount = Number(orderSnap.get("amount") || 0);
+      const couponCodeRaw = orderSnap.get("couponCode") || "";
+      const couponCode = String(couponCodeRaw || "")
+        .trim()
+        .toUpperCase();
+      const stockAlready = orderSnap.get("stockDeducted") === true;
+      const couponAlready =
+        orderSnap.get("couponRedeemed") === true ||
+        orderSnap.get("coupon")?.valid === true;
+      const grouped = new Map();
+      for (const it of items) {
+        const p = parseItem(it);
+        if (!p || !p.productId) continue;
+        if (!grouped.has(p.productId)) grouped.set(p.productId, []);
+        grouped.get(p.productId).push(p);
+      }
+
+      if (!stockAlready) {
+        for (const [productId, parts] of grouped.entries()) {
+          const ref = db.doc(`products/${productId}`);
+          const snap = await tx.get(ref);
+          if (!snap.exists) {
+            console.log("[decrementStockOnOrder] Product missing:", productId);
+            continue;
+          }
+          const data = snap.data() || {};
+
+          let updates = {};
+          let topQty = Number(data.quantity) || 0;
+          let applied = false;
+
+          if (data.sizeQuantities && typeof data.sizeQuantities === "object") {
+            const sq = { ...data.sizeQuantities };
+            for (const p of parts) {
+              if (!p.size || !p.gender) continue;
+              const gkey = findCaseInsensitiveKey(sq, p.gender);
+              const arr = gkey && Array.isArray(sq[gkey]) ? [...sq[gkey]] : [];
+              const idx = arr.findIndex(
+                (r) => String(r.size) === String(p.size)
+              );
+              if (idx !== -1) {
+                const cur = Number(arr[idx].quantity) || 0;
+                arr[idx] = { ...arr[idx], quantity: Math.max(0, cur - p.qty) };
+                if (gkey) sq[gkey] = arr;
+              }
+            }
+            updates.sizeQuantities = sq;
+            // recompute total
+            topQty = 0;
+            for (const g of Object.keys(sq)) {
+              const arr = Array.isArray(sq[g]) ? sq[g] : [];
+              topQty += arr.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+            }
+            applied = true;
+          } else if (
+            Array.isArray(data.sizes) &&
+            data.sizes.length &&
+            typeof data.sizes[0] === "object"
+          ) {
+            const sizes = [...data.sizes];
+            for (const p of parts) {
+              if (!p.size) continue;
+              const idx = sizes.findIndex(
+                (r) => String(r.size) === String(p.size)
+              );
+              if (idx !== -1) {
+                const cur = Number(sizes[idx].quantity) || 0;
+                sizes[idx] = {
+                  ...sizes[idx],
+                  quantity: Math.max(0, cur - p.qty),
+                };
+              }
+            }
+            updates.sizes = sizes;
+            topQty = sizes.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+            applied = true;
+          } else if (data.sizes && typeof data.sizes === "object") {
+            const smap = { ...data.sizes };
+            for (const p of parts) {
+              if (!p.size) continue;
+              const gkey = findCaseInsensitiveKey(smap, p.gender || "");
+              const arr =
+                gkey && Array.isArray(smap[gkey]) ? [...smap[gkey]] : [];
+              const objIdx = arr.findIndex(
+                (r) =>
+                  r &&
+                  typeof r === "object" &&
+                  String(r.size) === String(p.size)
+              );
+              if (objIdx !== -1) {
+                const cur = Number(arr[objIdx].quantity) || 0;
+                arr[objIdx] = {
+                  ...arr[objIdx],
+                  quantity: Math.max(0, cur - p.qty),
+                };
+                if (gkey) smap[gkey] = arr;
+              }
+            }
+            updates.sizes = smap;
+            topQty = 0;
+            for (const g of Object.keys(smap)) {
+              const arr = Array.isArray(smap[g]) ? smap[g] : [];
+              topQty += arr.reduce(
+                (a, b) =>
+                  a +
+                  (b && typeof b === "object" ? Number(b.quantity) || 0 : 0),
+                0
+              );
+            }
+            applied = true;
+          } else {
+            // Fallback: no per-size quantities present. Decrement top-level quantity only.
+            const totalQty = parts.reduce(
+              (a, b) => a + (Number(b.qty) || 0),
+              0
+            );
+            topQty = Math.max(0, topQty - totalQty);
+            applied = true;
+          }
+
+          if (applied) {
+            updates.quantity = topQty;
+            updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+            tx.set(ref, updates, { merge: true });
+          }
+        }
+      }
+
+      // Coupon redemption (idempotent)
+      let couponApplied = null;
+      if (couponCode && uid && !couponAlready) {
+        try {
+          const refC = db.doc(`coupons/${couponCode}`);
+          const snapC = await tx.get(refC);
+          if (snapC.exists) {
+            const c = snapC.data() || {};
+            if (isCouponActive(c)) {
+              const discount = computeCouponDiscount(c, amount);
+              const maxUses = Number(c.maxUses) || 0;
+              const totalUses = Number(c.totalUses) || 0;
+              const perUserLimit = Number(c.perUserLimit) || 1;
+              let ok = discount > 0 && (!maxUses || totalUses < maxUses);
+              let usedByUser = 0;
+              const refU = db.doc(`coupons/${couponCode}/users/${uid}`);
+              const snapU = await tx.get(refU);
+              usedByUser = snapU.exists ? Number(snapU.data()?.count || 0) : 0;
+              if (perUserLimit && usedByUser >= perUserLimit) ok = false;
+              if (ok) {
+                tx.set(
+                  refC,
+                  {
+                    totalUses: (totalUses || 0) + 1,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+                tx.set(
+                  refU,
+                  {
+                    count: usedByUser + 1,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+                couponApplied = { code: couponCode, discount, valid: true };
+              } else {
+                couponApplied = { code: couponCode, discount: 0, valid: false };
+              }
+            } else {
+              couponApplied = { code: couponCode, discount: 0, valid: false };
+            }
+          } else {
+            couponApplied = { code: couponCode, discount: 0, valid: false };
+          }
+        } catch (_) {
+          couponApplied = { code: couponCode, discount: 0, valid: false };
+        }
+      }
+
+      tx.set(
+        orderRef,
+        {
+          ...(stockAlready
+            ? {}
+            : {
+                stockDeducted: true,
+                stockDeductedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }),
+          ...(couponApplied
+            ? { coupon: couponApplied, couponRedeemed: true }
+            : {}),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+  }
+);
+
+// Removed separate Twilio-on-create handler; Twilio is handled inside the unified order creation function below.
+
+exports.fulfillOrderOnCreate = onDocumentCreated(
+  {
+    document: "orders/{orderId}",
+    region: REGION,
+    secrets: [
+      XPRESSBEES_USERNAME,
+      XPRESSBEES_PASSWORD,
+      TWILIO_ACCOUNT_SID,
+      TWILIO_AUTH_TOKEN,
+      TWILIO_WHATSAPP_FROM,
+      TWILIO_TEMPLATE_SID,
+    ],
+  },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data();
+    if (!data) return;
+    try {
+      // Bail out if HTTP flow created this order or a lock is preset
+      if (String(data.via || '').toLowerCase() === 'http-fulfill' || data.fulfillmentLock) {
+        return;
+      }
+      const onCreateEnabled = String(process.env.ORDER_FULFILL_ON_CREATE || 'true').trim().toLowerCase();
+      if (onCreateEnabled === 'false') { return; }
+      const db = admin.firestore();
+      const orderId = String(event.params.orderId || "");
+      const ref = db.doc(`orders/${orderId}`);
+      let proceed = false;
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(ref);
+        const cur = fresh.exists ? fresh.data() || {} : {};
+        if (cur.fulfillmentDone || cur.fulfillmentLock) return;
+        tx.set(
+          ref,
+          { fulfillmentLock: admin.firestore.FieldValue.serverTimestamp() },
+          { merge: true }
+        );
+        proceed = true;
+      });
+      if (!proceed) {
+        console.log("[fulfill] Locked or already processed; skipping");
+        return;
+      }
+
+      const accountSid =
+        TWILIO_ACCOUNT_SID.value() || process.env.TWILIO_ACCOUNT_SID || "";
+      const authToken =
+        TWILIO_AUTH_TOKEN.value() || process.env.TWILIO_AUTH_TOKEN || "";
+      const from =
+        TWILIO_WHATSAPP_FROM.value() || process.env.TWILIO_WHATSAPP_FROM || "";
+      const templateSid =
+        TWILIO_TEMPLATE_SID.value() || process.env.TWILIO_TEMPLATE_SID || "";
+      const username =
+        XPRESSBEES_USERNAME.value() || process.env.XPRESSBEES_USERNAME || "";
+      const password =
+        XPRESSBEES_PASSWORD.value() || process.env.XPRESSBEES_PASSWORD || "";
+
+      const method = String(
+        data.paymentMethod || (data.paymentId ? "online" : "")
+      ).toLowerCase();
+      const isCOD =
+        method === "cod" ||
+        String(data.paymentId || "").toUpperCase() === "COD";
+      const orderLabel = `MGX${orderId.slice(0, 6).toUpperCase()}`;
+      const amount = Math.round(Number(data.amount) || 0);
+      const discount = Math.round(Number(data.discount) || 0);
+      const base = Math.max(0, amount - discount);
+      const gst = Number.isFinite(Number(data.gst))
+        ? Math.round(Number(data.gst))
+        : Math.round(base * 0.18);
+      const payable = Math.round(Number(data.payable) || base + gst);
+
+      let twilioResult = { ok: false, sid: null, error: null };
+      let xbResult = { ok: false, awb: null, shipmentId: null, error: null };
+
+      // 1) WhatsApp first
+      try {
+        if (accountSid && authToken && from && templateSid) {
+          const to = formatWhatsappNumber(data?.billing?.phone || "");
+          if (to) {
+            const nameRaw = data?.billing?.name || "";
+            const firstName =
+              String(nameRaw || "there")
+                .split(/\s+/)
+                .filter(Boolean)[0] || "there";
+            const created =
+              data.createdAt && data.createdAt.toDate
+                ? data.createdAt.toDate()
+                : new Date();
+            const dateStr = created.toLocaleDateString("en-IN", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            });
+            const itemsSummary = summarizeItems(
+              Array.isArray(data.items) ? data.items : []
+            );
+            const contentVariables = JSON.stringify({
+              1: String(firstName),
+              2: String(orderLabel),
+              3: String(dateStr),
+              4: String(itemsSummary),
+              5: String(amount),
+              6: String(discount),
+              7: String(payable),
+            });
+            const body = new URLSearchParams({
+              From: from,
+              To: to,
+              ContentSid: templateSid,
+              ContentVariables: contentVariables,
+            }).toString();
+            const auth = Buffer.from(`${accountSid}:${authToken}`).toString(
+              "base64"
+            );
+            const resp = await fetch(
+              `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+              {
+                method: "POST",
+                headers: {
+                  "content-type": "application/x-www-form-urlencoded",
+                  authorization: `Basic ${auth}`,
+                },
+                body,
+              }
+            );
+            if (resp.ok) {
+              const msg = await resp.json().catch(() => ({}));
+              twilioResult = { ok: true, sid: msg?.sid || null, error: null };
+              await ref.set(
+                {
+                  waSent: true,
+                  waMessageSid: msg?.sid || null,
+                  waSentAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              );
+            } else {
+              const txt = await resp.text().catch(() => "");
+              twilioResult = {
+                ok: false,
+                sid: null,
+                error: txt || `HTTP ${resp.status}`,
+              };
+            }
+          } else {
+            twilioResult = {
+              ok: false,
+              sid: null,
+              error: "Invalid recipient phone",
+            };
+          }
+        } else {
+          twilioResult = {
+            ok: false,
+            sid: null,
+            error: "Twilio not configured",
+          };
+        }
+      } catch (e) {
+        twilioResult = { ok: false, sid: null, error: e?.message || String(e) };
+      }
+
+      // 2) Create shipment
+      try {
+        if (!username || !password)
+          throw new Error("XpressBees credentials not configured");
+        if (
+          String(process.env.XPRESSBEES_ENABLED || "true").toLowerCase() ===
+          "false"
+        )
+          throw new Error("XpressBees disabled");
+        const token = await getXpressbeesToken({ username, password });
+
+        const payload = buildXbShipmentPayload({
+          orderId,
+          orderLabel,
+          data,
+          isCOD,
+        });
+        const url = `${XB_ORIGIN}/api/shipments2`;
+
+        let resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        if (resp.status === 401 || resp.status === 403) {
+          const fresh = await getXpressbeesToken({ username, password });
+          resp = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${fresh}` }, body: JSON.stringify(payload) });
+        }
+        const ok = resp.ok;
+        let raw = null;
+        try {
+          raw = await resp.json();
+        } catch {
+          try {
+            raw = await resp.text();
+          } catch {
+            raw = null;
+          }
+        }
+        let awb = null,
+          shipmentId = null;
+        try {
+          const s = raw && typeof raw === "object" ? raw.data || raw || {} : {};
+          awb = s?.awb_number || s?.awb || s?.awbno || null;
+          shipmentId = s?.shipment_id || s?.order_id || s?.id || null;
+        } catch {}
+        xbResult = {
+          ok,
+          awb,
+          shipmentId,
+          error: ok
+            ? null
+            : typeof raw === "string"
+            ? raw
+            : raw?.message || `HTTP ${resp.status}`,
+        };
+        await ref.set(
+          {
+            xbCreated: !!ok,
+            xbStatus: ok ? "created" : "failed",
+            xbAwb: awb || null,
+            xbShipmentId: shipmentId || null,
+            xbRaw: raw || null,
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        xbResult = {
+          ok: false,
+          awb: null,
+          shipmentId: null,
+          error: e?.message || String(e),
+        };
+      }
+
+      // 3) Discord log
+      try {
+        const webhook = (
+          process.env.DISCORD_WEBHOOK_URL ||
+          "https://discordapp.com/api/webhooks/1427366532794810488/A8ixxfB6YTIRjnY4cTMiVVxm9bOq33biY3E3NhYMhjytAmP89_y_S_9s28NTPJ5GxFX1"
+        ).trim();
+        const content = `Order ${orderLabel} (${
+          isCOD ? "COD" : "Prepaid"
+        })\nTwilio: ${twilioResult.ok ? "OK" : "ERR"}${
+          twilioResult.sid ? " sid=" + twilioResult.sid : ""
+        }${twilioResult.error ? " • " + twilioResult.error : ""}\nXpressBees: ${
+          xbResult.ok ? "OK" : "ERR"
+        }${xbResult.awb ? " awb=" + xbResult.awb : ""}${
+          xbResult.error ? " • " + xbResult.error : ""
+        }`;
+        await fetch(webhook, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ content }),
+        });
+      } catch {}
+
+      await ref.set(
+        {
+          fulfillmentDone: true,
+          fulfillmentLock: admin.firestore.FieldValue.delete(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn("[fulfill] error", e?.message || e);
+      try {
+        const db = admin.firestore();
+        const orderId = String(event.params.orderId || "");
+        await db.doc(`orders/${orderId}`).set(
+          {
+            fulfillmentLock: admin.firestore.FieldValue.delete(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch {}
+    }
+  }
+);
+
+// (Removed) createXpressbeesShipmentOnPayment — merged into fulfillOrderOnCreate
+
+// (Removed) createXpressbeesShipment manual endpoint — merged into unified flow
+
+// Test helper: create a dummy order (triggers shipment). Intended for QA.
+// If env TEST_ENDPOINT_KEY is set, require header 'x-test-key' to match.
+exports.createDummyOrder = onRequest(
+  { region: REGION, cors: true },
+  async (req, res) => {
+    try {
+      if (req.method !== "POST") {
+        res.status(405).json({ error: "Method Not Allowed" });
+        return;
+      }
+      const key = (process.env.TEST_ENDPOINT_KEY || "").trim();
+      if (key) {
+        const hdr = String(req.headers["x-test-key"] || "").trim();
+        if (hdr !== key) {
+          res.status(401).json({ error: "Unauthorized" });
+          return;
+        }
+      }
+
+      const body =
+        typeof req.body === "string"
+          ? JSON.parse(req.body || "{}")
+          : req.body || {};
+      const pm = String(body.paymentMethod || "").toLowerCase();
+      const paymentMethod =
+        pm === "cod" ? "cod" : pm === "prepaid" ? "online" : "cod";
+
+      const itemsIn = Array.isArray(body.items) ? body.items : [];
+      const items = itemsIn.length
+        ? itemsIn
+        : [
+            {
+              id: "test-shoe-black-s9-men",
+              name: "Test Shoe",
+              price: 1499,
+              qty: 1,
+              meta: { size: "9", gender: "men" },
+            },
+          ];
+      const amount = items.reduce(
+        (a, b) => a + (Number(b.price) || 0) * (Number(b.qty) || 0),
+        0
+      );
+      const discount = Math.max(0, Number(body.discount || 0));
+      const net = Math.max(0, amount - discount);
+      const gst = Math.round(net * 0.18);
+      const payable = net + gst;
+
+      const billingIn = body.billing || {};
+      const billing = {
+        name: String(billingIn.name || "Dummy Buyer"),
+        email: String(billingIn.email || "buyer+dummy@megance.com"),
+        phone: String(billingIn.phone || "8888888888"),
+        address: String(billingIn.address || "221B Baker Street, Near Park"),
+        city: String(billingIn.city || "New Delhi"),
+        state: String(billingIn.state || "Delhi"),
+        zip: String(billingIn.zip || "110063"),
+      };
+
+      const db = admin.firestore();
+      const payload = {
+        userId: null,
+        items,
+        amount,
+        discount,
+        gst,
+        couponCode: null,
+        payable,
+        status: "ordered",
+        paymentMethod,
+        paymentId: paymentMethod === "cod" ? "COD" : "",
+        billing,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      const ref = await db.collection("orders").add(payload);
+      res
+        .status(200)
+        .json({ ok: true, orderId: ref.id, amount, payable, paymentMethod });
+    } catch (e) {
+      res.status(500).json({ error: e?.message || "Internal error" });
+    }
+  }
+);
+
+// Razorpay Order endpoints (require secrets to be set)
+const RAZORPAY_KEY_ID = defineSecret("RAZORPAY_KEY_ID");
+const RAZORPAY_KEY_SECRET = defineSecret("RAZORPAY_KEY_SECRET");
+exports.createRazorpayOrder = onRequest(
+  {
+    region: REGION,
+    cors: true,
+    secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET],
+  },
+  async (req, res) => {
+    try {
+      if (req.method !== "POST") {
+        res.status(405).json({ error: "Method Not Allowed" });
+        return;
+      }
+      const body =
+        typeof req.body === "string"
+          ? JSON.parse(req.body || "{}")
+          : req.body || {};
+      const rupees = Number(body.amount) || 0; // allow rupees for convenience
+      const amount = Number.isFinite(rupees) ? Math.round(rupees * 100) : 0; // paise
+      const currency = (body.currency || "INR").toUpperCase();
+      // Razorpay requires receipt length <= 40. Sanitize/truncate safely.
+      const rawReceipt = String(body.receipt || "").trim();
+      let receipt = rawReceipt && rawReceipt.length <= 40 ? rawReceipt : "";
+      if (!receipt) {
+        // Short unique fallback like r-k5yo9f-a1b2c3
+        receipt = `r-${Date.now().toString(36)}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`;
+      } else if (receipt.length > 40) {
+        receipt = receipt.slice(0, 40);
+      }
+      if (!amount || amount < 100) {
+        res.status(400).json({ error: "Invalid amount" });
+        return;
+      }
+
+      const keyId = RAZORPAY_KEY_ID.value();
+      const keySecret = RAZORPAY_KEY_SECRET.value();
+      if (!keyId || !keySecret) {
+        console.warn("[createRazorpayOrder] Secrets missing");
+        res.status(500).json({ error: "Razorpay secrets not configured" });
+        return;
+      }
+
+      const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+      const rpRes = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Basic ${auth}`,
+        },
+        body: JSON.stringify({ amount, currency, receipt, payment_capture: 1 }),
+      });
+      if (!rpRes.ok) {
+        const text = await rpRes.text();
+        console.error(
+          "[createRazorpayOrder] Razorpay error",
+          rpRes.status,
+          text
+        );
+        res.status(502).json({
+          error: "Failed to create order",
+          status: rpRes.status,
+          details: text,
+        });
+        return;
+      }
+      const data = await rpRes.json();
+      res.status(200).json({ order: data, keyId }); // return public keyId to client
+    } catch (e) {
+      console.error("[createRazorpayOrder] exception", e?.message || e);
+      res.status(500).json({ error: e?.message || "Internal error" });
+    }
+  }
+);
+
+// Verify Razorpay signature and mark order as paid
+exports.verifyRazorpaySignature = onRequest(
+  {
+    region: REGION,
+    cors: true,
+    secrets: [
+      RAZORPAY_KEY_SECRET,
+      TWILIO_ACCOUNT_SID,
+      TWILIO_AUTH_TOKEN,
+      TWILIO_WHATSAPP_FROM,
+      TWILIO_TEMPLATE_SID,
+    ],
+  },
+  async (req, res) => {
+    try {
+      if (req.method !== "POST") {
+        res.status(405).json({ error: "Method Not Allowed" });
+        return;
+      }
+      const body =
+        typeof req.body === "string"
+          ? JSON.parse(req.body || "{}")
+          : req.body || {};
+      const orderId = String(body.razorpay_order_id || "");
+      const paymentId = String(body.razorpay_payment_id || "");
+      const signature = String(body.razorpay_signature || "");
+      const orderDocId = String(body.orderDocId || "");
+      if (!orderId || !paymentId || !signature || !orderDocId) {
+        res.status(400).json({ error: "Missing fields" });
+        return;
+      }
+
+      const keySecret = RAZORPAY_KEY_SECRET.value();
+      const expected = crypto
+        .createHmac("sha256", keySecret)
+        .update(`${orderId}|${paymentId}`)
+        .digest("hex");
+      const valid = expected === signature;
+      if (!valid) {
+        res.status(400).json({ ok: false, valid: false });
+        return;
+      }
+
+      const db = admin.firestore();
+      const ref = db.doc(`orders/${orderDocId}`);
+      await ref.update({
+        status: "paid",
+        paymentVerified: true,
+        razorpay: { orderId, paymentId, signature },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Attempt to send WhatsApp confirmation here (online payments only)
+      try {
+        const [accountSid, authToken, from, templateSid] = [
+          TWILIO_ACCOUNT_SID.value() || process.env.TWILIO_ACCOUNT_SID || "",
+          TWILIO_AUTH_TOKEN.value() || process.env.TWILIO_AUTH_TOKEN || "",
+          TWILIO_WHATSAPP_FROM.value() ||
+            process.env.TWILIO_WHATSAPP_FROM ||
+            "",
+          TWILIO_TEMPLATE_SID.value() || process.env.TWILIO_TEMPLATE_SID || "",
+        ];
+        if (accountSid && authToken && from && templateSid) {
+          // Idempotency lock for online send
+          let proceed = false;
+          await db.runTransaction(async (tx) => {
+            const fresh = await tx.get(ref);
+            const cur = fresh.exists ? fresh.data() || {} : {};
+            if (cur.waSent || cur.waLock) return;
+            tx.set(
+              ref,
+              { waLock: admin.firestore.FieldValue.serverTimestamp() },
+              { merge: true }
+            );
+            proceed = true;
+          });
+          if (proceed) {
+            const snap = await ref.get();
+            const data = snap.exists ? snap.data() || {} : {};
+            const to = formatWhatsappNumber(data?.billing?.phone || "");
+            if (to) {
+              const nameRaw = (data.billing && data.billing.name) || "";
+              const firstName =
+                String(nameRaw || "there")
+                  .split(/\s+/)
+                  .filter(Boolean)[0] || "there";
+              const orderLabel = `MGX${orderDocId.slice(0, 6).toUpperCase()}`;
+              const created =
+                data.createdAt && data.createdAt.toDate
+                  ? data.createdAt.toDate()
+                  : new Date();
+              const dateStr = created.toLocaleDateString("en-IN", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              });
+              const itemsSummary = summarizeItems(
+                Array.isArray(data.items) ? data.items : []
+              );
+              const amount = Math.round(Number(data.amount) || 0);
+              const discount = Math.round(Number(data.discount) || 0);
+              const base = Math.max(0, amount - discount);
+              const gst = Number.isFinite(Number(data.gst))
+                ? Math.round(Number(data.gst))
+                : Math.round(base * 0.18);
+              const payable = Math.round(Number(data.payable) || base + gst);
+
+              const contentVariables = JSON.stringify({
+                1: String(firstName),
+                2: String(orderLabel),
+                3: String(dateStr),
+                4: String(itemsSummary),
+                5: String(amount),
+                6: String(discount),
+                7: String(payable),
+              });
+
+              const bodyForm = new URLSearchParams({
+                From: from,
+                To: to,
+                ContentSid: templateSid,
+                ContentVariables: contentVariables,
+              }).toString();
+              const auth = Buffer.from(`${accountSid}:${authToken}`).toString(
+                "base64"
+              );
+              const resp2 = await fetch(
+                `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+                {
+                  method: "POST",
+                  headers: {
+                    "content-type": "application/x-www-form-urlencoded",
+                    authorization: `Basic ${auth}`,
+                  },
+                  body: bodyForm,
+                }
+              );
+              if (resp2.ok) {
+                const msg = await resp2.json().catch(() => ({}));
+                await ref.set(
+                  {
+                    waSent: true,
+                    waMessageSid: msg?.sid || null,
+                    waSentAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+              } else {
+                const txt = await resp2.text().catch(() => "");
+                console.warn(
+                  "[verifyRazorpaySignature] Twilio send failed",
+                  resp2.status,
+                  txt
+                );
+                try {
+                  await ref.set(
+                    {
+                      waLock: admin.firestore.FieldValue.delete(),
+                      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    { merge: true }
+                  );
+                } catch {}
+              }
+            } else {
+              console.warn(
+                "[verifyRazorpaySignature] No valid recipient phone; skipping WhatsApp"
+              );
+              try {
+                await ref.set(
+                  {
+                    waLock: admin.firestore.FieldValue.delete(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+              } catch {}
+            }
+          } else {
+            console.log(
+              "[verifyRazorpaySignature] Locked or already sent; skipping"
+            );
+          }
+        }
+      } catch (e2) {
+        console.warn(
+          "[verifyRazorpaySignature] WhatsApp send error",
+          e2?.message || e2
+        );
+        try {
+          const db = admin.firestore();
+          const ref = db.doc(`orders/${orderDocId}`);
+          await ref.set(
+            {
+              waLock: admin.firestore.FieldValue.delete(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } catch {}
+      }
+
+      res.status(200).json({ ok: true, valid: true });
+    } catch (e) {
+      res.status(500).json({ error: e?.message || "Internal error" });
+    }
+  }
+);
+
+// Generate a simple invoice PDF for a given order (auth required)
+exports.getOrderInvoicePdf = onRequest(
+  { region: REGION, cors: true },
+  async (req, res) => {
+    try {
+      const db = admin.firestore();
+      const orderId = String(req.query.orderId || "").trim();
+      const token = String(
+        req.query.token ||
+          (req.headers.authorization || "").replace(/^Bearer\s+/i, "")
+      ).trim();
+      if (!orderId || !token) {
+        res.status(401).send("Unauthorized");
+        return;
+      }
+      let decoded;
+      try {
+        decoded = await admin.auth().verifyIdToken(token);
+      } catch {
+        res.status(401).send("Unauthorized");
+        return;
+      }
+      const uid = decoded.uid;
+      const snap = await db.doc(`orders/${orderId}`).get();
+      if (!snap.exists) {
+        res.status(404).send("Not found");
+        return;
+      }
+      const data = snap.data() || {};
+      if (data.userId && data.userId !== uid && decoded.email !== OWNER_EMAIL) {
+        res.status(403).send("Forbidden");
+        return;
+      }
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      const billing = data.billing || {};
+      const created =
+        data.createdAt && data.createdAt.toDate
+          ? data.createdAt.toDate()
+          : new Date();
+
+      res.setHeader("content-type", "application/pdf");
+      res.setHeader(
+        "content-disposition",
+        `inline; filename=invoice-${orderId}.pdf`
+      );
+      const doc = new PDFDocument({ size: "A4", margin: 40 });
+      doc.pipe(res);
+
+      doc
+        .fontSize(18)
+        .text("Megance", { continued: true })
+        .fontSize(12)
+        .text("  • Invoice", { align: "left" });
+      doc.moveDown(0.5);
+      doc
+        .fontSize(10)
+        .fillColor("#666")
+        .text(
+          `Order: #${orderId
+            .slice(0, 6)
+            .toUpperCase()}    Date: ${created.toLocaleString()}    Payment: ${(
+            data.paymentMethod || (data.paymentId ? "online" : "cod")
+          ).toUpperCase()}`
+        );
+      doc.moveDown(1);
+      doc.fillColor("#111").fontSize(12).text("Bill To:");
+      doc.fontSize(10).text(`${billing.name || ""}`);
+      doc.text(`${billing.email || ""}`);
+      doc.text(`${billing.phone || ""}`);
+      doc.text(
+        `${[billing.address, billing.city, billing.state, billing.zip]
+          .filter(Boolean)
+          .join(", ")}`
+      );
+
+      doc.moveDown(1);
+      // Table header
+      doc.fontSize(12).text("Item", 40, doc.y, { continued: true });
+      doc.text("Qty", 340, undefined, { continued: true });
+      doc.text("Amount", 420);
+      doc
+        .moveTo(40, doc.y + 4)
+        .lineTo(555, doc.y + 4)
+        .strokeColor("#ddd")
+        .stroke();
+      doc.moveDown(0.5);
+
+      let total = 0;
+      items.forEach((it) => {
+        const unit = Number(it.price) || 0;
+        const qty = Number(it.qty) || 0;
+        const amt = unit * qty;
+        total += amt;
+        doc
+          .fontSize(10)
+          .fillColor("#111")
+          .text(String(it.name || ""), 40, doc.y, { width: 280 });
+        doc.text(String(qty), 340, undefined);
+        doc.text(`₹ ${amt}`, 420, undefined);
+        if (it.description) {
+          doc
+            .fillColor("#666")
+            .fontSize(9)
+            .text(String(it.description).slice(0, 140), 40, doc.y, {
+              width: 520,
+            });
+        }
+        doc.moveDown(0.6);
+      });
+
+      doc.moveDown(0.5);
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#ddd").stroke();
+      doc.moveDown(0.5);
+      const discount = Number(data.discount || 0);
+      const net = Math.max(0, total - discount);
+      const tax =
+        typeof data.gst === "number"
+          ? Number(data.gst)
+          : Math.round(net * 0.18);
+      const payable = Number(data.payable || net + tax);
+      doc
+        .fontSize(11)
+        .fillColor("#111")
+        .text(`Subtotal: ₹ ${total}`, { align: "right" });
+      if (discount > 0)
+        doc.text(`Discount: - ₹ ${discount}`, { align: "right" });
+      doc.text(`GST (18%): ₹ ${tax}`, { align: "right" });
+      doc.fontSize(12).text(`Total: ₹ ${payable}`, { align: "right" });
+
+      doc.end();
+    } catch (e) {
+      try {
+        console.error("getOrderInvoicePdf error", e?.message || e);
+      } catch {}
+      res.status(500).send("Internal error");
+    }
+  }
+);
+
+// Callable variant that returns a base64 PDF (auth required)
+exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
+  const uid = req.auth?.uid;
+  const email = req.auth?.token?.email || "";
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
   const db = admin.firestore();
-  const orderId = event.params.orderId;
+  const orderId = String(req.data?.orderId || "").trim();
+  if (!orderId) throw new HttpsError("invalid-argument", "orderId is required");
+  const snap = await db.doc(`orders/${orderId}`).get();
+  if (!snap.exists) throw new HttpsError("not-found", "Order not found");
+  const data = snap.data() || {};
+  if (data.userId && data.userId !== uid && email !== OWNER_EMAIL)
+    throw new HttpsError("permission-denied", "Forbidden");
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const billing = data.billing || {};
+  const created =
+    data.createdAt && data.createdAt.toDate
+      ? data.createdAt.toDate()
+      : new Date();
+
+  // Lazy load to avoid analyzer crash
+  let _PDF = PDFDocument;
+  if (!_PDF) {
+    try {
+      _PDF = require("pdfkit");
+    } catch (e) {
+      throw new HttpsError("internal", "PDF engine missing");
+    }
+  }
+  const doc = new _PDF({ size: "A4", margin: 40 });
+  const chunks = [];
+  return await new Promise((resolve, reject) => {
+    doc.on("data", (c) => chunks.push(c));
+    doc.on("error", (e) =>
+      reject(new HttpsError("internal", e?.message || "PDF error"))
+    );
+    doc.on("end", () => {
+      const buffer = Buffer.concat(chunks);
+      const b64 = buffer.toString("base64");
+      resolve({
+        contentType: "application/pdf",
+        filename: `invoice-${orderId}.pdf`,
+        data: b64,
+      });
+    });
+
+    doc
+      .fontSize(18)
+      .text("Megance", { continued: true })
+      .fontSize(12)
+      .text("  • Invoice", { align: "left" });
+    doc.moveDown(0.5);
+    doc
+      .fontSize(10)
+      .fillColor("#666")
+      .text(
+        `Order: #${orderId
+          .slice(0, 6)
+          .toUpperCase()}    Date: ${created.toLocaleString()}    Payment: ${(
+          data.paymentMethod || (data.paymentId ? "online" : "cod")
+        ).toUpperCase()}`
+      );
+    doc.moveDown(1);
+    doc.fillColor("#111").fontSize(12).text("Bill To:");
+    doc.fontSize(10).text(`${billing.name || ""}`);
+    doc.text(`${billing.email || ""}`);
+    doc.text(`${billing.phone || ""}`);
+    doc.text(
+      `${[billing.address, billing.city, billing.state, billing.zip]
+        .filter(Boolean)
+        .join(", ")}`
+    );
+
+    doc.moveDown(1);
+    doc.fontSize(12).text("Item", 40, doc.y, { continued: true });
+    doc.text("Qty", 340, undefined, { continued: true });
+    doc.text("Amount", 420);
+    doc
+      .moveTo(40, doc.y + 4)
+      .lineTo(555, doc.y + 4)
+      .strokeColor("#ddd")
+      .stroke();
+    doc.moveDown(0.5);
+
+    let total = 0;
+    items.forEach((it) => {
+      const unit = Number(it.price) || 0;
+      const qty = Number(it.qty) || 0;
+      const amt = unit * qty;
+      total += amt;
+      doc
+        .fontSize(10)
+        .fillColor("#111")
+        .text(String(it.name || ""), 40, doc.y, { width: 280 });
+      doc.text(String(qty), 340, undefined);
+      doc.text(`₹ ${amt}`, 420, undefined);
+      if (it.description) {
+        doc
+          .fillColor("#666")
+          .fontSize(9)
+          .text(String(it.description).slice(0, 140), 40, doc.y, {
+            width: 520,
+          });
+      }
+      doc.moveDown(0.6);
+    });
+
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#ddd").stroke();
+    doc.moveDown(0.5);
+    const discount = Number(data.discount || 0);
+    const payable = Number(data.payable || total - discount);
+    doc
+      .fontSize(11)
+      .fillColor("#111")
+      .text(`Subtotal: ₹ ${total}`, { align: "right" });
+    if (discount > 0) doc.text(`Discount: - ₹ ${discount}`, { align: "right" });
+    doc.fontSize(12).text(`Total: ₹ ${payable}`, { align: "right" });
+
+    doc.end();
+  });
+});
+// Preview a coupon (does not reserve). Requires auth.
+exports.previewCoupon = onCall({ region: REGION }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+  const db = admin.firestore();
+  const code = req.data?.code;
+  const amount = Number(req.data?.amount) || 0;
+  const res = await validateCouponForUser({ db, code, uid, amount });
+  if (!res.ok) return res;
+  return { ok: true, code: res.code, discount: res.discount };
+});
+
+// Callable: decrement stock for a given order id (idempotent), owned by the caller
+exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
+  const uid = req.auth?.uid;
+  const orderId = String(req.data?.orderId || "");
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+  if (!orderId) throw new HttpsError("invalid-argument", "orderId is required");
+
+  const db = admin.firestore();
   const orderRef = db.doc(`orders/${orderId}`);
-  console.log('[decrementStockOnOrder] Triggered for order', orderId);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found");
+  const order = orderSnap.data() || {};
+  if (order.userId && order.userId !== uid)
+    throw new HttpsError("permission-denied", "Not your order");
+  // Proceed even if stock was already deducted to allow coupon redemption idempotently
 
   function parseItem(it) {
     try {
       const meta = it.meta || {};
-      let size = meta.size ? String(meta.size) : '';
+      let size = meta.size ? String(meta.size) : "";
       let gender = meta.gender || null;
-      let id = String(it.id || '');
+      let id = String(it.id || "");
       let base = id;
       if (size) {
         const idx = base.lastIndexOf(`-s${size}`);
         base = idx !== -1 ? base.slice(0, idx) : base;
       }
-      // Strip gender suffix from base id if present (regardless of whether meta.gender exists)
-      if (gender && (base.endsWith(`-${gender}`))) {
-        base = base.slice(0, -(`-${gender}`).length);
+      if (gender && base.endsWith(`-${gender}`)) {
+        base = base.slice(0, -`-${gender}`.length);
       } else if (!gender) {
-        if (base.endsWith('-men')) { gender = 'men'; base = base.slice(0, -4); }
-        else if (base.endsWith('-women')) { gender = 'women'; base = base.slice(0, -6); }
+        if (base.endsWith("-men")) {
+          gender = "men";
+          base = base.slice(0, -4);
+        } else if (base.endsWith("-women")) {
+          gender = "women";
+          base = base.slice(0, -6);
+        }
       }
       return { productId: base, size, gender, qty: Number(it.qty) || 0 };
     } catch (_) {
@@ -330,22 +2015,14 @@ exports.decrementStockOnOrder = onDocumentCreated({
   }
 
   await db.runTransaction(async (tx) => {
-    const orderSnap = await tx.get(orderRef);
-    if (!orderSnap.exists) { console.log('[decrementStockOnOrder] No order snapshot'); return; }
-    // Proceed for typical success statuses; be lenient to support test flows
-    const status = String(orderSnap.get('status') || '').toLowerCase();
-    if (status && !['ordered', 'paid', 'completed', 'success'].includes(status)) {
-      console.log('[decrementStockOnOrder] Ignoring status', status);
-      return;
-    }
-
-    const items = Array.isArray(orderSnap.get('items')) ? orderSnap.get('items') : [];
-    const uid = orderSnap.get('userId') || null;
-    const amount = Number(orderSnap.get('amount') || 0);
-    const couponCodeRaw = orderSnap.get('couponCode') || '';
-    const couponCode = String(couponCodeRaw || '').trim().toUpperCase();
-    const stockAlready = orderSnap.get('stockDeducted') === true;
-    const couponAlready = orderSnap.get('couponRedeemed') === true || (orderSnap.get('coupon')?.valid === true);
+    const fresh = await tx.get(orderRef);
+    if (!fresh.exists) throw new HttpsError("not-found", "Order missing");
+    const alreadyStock = fresh.get("stockDeducted") === true;
+    const items = Array.isArray(fresh.get("items")) ? fresh.get("items") : [];
+    const amount = Number(fresh.get("amount") || 0);
+    const couponCode = String(fresh.get("couponCode") || "")
+      .trim()
+      .toUpperCase();
     const grouped = new Map();
     for (const it of items) {
       const p = parseItem(it);
@@ -354,18 +2031,17 @@ exports.decrementStockOnOrder = onDocumentCreated({
       grouped.get(p.productId).push(p);
     }
 
-    if (!stockAlready) {
+    if (!alreadyStock)
       for (const [productId, parts] of grouped.entries()) {
         const ref = db.doc(`products/${productId}`);
         const snap = await tx.get(ref);
-        if (!snap.exists) { console.log('[decrementStockOnOrder] Product missing:', productId); continue; }
+        if (!snap.exists) continue;
         const data = snap.data() || {};
-
         let updates = {};
         let topQty = Number(data.quantity) || 0;
         let applied = false;
 
-        if (data.sizeQuantities && typeof data.sizeQuantities === 'object') {
+        if (data.sizeQuantities && typeof data.sizeQuantities === "object") {
           const sq = { ...data.sizeQuantities };
           for (const p of parts) {
             if (!p.size || !p.gender) continue;
@@ -379,36 +2055,51 @@ exports.decrementStockOnOrder = onDocumentCreated({
             }
           }
           updates.sizeQuantities = sq;
-          // recompute total
           topQty = 0;
           for (const g of Object.keys(sq)) {
             const arr = Array.isArray(sq[g]) ? sq[g] : [];
             topQty += arr.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
           }
           applied = true;
-        } else if (Array.isArray(data.sizes) && data.sizes.length && typeof data.sizes[0] === 'object') {
+        } else if (
+          Array.isArray(data.sizes) &&
+          data.sizes.length &&
+          typeof data.sizes[0] === "object"
+        ) {
           const sizes = [...data.sizes];
           for (const p of parts) {
             if (!p.size) continue;
-            const idx = sizes.findIndex((r) => String(r.size) === String(p.size));
+            const idx = sizes.findIndex(
+              (r) => String(r.size) === String(p.size)
+            );
             if (idx !== -1) {
               const cur = Number(sizes[idx].quantity) || 0;
-              sizes[idx] = { ...sizes[idx], quantity: Math.max(0, cur - p.qty) };
+              sizes[idx] = {
+                ...sizes[idx],
+                quantity: Math.max(0, cur - p.qty),
+              };
             }
           }
           updates.sizes = sizes;
           topQty = sizes.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
           applied = true;
-        } else if (data.sizes && typeof data.sizes === 'object') {
+        } else if (data.sizes && typeof data.sizes === "object") {
           const smap = { ...data.sizes };
           for (const p of parts) {
             if (!p.size) continue;
-            const gkey = findCaseInsensitiveKey(smap, p.gender || '');
-            const arr = gkey && Array.isArray(smap[gkey]) ? [...smap[gkey]] : [];
-            const objIdx = arr.findIndex((r) => r && typeof r === 'object' && String(r.size) === String(p.size));
+            const gkey = findCaseInsensitiveKey(smap, p.gender || "");
+            const arr =
+              gkey && Array.isArray(smap[gkey]) ? [...smap[gkey]] : [];
+            const objIdx = arr.findIndex(
+              (r) =>
+                r && typeof r === "object" && String(r.size) === String(p.size)
+            );
             if (objIdx !== -1) {
               const cur = Number(arr[objIdx].quantity) || 0;
-              arr[objIdx] = { ...arr[objIdx], quantity: Math.max(0, cur - p.qty) };
+              arr[objIdx] = {
+                ...arr[objIdx],
+                quantity: Math.max(0, cur - p.qty),
+              };
               if (gkey) smap[gkey] = arr;
             }
           }
@@ -416,11 +2107,14 @@ exports.decrementStockOnOrder = onDocumentCreated({
           topQty = 0;
           for (const g of Object.keys(smap)) {
             const arr = Array.isArray(smap[g]) ? smap[g] : [];
-            topQty += arr.reduce((a, b) => a + (b && typeof b === 'object' ? (Number(b.quantity) || 0) : 0), 0);
+            topQty += arr.reduce(
+              (a, b) =>
+                a + (b && typeof b === "object" ? Number(b.quantity) || 0 : 0),
+              0
+            );
           }
           applied = true;
         } else {
-          // Fallback: no per-size quantities present. Decrement top-level quantity only.
           const totalQty = parts.reduce((a, b) => a + (Number(b.qty) || 0), 0);
           topQty = Math.max(0, topQty - totalQty);
           applied = true;
@@ -432,619 +2126,6 @@ exports.decrementStockOnOrder = onDocumentCreated({
           tx.set(ref, updates, { merge: true });
         }
       }
-    }
-
-    // Coupon redemption (idempotent)
-    let couponApplied = null;
-    if (couponCode && uid && !couponAlready) {
-      try {
-        const refC = db.doc(`coupons/${couponCode}`);
-        const snapC = await tx.get(refC);
-        if (snapC.exists) {
-          const c = snapC.data() || {};
-          if (isCouponActive(c)) {
-            const discount = computeCouponDiscount(c, amount);
-            const maxUses = Number(c.maxUses) || 0;
-            const totalUses = Number(c.totalUses) || 0;
-            const perUserLimit = Number(c.perUserLimit) || 1;
-            let ok = discount > 0 && (!maxUses || totalUses < maxUses);
-            let usedByUser = 0;
-            const refU = db.doc(`coupons/${couponCode}/users/${uid}`);
-            const snapU = await tx.get(refU);
-            usedByUser = snapU.exists ? Number(snapU.data()?.count || 0) : 0;
-            if (perUserLimit && usedByUser >= perUserLimit) ok = false;
-            if (ok) {
-              tx.set(refC, { totalUses: (totalUses || 0) + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-              tx.set(refU, { count: usedByUser + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-              couponApplied = { code: couponCode, discount, valid: true };
-            } else {
-              couponApplied = { code: couponCode, discount: 0, valid: false };
-            }
-          } else {
-            couponApplied = { code: couponCode, discount: 0, valid: false };
-          }
-        } else {
-          couponApplied = { code: couponCode, discount: 0, valid: false };
-        }
-      } catch (_) {
-        couponApplied = { code: couponCode, discount: 0, valid: false };
-      }
-    }
-
-    tx.set(orderRef, {
-      ...(stockAlready ? {} : { stockDeducted: true, stockDeductedAt: admin.firestore.FieldValue.serverTimestamp() }),
-      ...(couponApplied ? { coupon: couponApplied, couponRedeemed: true } : {}),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-  });
-});
-
-// Send WhatsApp order confirmation via Twilio on order creation
-exports.sendWhatsappOnOrder = onDocumentCreated({
-  document: 'orders/{orderId}',
-  region: REGION,
-  secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_TEMPLATE_SID],
-}, async (event) => {
-  const snap = event.data;
-  if (!snap) return;
-  const data = snap.data();
-  if (!data) return;
-
-  try {
-    const accountSid = TWILIO_ACCOUNT_SID.value() || process.env.TWILIO_ACCOUNT_SID || '';
-    const authToken = TWILIO_AUTH_TOKEN.value() || process.env.TWILIO_AUTH_TOKEN || '';
-    const from = TWILIO_WHATSAPP_FROM.value() || process.env.TWILIO_WHATSAPP_FROM || '';
-    const templateSid = TWILIO_TEMPLATE_SID.value() || process.env.TWILIO_TEMPLATE_SID || '';
-
-    if (!accountSid || !authToken || !from || !templateSid) {
-      console.warn('[sendWhatsappOnOrder] Twilio not configured; skipping');
-      return;
-    }
-
-    // Only send for COD immediately on creation, or if already verified
-    const status = String(data.status || '').toLowerCase();
-    const method = String(data.paymentMethod || (data.paymentId ? 'online' : '')).toLowerCase();
-    const isCOD = method === 'cod' || String(data.paymentId || '').toUpperCase() === 'COD';
-    const allowed = isCOD || data.paymentVerified === true || ['paid', 'completed', 'success'].includes(status);
-    if (!allowed) {
-      console.log('[sendWhatsappOnOrder] Skipping status:', status);
-      return;
-    }
-
-    const orderId = String(event.params.orderId || '');
-    const db = admin.firestore();
-    const ref = db.doc(`orders/${orderId}`);
-
-    // Idempotency: acquire a simple lock before sending
-    let proceed = false;
-    await db.runTransaction(async (tx) => {
-      const fresh = await tx.get(ref);
-      const cur = fresh.exists ? (fresh.data() || {}) : {};
-      if (cur.waSent || cur.waLock) return; // another sender already acted or in progress
-      tx.set(ref, { waLock: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-      proceed = true;
-    });
-    if (!proceed) { console.log('[sendWhatsappOnOrder] Locked or already sent; skipping'); return; }
-
-    const toPhone = (data.billing && data.billing.phone) || '';
-    const to = formatWhatsappNumber(toPhone);
-    if (!to) { console.warn('[sendWhatsappOnOrder] No valid recipient phone; skipping'); return; }
-
-    const nameRaw = (data.billing && data.billing.name) || '';
-    const firstName = String(nameRaw || 'there').split(/\s+/).filter(Boolean)[0] || 'there';
-    const orderLabel = `MGX${orderId.slice(0, 6).toUpperCase()}`;
-    const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date();
-    const dateStr = created.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
-    const itemsSummary = summarizeItems(Array.isArray(data.items) ? data.items : []);
-    const amount = Math.round(Number(data.amount) || 0);
-    const discount = Math.round(Number(data.discount) || 0);
-    const base = Math.max(0, amount - discount);
-    const gst = Number.isFinite(Number(data.gst)) ? Math.round(Number(data.gst)) : Math.round(base * 0.18);
-    const payable = Math.round(Number(data.payable) || (base + gst));
-
-    const contentVariables = JSON.stringify({
-      '1': String(firstName),
-      '2': String(orderLabel),
-      '3': String(dateStr),
-      '4': String(itemsSummary),
-      '5': String(amount),
-      '6': String(discount),
-      '7': String(payable),
-    });
-
-    const body = new URLSearchParams({
-      From: from,
-      To: to,
-      ContentSid: templateSid,
-      ContentVariables: contentVariables,
-    }).toString();
-
-    const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-    const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-        'authorization': `Basic ${auth}`,
-      },
-      body,
-    });
-
-    if (!resp.ok) {
-      const txt = await resp.text().catch(() => '');
-      console.warn('[sendWhatsappOnOrder] Twilio send failed', resp.status, txt);
-      // Clear lock so a future update can retry
-      try { await ref.set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
-      return;
-    }
-    const msg = await resp.json().catch(() => ({}));
-    await ref.set({ waSent: true, waMessageSid: msg?.sid || null, waSentAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-
-    console.log('[sendWhatsappOnOrder] WhatsApp message sent', msg?.sid || '(no sid)');
-  } catch (e) {
-    console.warn('[sendWhatsappOnOrder] error', e?.message || e);
-    // Clear lock on error to allow retry
-    try {
-      const db = admin.firestore();
-      const orderId = String(event.params.orderId || '');
-      await db.doc(`orders/${orderId}`).set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    } catch {}
-  }
-});
-
-
-// Razorpay Order endpoints (require secrets to be set)
-const RAZORPAY_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
-const RAZORPAY_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');
-exports.createRazorpayOrder = onRequest({
-  region: REGION,
-  cors: true,
-  secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET],
-}, async (req, res) => {
-  try {
-    if (req.method !== 'POST') { res.status(405).json({ error: 'Method Not Allowed' }); return; }
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const rupees = Number(body.amount) || 0; // allow rupees for convenience
-    const amount = Number.isFinite(rupees) ? Math.round(rupees * 100) : 0; // paise
-    const currency = (body.currency || 'INR').toUpperCase();
-    // Razorpay requires receipt length <= 40. Sanitize/truncate safely.
-    const rawReceipt = String(body.receipt || '').trim();
-    let receipt = rawReceipt && rawReceipt.length <= 40 ? rawReceipt : '';
-    if (!receipt) {
-      // Short unique fallback like r-k5yo9f-a1b2c3
-      receipt = `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    } else if (receipt.length > 40) {
-      receipt = receipt.slice(0, 40);
-    }
-    if (!amount || amount < 100) { res.status(400).json({ error: 'Invalid amount' }); return; }
-
-    const keyId = RAZORPAY_KEY_ID.value();
-    const keySecret = RAZORPAY_KEY_SECRET.value();
-    if (!keyId || !keySecret) {
-      console.warn('[createRazorpayOrder] Secrets missing');
-      res.status(500).json({ error: 'Razorpay secrets not configured' });
-      return;
-    }
-
-    const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
-    const rpRes = await fetch('https://api.razorpay.com/v1/orders', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'authorization': `Basic ${auth}`,
-      },
-      body: JSON.stringify({ amount, currency, receipt, payment_capture: 1 }),
-    });
-    if (!rpRes.ok) {
-      const text = await rpRes.text();
-      console.error('[createRazorpayOrder] Razorpay error', rpRes.status, text);
-      res.status(502).json({ error: 'Failed to create order', status: rpRes.status, details: text });
-      return;
-    }
-    const data = await rpRes.json();
-    res.status(200).json({ order: data, keyId }); // return public keyId to client
-  } catch (e) {
-    console.error('[createRazorpayOrder] exception', e?.message || e);
-    res.status(500).json({ error: e?.message || 'Internal error' });
-  }
-});
-
-// Verify Razorpay signature and mark order as paid
-exports.verifyRazorpaySignature = onRequest({
-  region: REGION,
-  cors: true,
-  secrets: [RAZORPAY_KEY_SECRET, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_TEMPLATE_SID],
-}, async (req, res) => {
-  try {
-    if (req.method !== 'POST') { res.status(405).json({ error: 'Method Not Allowed' }); return; }
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const orderId = String(body.razorpay_order_id || '');
-    const paymentId = String(body.razorpay_payment_id || '');
-    const signature = String(body.razorpay_signature || '');
-    const orderDocId = String(body.orderDocId || '');
-    if (!orderId || !paymentId || !signature || !orderDocId) { res.status(400).json({ error: 'Missing fields' }); return; }
-
-    const keySecret = RAZORPAY_KEY_SECRET.value();
-    const expected = crypto.createHmac('sha256', keySecret)
-      .update(`${orderId}|${paymentId}`)
-      .digest('hex');
-    const valid = expected === signature;
-    if (!valid) { res.status(400).json({ ok: false, valid: false }); return; }
-
-    const db = admin.firestore();
-    const ref = db.doc(`orders/${orderDocId}`);
-    await ref.update({
-      status: 'paid',
-      paymentVerified: true,
-      razorpay: { orderId, paymentId, signature },
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    // Attempt to send WhatsApp confirmation here (online payments only)
-    try {
-      const [accountSid, authToken, from, templateSid] = [
-        TWILIO_ACCOUNT_SID.value() || process.env.TWILIO_ACCOUNT_SID || '',
-        TWILIO_AUTH_TOKEN.value() || process.env.TWILIO_AUTH_TOKEN || '',
-        TWILIO_WHATSAPP_FROM.value() || process.env.TWILIO_WHATSAPP_FROM || '',
-        TWILIO_TEMPLATE_SID.value() || process.env.TWILIO_TEMPLATE_SID || '',
-      ];
-      if (accountSid && authToken && from && templateSid) {
-        // Idempotency lock for online send
-        let proceed = false;
-        await db.runTransaction(async (tx) => {
-          const fresh = await tx.get(ref);
-          const cur = fresh.exists ? (fresh.data() || {}) : {};
-          if (cur.waSent || cur.waLock) return;
-          tx.set(ref, { waLock: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-          proceed = true;
-        });
-        if (proceed) {
-          const snap = await ref.get();
-          const data = snap.exists ? (snap.data() || {}) : {};
-          const to = formatWhatsappNumber(data?.billing?.phone || '');
-          if (to) {
-            const nameRaw = (data.billing && data.billing.name) || '';
-            const firstName = String(nameRaw || 'there').split(/\s+/).filter(Boolean)[0] || 'there';
-            const orderLabel = `MGX${orderDocId.slice(0, 6).toUpperCase()}`;
-            const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date();
-            const dateStr = created.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
-            const itemsSummary = summarizeItems(Array.isArray(data.items) ? data.items : []);
-            const amount = Math.round(Number(data.amount) || 0);
-            const discount = Math.round(Number(data.discount) || 0);
-            const base = Math.max(0, amount - discount);
-            const gst = Number.isFinite(Number(data.gst)) ? Math.round(Number(data.gst)) : Math.round(base * 0.18);
-            const payable = Math.round(Number(data.payable) || (base + gst));
-
-            const contentVariables = JSON.stringify({
-              '1': String(firstName),
-              '2': String(orderLabel),
-              '3': String(dateStr),
-              '4': String(itemsSummary),
-              '5': String(amount),
-              '6': String(discount),
-              '7': String(payable),
-            });
-
-            const bodyForm = new URLSearchParams({ From: from, To: to, ContentSid: templateSid, ContentVariables: contentVariables }).toString();
-            const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-            const resp2 = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-              method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'authorization': `Basic ${auth}` }, body: bodyForm,
-            });
-            if (resp2.ok) {
-              const msg = await resp2.json().catch(() => ({}));
-              await ref.set({ waSent: true, waMessageSid: msg?.sid || null, waSentAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-            } else {
-              const txt = await resp2.text().catch(() => '');
-              console.warn('[verifyRazorpaySignature] Twilio send failed', resp2.status, txt);
-              try { await ref.set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
-            }
-          } else {
-            console.warn('[verifyRazorpaySignature] No valid recipient phone; skipping WhatsApp');
-            try { await ref.set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
-          }
-        } else {
-          console.log('[verifyRazorpaySignature] Locked or already sent; skipping');
-        }
-      }
-    } catch (e2) {
-      console.warn('[verifyRazorpaySignature] WhatsApp send error', e2?.message || e2);
-      try {
-        const db = admin.firestore();
-        const ref = db.doc(`orders/${orderDocId}`);
-        await ref.set({ waLock: admin.firestore.FieldValue.delete(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-      } catch {}
-    }
-
-    res.status(200).json({ ok: true, valid: true });
-  } catch (e) {
-    res.status(500).json({ error: e?.message || 'Internal error' });
-  }
-});
-
-// Generate a simple invoice PDF for a given order (auth required)
-exports.getOrderInvoicePdf = onRequest({ region: REGION, cors: true }, async (req, res) => {
-  try {
-    const db = admin.firestore();
-    const orderId = String(req.query.orderId || '').trim();
-    const token = String(req.query.token || (req.headers.authorization || '').replace(/^Bearer\s+/i, '')).trim();
-    if (!orderId || !token) { res.status(401).send('Unauthorized'); return; }
-    let decoded;
-    try { decoded = await admin.auth().verifyIdToken(token); } catch { res.status(401).send('Unauthorized'); return; }
-    const uid = decoded.uid;
-    const snap = await db.doc(`orders/${orderId}`).get();
-    if (!snap.exists) { res.status(404).send('Not found'); return; }
-    const data = snap.data() || {};
-    if (data.userId && data.userId !== uid && decoded.email !== OWNER_EMAIL) { res.status(403).send('Forbidden'); return; }
-
-    const items = Array.isArray(data.items) ? data.items : [];
-    const billing = data.billing || {};
-    const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date();
-
-    res.setHeader('content-type', 'application/pdf');
-    res.setHeader('content-disposition', `inline; filename=invoice-${orderId}.pdf`);
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
-    doc.pipe(res);
-
-    doc.fontSize(18).text('Megance', { continued: true }).fontSize(12).text('  • Invoice', { align: 'left' });
-    doc.moveDown(0.5);
-    doc.fontSize(10).fillColor('#666').text(`Order: #${orderId.slice(0,6).toUpperCase()}    Date: ${created.toLocaleString()}    Payment: ${(data.paymentMethod || (data.paymentId ? 'online' : 'cod')).toUpperCase()}`);
-    doc.moveDown(1);
-    doc.fillColor('#111').fontSize(12).text('Bill To:');
-    doc.fontSize(10).text(`${billing.name || ''}`);
-    doc.text(`${billing.email || ''}`);
-    doc.text(`${billing.phone || ''}`);
-    doc.text(`${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}`);
-
-    doc.moveDown(1);
-    // Table header
-    doc.fontSize(12).text('Item', 40, doc.y, { continued: true });
-    doc.text('Qty', 340, undefined, { continued: true });
-    doc.text('Amount', 420);
-    doc.moveTo(40, doc.y + 4).lineTo(555, doc.y + 4).strokeColor('#ddd').stroke();
-    doc.moveDown(0.5);
-
-    let total = 0;
-    items.forEach((it) => {
-      const unit = Number(it.price) || 0;
-      const qty = Number(it.qty) || 0;
-      const amt = unit * qty;
-      total += amt;
-      doc.fontSize(10).fillColor('#111').text(String(it.name || ''), 40, doc.y, { width: 280 });
-      doc.text(String(qty), 340, undefined);
-      doc.text(`₹ ${amt}`, 420, undefined);
-      if (it.description) { doc.fillColor('#666').fontSize(9).text(String(it.description).slice(0, 140), 40, doc.y, { width: 520 }); }
-      doc.moveDown(0.6);
-    });
-
-    doc.moveDown(0.5);
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#ddd').stroke();
-    doc.moveDown(0.5);
-    const discount = Number(data.discount || 0);
-    const net = Math.max(0, total - discount);
-    const tax = typeof data.gst === 'number' ? Number(data.gst) : Math.round(net * 0.18);
-    const payable = Number(data.payable || (net + tax));
-    doc.fontSize(11).fillColor('#111').text(`Subtotal: ₹ ${total}`, { align: 'right' });
-    if (discount > 0) doc.text(`Discount: - ₹ ${discount}`, { align: 'right' });
-    doc.text(`GST (18%): ₹ ${tax}`, { align: 'right' });
-    doc.fontSize(12).text(`Total: ₹ ${payable}`, { align: 'right' });
-
-    doc.end();
-  } catch (e) {
-    try { console.error('getOrderInvoicePdf error', e?.message || e); } catch {}
-    res.status(500).send('Internal error');
-  }
-});
-
-// Callable variant that returns a base64 PDF (auth required)
-exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
-  const uid = req.auth?.uid;
-  const email = req.auth?.token?.email || '';
-  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
-  const db = admin.firestore();
-  const orderId = String(req.data?.orderId || '').trim();
-  if (!orderId) throw new HttpsError('invalid-argument', 'orderId is required');
-  const snap = await db.doc(`orders/${orderId}`).get();
-  if (!snap.exists) throw new HttpsError('not-found', 'Order not found');
-  const data = snap.data() || {};
-  if (data.userId && data.userId !== uid && email !== OWNER_EMAIL) throw new HttpsError('permission-denied', 'Forbidden');
-
-  const items = Array.isArray(data.items) ? data.items : [];
-  const billing = data.billing || {};
-  const created = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate() : new Date();
-
-  // Lazy load to avoid analyzer crash
-  let _PDF = PDFDocument; if (!_PDF) { try { _PDF = require('pdfkit'); } catch (e) { throw new HttpsError('internal', 'PDF engine missing'); } }
-  const doc = new _PDF({ size: 'A4', margin: 40 });
-  const chunks = [];
-  return await new Promise((resolve, reject) => {
-    doc.on('data', (c) => chunks.push(c));
-    doc.on('error', (e) => reject(new HttpsError('internal', e?.message || 'PDF error')));
-    doc.on('end', () => {
-      const buffer = Buffer.concat(chunks);
-      const b64 = buffer.toString('base64');
-      resolve({ contentType: 'application/pdf', filename: `invoice-${orderId}.pdf`, data: b64 });
-    });
-
-    doc.fontSize(18).text('Megance', { continued: true }).fontSize(12).text('  • Invoice', { align: 'left' });
-    doc.moveDown(0.5);
-    doc.fontSize(10).fillColor('#666').text(`Order: #${orderId.slice(0,6).toUpperCase()}    Date: ${created.toLocaleString()}    Payment: ${(data.paymentMethod || (data.paymentId ? 'online' : 'cod')).toUpperCase()}`);
-    doc.moveDown(1);
-    doc.fillColor('#111').fontSize(12).text('Bill To:');
-    doc.fontSize(10).text(`${billing.name || ''}`);
-    doc.text(`${billing.email || ''}`);
-    doc.text(`${billing.phone || ''}`);
-    doc.text(`${[billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ')}`);
-
-    doc.moveDown(1);
-    doc.fontSize(12).text('Item', 40, doc.y, { continued: true });
-    doc.text('Qty', 340, undefined, { continued: true });
-    doc.text('Amount', 420);
-    doc.moveTo(40, doc.y + 4).lineTo(555, doc.y + 4).strokeColor('#ddd').stroke();
-    doc.moveDown(0.5);
-
-    let total = 0;
-    items.forEach((it) => {
-      const unit = Number(it.price) || 0;
-      const qty = Number(it.qty) || 0;
-      const amt = unit * qty;
-      total += amt;
-      doc.fontSize(10).fillColor('#111').text(String(it.name || ''), 40, doc.y, { width: 280 });
-      doc.text(String(qty), 340, undefined);
-      doc.text(`₹ ${amt}`, 420, undefined);
-      if (it.description) { doc.fillColor('#666').fontSize(9).text(String(it.description).slice(0, 140), 40, doc.y, { width: 520 }); }
-      doc.moveDown(0.6);
-    });
-
-    doc.moveDown(0.5);
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#ddd').stroke();
-    doc.moveDown(0.5);
-    const discount = Number(data.discount || 0);
-    const payable = Number(data.payable || (total - discount));
-    doc.fontSize(11).fillColor('#111').text(`Subtotal: ₹ ${total}`, { align: 'right' });
-    if (discount > 0) doc.text(`Discount: - ₹ ${discount}`, { align: 'right' });
-    doc.fontSize(12).text(`Total: ₹ ${payable}`, { align: 'right' });
-
-    doc.end();
-  });
-});
-// Preview a coupon (does not reserve). Requires auth.
-exports.previewCoupon = onCall({ region: REGION }, async (req) => {
-  const uid = req.auth?.uid;
-  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
-  const db = admin.firestore();
-  const code = req.data?.code;
-  const amount = Number(req.data?.amount) || 0;
-  const res = await validateCouponForUser({ db, code, uid, amount });
-  if (!res.ok) return res;
-  return { ok: true, code: res.code, discount: res.discount };
-});
-
-// Callable: decrement stock for a given order id (idempotent), owned by the caller
-exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
-  const uid = req.auth?.uid;
-  const orderId = String(req.data?.orderId || '');
-  if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
-  if (!orderId) throw new HttpsError('invalid-argument', 'orderId is required');
-
-  const db = admin.firestore();
-  const orderRef = db.doc(`orders/${orderId}`);
-  const orderSnap = await orderRef.get();
-  if (!orderSnap.exists) throw new HttpsError('not-found', 'Order not found');
-  const order = orderSnap.data() || {};
-  if (order.userId && order.userId !== uid) throw new HttpsError('permission-denied', 'Not your order');
-  // Proceed even if stock was already deducted to allow coupon redemption idempotently
-
-  function parseItem(it) {
-    try {
-      const meta = it.meta || {};
-      let size = meta.size ? String(meta.size) : '';
-      let gender = meta.gender || null;
-      let id = String(it.id || '');
-      let base = id;
-      if (size) {
-        const idx = base.lastIndexOf(`-s${size}`);
-        base = idx !== -1 ? base.slice(0, idx) : base;
-      }
-      if (gender && (base.endsWith(`-${gender}`))) {
-        base = base.slice(0, -(`-${gender}`).length);
-      } else if (!gender) {
-        if (base.endsWith('-men')) { gender = 'men'; base = base.slice(0, -4); }
-        else if (base.endsWith('-women')) { gender = 'women'; base = base.slice(0, -6); }
-      }
-      return { productId: base, size, gender, qty: Number(it.qty) || 0 };
-    } catch (_) {
-      return null;
-    }
-  }
-
-  await db.runTransaction(async (tx) => {
-    const fresh = await tx.get(orderRef);
-    if (!fresh.exists) throw new HttpsError('not-found', 'Order missing');
-    const alreadyStock = fresh.get('stockDeducted') === true;
-    const items = Array.isArray(fresh.get('items')) ? fresh.get('items') : [];
-    const amount = Number(fresh.get('amount') || 0);
-    const couponCode = String(fresh.get('couponCode') || '').trim().toUpperCase();
-    const grouped = new Map();
-    for (const it of items) {
-      const p = parseItem(it);
-      if (!p || !p.productId) continue;
-      if (!grouped.has(p.productId)) grouped.set(p.productId, []);
-      grouped.get(p.productId).push(p);
-    }
-
-    if (!alreadyStock) for (const [productId, parts] of grouped.entries()) {
-      const ref = db.doc(`products/${productId}`);
-      const snap = await tx.get(ref);
-      if (!snap.exists) continue;
-      const data = snap.data() || {};
-      let updates = {};
-      let topQty = Number(data.quantity) || 0;
-      let applied = false;
-
-      if (data.sizeQuantities && typeof data.sizeQuantities === 'object') {
-        const sq = { ...data.sizeQuantities };
-        for (const p of parts) {
-          if (!p.size || !p.gender) continue;
-          const gkey = findCaseInsensitiveKey(sq, p.gender);
-          const arr = gkey && Array.isArray(sq[gkey]) ? [...sq[gkey]] : [];
-          const idx = arr.findIndex((r) => String(r.size) === String(p.size));
-          if (idx !== -1) {
-            const cur = Number(arr[idx].quantity) || 0;
-            arr[idx] = { ...arr[idx], quantity: Math.max(0, cur - p.qty) };
-            if (gkey) sq[gkey] = arr;
-          }
-        }
-        updates.sizeQuantities = sq;
-        topQty = 0;
-        for (const g of Object.keys(sq)) {
-          const arr = Array.isArray(sq[g]) ? sq[g] : [];
-          topQty += arr.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
-        }
-        applied = true;
-      } else if (Array.isArray(data.sizes) && data.sizes.length && typeof data.sizes[0] === 'object') {
-        const sizes = [...data.sizes];
-        for (const p of parts) {
-          if (!p.size) continue;
-          const idx = sizes.findIndex((r) => String(r.size) === String(p.size));
-          if (idx !== -1) {
-            const cur = Number(sizes[idx].quantity) || 0;
-            sizes[idx] = { ...sizes[idx], quantity: Math.max(0, cur - p.qty) };
-          }
-        }
-        updates.sizes = sizes;
-        topQty = sizes.reduce((a, b) => a + (Number(b.quantity) || 0), 0);
-        applied = true;
-      } else if (data.sizes && typeof data.sizes === 'object') {
-        const smap = { ...data.sizes };
-        for (const p of parts) {
-          if (!p.size) continue;
-          const gkey = findCaseInsensitiveKey(smap, p.gender || '');
-          const arr = gkey && Array.isArray(smap[gkey]) ? [...smap[gkey]] : [];
-          const objIdx = arr.findIndex((r) => r && typeof r === 'object' && String(r.size) === String(p.size));
-          if (objIdx !== -1) {
-            const cur = Number(arr[objIdx].quantity) || 0;
-            arr[objIdx] = { ...arr[objIdx], quantity: Math.max(0, cur - p.qty) };
-            if (gkey) smap[gkey] = arr;
-          }
-        }
-        updates.sizes = smap;
-        topQty = 0;
-        for (const g of Object.keys(smap)) {
-          const arr = Array.isArray(smap[g]) ? smap[g] : [];
-          topQty += arr.reduce((a, b) => a + (b && typeof b === 'object' ? (Number(b.quantity) || 0) : 0), 0);
-        }
-        applied = true;
-      } else {
-        const totalQty = parts.reduce((a, b) => a + (Number(b.qty) || 0), 0);
-        topQty = Math.max(0, topQty - totalQty);
-        applied = true;
-      }
-
-      if (applied) {
-        updates.quantity = topQty;
-        updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-        tx.set(ref, updates, { merge: true });
-      }
-    }
 
     // Coupon redemption (idempotent): validate again and increment counters
     let couponApplied = null;
@@ -1066,8 +2147,22 @@ exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
             usedByUser = snapU.exists ? Number(snapU.data()?.count || 0) : 0;
             if (perUserLimit && usedByUser >= perUserLimit) ok = false;
             if (ok) {
-              tx.set(refC, { totalUses: (totalUses || 0) + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-              tx.set(refU, { count: usedByUser + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+              tx.set(
+                refC,
+                {
+                  totalUses: (totalUses || 0) + 1,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              );
+              tx.set(
+                refU,
+                {
+                  count: usedByUser + 1,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              );
               couponApplied = { code: couponCode, discount, valid: true };
             } else {
               couponApplied = { code: couponCode, discount: 0, valid: false };
@@ -1084,7 +2179,12 @@ exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
     }
 
     tx.update(orderRef, {
-      ...(alreadyStock ? {} : { stockDeducted: true, stockDeductedAt: admin.firestore.FieldValue.serverTimestamp() }),
+      ...(alreadyStock
+        ? {}
+        : {
+            stockDeducted: true,
+            stockDeductedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }),
       ...(couponApplied ? { coupon: couponApplied, couponRedeemed: true } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -1093,86 +2193,110 @@ exports.decrementStockForOrder = onCall({ region: REGION }, async (req) => {
   return { ok: true };
 });
 // Create or hydrate a user profile on first sign-in (optional: disabled by default)
-if (process.env.IDENTITY_ENABLED === 'true') {
+if (process.env.IDENTITY_ENABLED === "true") {
   exports.onUserCreated = functions
-  .region(REGION)
-  .auth.user()
-  .onCreate(async (user) => {
+    .region(REGION)
+    .auth.user()
+    .onCreate(async (user) => {
       if (!user || !user.uid) return;
       const { uid, displayName, email, phoneNumber } = user;
       const db = admin.firestore();
       const ref = db.doc(`users/${uid}`);
       try {
-        await ref.set({
-          name: displayName || '',
-          email: email || '',
-          phone: phoneNumber || '',
-          phoneVerified: !!phoneNumber,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+        await ref.set(
+          {
+            name: displayName || "",
+            email: email || "",
+            phone: phoneNumber || "",
+            phoneVerified: !!phoneNumber,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
       } catch (e) {
-        console.error('[onUserCreated] failed to create profile', e?.message || e);
+        console.error(
+          "[onUserCreated] failed to create profile",
+          e?.message || e
+        );
       }
     });
 }
 
 // Authenticated profile update (server authoritative)
-exports.updateUserProfile = onRequest({
-  region: REGION,
-  cors: true,
-}, async (req, res) => {
-  try {
-    if (req.method !== 'POST') { res.status(405).json({ error: 'Method Not Allowed' }); return; }
-    const authHeader = String(req.headers.authorization || '');
-    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    if (!idToken) { res.status(401).json({ error: 'Missing Authorization' }); return; }
-    let decoded;
+exports.updateUserProfile = onRequest(
+  {
+    region: REGION,
+    cors: true,
+  },
+  async (req, res) => {
     try {
-      decoded = await admin.auth().verifyIdToken(idToken);
+      if (req.method !== "POST") {
+        res.status(405).json({ error: "Method Not Allowed" });
+        return;
+      }
+      const authHeader = String(req.headers.authorization || "");
+      const idToken = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : "";
+      if (!idToken) {
+        res.status(401).json({ error: "Missing Authorization" });
+        return;
+      }
+      let decoded;
+      try {
+        decoded = await admin.auth().verifyIdToken(idToken);
+      } catch (e) {
+        res.status(401).json({ error: "Invalid token" });
+        return;
+      }
+      const uid = decoded.uid;
+
+      const body =
+        typeof req.body === "string"
+          ? JSON.parse(req.body || "{}")
+          : req.body || {};
+      const trim = (v, max = 240) =>
+        typeof v === "string" ? v.trim().slice(0, max) : "";
+      const payload = {
+        name: trim(body.name, 120),
+        email: trim(body.email, 200),
+        address: trim(body.address, 240),
+        city: trim(body.city, 120),
+        state: trim(body.state, 120),
+        zip: trim(body.zip, 32),
+      };
+
+      // Derive phone and verification status from auth record (authoritative)
+      const userRecord = await admin.auth().getUser(uid);
+      const phone = userRecord.phoneNumber || "";
+      const email = userRecord.email || "";
+      const profile = {
+        ...payload,
+        email: email || "",
+        phone,
+        phoneVerified: !!phone,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await admin.firestore().doc(`users/${uid}`).set(profile, { merge: true });
+      res
+        .status(200)
+        .json({ ok: true, profile: { ...profile, updatedAt: Date.now() } });
     } catch (e) {
-      res.status(401).json({ error: 'Invalid token' });
-      return;
+      res.status(500).json({ error: e?.message || "Internal error" });
     }
-    const uid = decoded.uid;
-
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const trim = (v, max = 240) => typeof v === 'string' ? v.trim().slice(0, max) : '';
-    const payload = {
-      name: trim(body.name, 120),
-      email: trim(body.email, 200),
-      address: trim(body.address, 240),
-      city: trim(body.city, 120),
-      state: trim(body.state, 120),
-      zip: trim(body.zip, 32),
-    };
-
-    // Derive phone and verification status from auth record (authoritative)
-    const userRecord = await admin.auth().getUser(uid);
-    const phone = userRecord.phoneNumber || '';
-    const email = userRecord.email || '';
-    const profile = {
-      ...payload,
-      email: email || '',
-      phone,
-      phoneVerified: !!phone,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    await admin.firestore().doc(`users/${uid}`).set(profile, { merge: true });
-    res.status(200).json({ ok: true, profile: { ...profile, updatedAt: Date.now() } });
-  } catch (e) {
-    res.status(500).json({ error: e?.message || 'Internal error' });
   }
-});
+);
 
 // Callable variant for frontend (avoids CORS/base-URL issues)
 exports.updateUserProfileCallable = onCall({ region: REGION }, async (req) => {
   try {
     const uid = req.auth?.uid;
-    if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
     const body = req.data || {};
-    const trim = (v, max = 240) => typeof v === 'string' ? v.trim().slice(0, max) : '';
+    const trim = (v, max = 240) =>
+      typeof v === "string" ? v.trim().slice(0, max) : "";
     const payload = {
       name: trim(body.name, 120),
       email: trim(body.email, 200),
@@ -1183,11 +2307,11 @@ exports.updateUserProfileCallable = onCall({ region: REGION }, async (req) => {
     };
 
     const userRecord = await admin.auth().getUser(uid);
-    const phone = userRecord.phoneNumber || '';
-    const email = userRecord.email || '';
+    const phone = userRecord.phoneNumber || "";
+    const email = userRecord.email || "";
     const profile = {
       ...payload,
-      email: email || payload.email || '',
+      email: email || payload.email || "",
       phone,
       phoneVerified: !!phone,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1197,6 +2321,30 @@ exports.updateUserProfileCallable = onCall({ region: REGION }, async (req) => {
     return { ok: true };
   } catch (e) {
     if (e instanceof HttpsError) throw e;
-    throw new HttpsError('internal', e?.message || 'Internal error');
+    throw new HttpsError("internal", e?.message || "Internal error");
   }
 });
+function xbOrigin(rawBase) {
+  try {
+    const raw = (
+      rawBase ||
+      process.env.XPRESSBEES_BASE_URL ||
+      "https://shipment.xpressbees.com"
+    ).toString();
+    const u = new URL(raw);
+    // If a full path was provided (e.g., https://.../api/shipments2), strip to origin
+    return u.origin;
+  } catch (_) {
+    try {
+      return String(
+        rawBase ||
+          process.env.XPRESSBEES_BASE_URL ||
+          "https://shipment.xpressbees.com"
+      )
+        .replace(/\/api\/?.*$/, "")
+        .replace(/\/$/, "");
+    } catch {
+      return "https://shipment.xpressbees.com";
+    }
+  }
+}
