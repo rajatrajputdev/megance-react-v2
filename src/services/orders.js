@@ -55,12 +55,36 @@ export async function decrementStockForOrder(orderId) {
   return res.data || { ok: true };
 }
 
-export async function requestReturn(orderId) {
-  const region = (import.meta.env.VITE_FUNCTIONS_REGION || "").trim() || undefined;
-  const fns = getFunctions(app, region);
-  const call = httpsCallable(fns, "requestReturnForOrder");
-  const res = await call({ orderId });
-  return res.data || { ok: true };
+export async function requestReturn(orderId, meta = {}) {
+  const payload = { orderId };
+  if (meta && typeof meta === 'object') {
+    if (meta.reason) payload.reason = String(meta.reason);
+    if (meta.notes) payload.notes = String(meta.notes);
+    if (meta.pickup && typeof meta.pickup === 'object') payload.pickup = meta.pickup;
+  }
+
+  const regionEnv = (import.meta.env.VITE_FUNCTIONS_REGION || "").trim();
+  const candidates = Array.from(
+    new Set([regionEnv || undefined, 'asia-south2', 'us-central1', undefined])
+  );
+
+  let lastErr = null;
+  for (const region of candidates) {
+    try {
+      const fns = getFunctions(app, region || undefined);
+      const call = httpsCallable(fns, "requestReturnForOrder");
+      const res = await Promise.race([
+        call(payload),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+      ]);
+      return res?.data || { ok: false };
+    } catch (e) {
+      lastErr = e;
+      // try next region
+    }
+  }
+  if (lastErr) throw lastErr;
+  return { ok: false };
 }
 
 export async function getOrderShipmentStatus({ orderId, awb, prefer }) {

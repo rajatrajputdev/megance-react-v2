@@ -29,6 +29,9 @@ const REGION = process.env.FUNCTIONS_REGION || "asia-south2";
 const MEGANCE_GSTIN = process.env.MEGANCE_GSTIN || "27AAACB2230M1Z5"; // dummy-format GSTIN
 const MEGANCE_LOGO_URL = process.env.MEGANCE_LOGO_URL ||
   "https://megance.in/assets/imgs/megance_logo_w.png";
+// Hardcoded warehouse address for outbound and reverse delivery
+const MEGANCE_WAREHOUSE_ADDRESS = (process.env.MEGANCE_WAREHOUSE_ADDRESS ||
+  "A-51, First floor, Meera Bagh, Paschim Vihar, New Delhi 110087").trim();
 
 // Owner email to receive order copies
 const OWNER_EMAIL = "megancetech@gmail.com";
@@ -65,10 +68,12 @@ const XB_HC_PASSWORD = 'Megance@2025';
 
 // Always login and return a fresh XpressBees token (no caching)
 async function getXpressbeesToken({ username, password }) {
+  const email = (username || XB_HC_EMAIL).trim();
+  const pass = (password || XB_HC_PASSWORD).trim();
   const resp = await fetch(XB_LOGIN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: XB_HC_EMAIL, password: XB_HC_PASSWORD }),
+    body: JSON.stringify({ email, password: pass }),
   });
   let json = null;
   try { json = await resp.json(); } catch { json = null; }
@@ -166,20 +171,18 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
   const dbt = Number(process.env.XPRESSBEES_DEFAULT_BREADTH || 20);
   const dh = Number(process.env.XPRESSBEES_DEFAULT_HEIGHT || 10);
 
-  const pickupPhone = phone10(process.env.XPRESSBEES_PICKUP_PHONE || "");
+  // Hardcode pickup (our warehouse) for forward shipments
+  const pickupPhone = phone10(process.env.XPRESSBEES_PICKUP_PHONE || "9999999999");
   const shipPhone = phone10(billing.phone || "");
   const shipPin = pin6(billing.zip || "");
-  const pickupPin = pin6(process.env.XPRESSBEES_PICKUP_PINCODE || "");
-  const whNameRaw = (
-    process.env.XPRESSBEES_PICKUP_WAREHOUSE ||
-    process.env.XPRESSBEES_PICKUP_NAME ||
-    "Megance WH"
-  ).trim();
-  const warehouse_name =
-    trunc(whNameRaw.replace(/\s+/g, " ").slice(0, 20), 20) || "MeganceWH1";
-  const { address: pickupAddr1, address_2: pickupAddr2 } = splitAddress(
-    process.env.XPRESSBEES_PICKUP_ADDRESS || ""
-  );
+  const whNameRaw = "Megance Warehouse";
+  const warehouse_name = trunc(whNameRaw, 20) || "MeganceWH1";
+  // Parse the hardcoded warehouse address
+  const whAddrStr = MEGANCE_WAREHOUSE_ADDRESS;
+  const pinMatch = whAddrStr.match(/(\d{6})(?!.*\d)/);
+  const pickupPin = pinMatch ? pin6(pinMatch[1]) : pin6(process.env.XPRESSBEES_PICKUP_PINCODE || "");
+  const whAddrNoPin = whAddrStr.replace(/\d{6}(?!.*\d)/, '').replace(/,\s*$/, '').trim();
+  const { address: pickupAddr1, address_2: pickupAddr2 } = splitAddress(whAddrNoPin);
   const { address: shipAddr1, address_2: shipAddr2 } = splitAddress(
     billing.address || ""
   );
@@ -231,16 +234,11 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
     },
     pickup: {
       warehouse_name,
-      name: trunc(
-        process.env.XPRESSBEES_PICKUP_CONTACT ||
-          process.env.XPRESSBEES_PICKUP_NAME ||
-          "Megance",
-        200
-      ),
+      name: trunc("Megance", 200),
       address: pickupAddr1,
       address_2: pickupAddr2,
-      city: trunc(process.env.XPRESSBEES_PICKUP_CITY || "", 40),
-      state: trunc(process.env.XPRESSBEES_PICKUP_STATE || "", 40),
+      city: trunc("New Delhi", 40),
+      state: trunc("Delhi", 40),
       pincode: pickupPin,
       phone: pickupPhone,
       ...(gstNo ? { gst_number: gstNo, gst_umber: gstNo } : {}),
@@ -251,7 +249,7 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
 }
 
 // Build a reverse-pickup shipment payload: pickup from buyer, deliver back to warehouse
-function buildXbReversePayload({ orderLabel, data }) {
+function buildXbReversePayload({ orderLabel, data, pickupOverride }) {
   const billing = data.billing || {};
   const items = Array.isArray(data.items) ? data.items : [];
   const amount = Math.round(Number(data.amount) || 0);
@@ -268,25 +266,32 @@ function buildXbReversePayload({ orderLabel, data }) {
   const dbt = Number(process.env.XPRESSBEES_DEFAULT_BREADTH || 20);
   const dh = Number(process.env.XPRESSBEES_DEFAULT_HEIGHT || 10);
 
-  // In reverse, pickup is buyer
-  const pickupPhone = phone10(billing.phone || "");
-  const pickupPin = pin6(billing.zip || "");
-  const { address: pickupAddr1, address_2: pickupAddr2 } = splitAddress(
-    billing.address || ""
-  );
+  // In reverse, pickup is buyer (allow override from returns form)
+  const pName = pickupOverride?.name || billing.name || "";
+  const pPhone = phone10(pickupOverride?.phone || billing.phone || "");
+  const pZipRaw = pickupOverride?.zip || pickupOverride?.pincode || pickupOverride?.pin || "";
+  const pickupPin = pin6(pZipRaw || billing.zip || "");
+  const pickupAddressRaw = pickupOverride?.address || billing.address || "";
+  const { address: pickupAddr1, address_2: pickupAddr2 } = splitAddress(pickupAddressRaw);
+  const pickupCity = trunc(pickupOverride?.city || billing.city || "", 40);
+  const pickupState = trunc(pickupOverride?.state || billing.state || "", 40);
 
   // Consignee is warehouse (where it originally came from)
-  const whNameRaw = (
-    process.env.XPRESSBEES_PICKUP_WAREHOUSE ||
-    process.env.XPRESSBEES_PICKUP_NAME ||
-    "Megance WH"
-  ).trim();
-  const warehouse_name =
-    trunc(whNameRaw.replace(/\s+/g, " ").slice(0, 20), 20) || "MeganceWH1";
-  const { address: consAddr1, address_2: consAddr2 } = splitAddress(
-    process.env.XPRESSBEES_PICKUP_ADDRESS || ""
-  );
-  const consigneePin = pin6(process.env.XPRESSBEES_PICKUP_PINCODE || "");
+  // Hardcode consignee (warehouse) for reverse deliveries
+  const whNameRaw = "Megance Warehouse";
+  const warehouse_name = trunc(whNameRaw, 20);
+  // Parse the hardcoded address
+  const whAddrStr = MEGANCE_WAREHOUSE_ADDRESS;
+  const pinMatch = whAddrStr.match(/(\d{6})(?!.*\d)/);
+  const consigneePin = pinMatch ? pin6(pinMatch[1]) : pin6(process.env.XPRESSBEES_PICKUP_PINCODE || "");
+  // Remove pincode from end for cleaner split
+  const whAddrNoPin = whAddrStr.replace(/\d{6}(?!.*\d)/, '').replace(/,\s*$/, '').trim();
+  const { address: consAddr1, address_2: consAddr2 } = splitAddress(whAddrNoPin);
+  // Derive city/state – default to New Delhi / Delhi
+  const cityGuess = (() => {
+    const parts = whAddrNoPin.split(/,\s*/);
+    return parts[parts.length - 1] || 'New Delhi';
+  })();
   const consigneePhone = phone10(process.env.XPRESSBEES_PICKUP_PHONE || "");
   const gstNo = (
     process.env.XPRESSBEES_PICKUP_GST ||
@@ -326,32 +331,24 @@ function buildXbReversePayload({ orderLabel, data }) {
     request_auto_pickup: autoPickup,
     // Swap roles: buyer as pickup, our warehouse as consignee
     pickup: {
-      warehouse_name: trunc((billing.name || "Buyer").toString(), 20),
-      name: trunc(billing.name || "", 200),
+      warehouse_name: trunc((pName || "Buyer").toString(), 20),
+      name: trunc(pName || "", 200),
       address: pickupAddr1,
       address_2: pickupAddr2,
-      city: trunc(billing.city || "", 40),
-      state: trunc(billing.state || "", 40),
+      city: pickupCity,
+      state: pickupState,
       pincode: pickupPin,
-      phone: pickupPhone,
+      phone: pPhone,
     },
     consignee: {
-      name: trunc(
-        process.env.XPRESSBEES_PICKUP_CONTACT ||
-          process.env.XPRESSBEES_PICKUP_NAME ||
-          "Megance",
-        200
-      ),
-      company_name: trunc(
-        process.env.XPRESSBEES_CONSIGNEE_COMPANY || warehouse_name,
-        200
-      ),
+      name: trunc("Megance", 200),
+      company_name: trunc(warehouse_name, 200),
       address: consAddr1,
       address_2: consAddr2,
-      city: trunc(process.env.XPRESSBEES_PICKUP_CITY || "", 40),
-      state: trunc(process.env.XPRESSBEES_PICKUP_STATE || "", 40),
+      city: trunc(cityGuess || "New Delhi", 40),
+      state: trunc("Delhi", 40),
       pincode: consigneePin,
-      phone: consigneePhone,
+      phone: consigneePhone || "9999999999",
       ...(gstNo ? { gst_number: gstNo, gst_umber: gstNo } : {}),
     },
     order_items,
@@ -2650,16 +2647,61 @@ exports.requestReturnForOrder = onCall(
     if (!orderId) throw new HttpsError('invalid-argument', 'orderId is required');
 
     const db = admin.firestore();
-    const ref = db.doc(`orders/${orderId}`);
-    const snap = await ref.get();
+    // Resolve top-level order doc robustly
+    let ref = db.doc(`orders/${orderId}`);
+    let snap = await ref.get();
+    if (!snap.exists) {
+      // Try to find by field 'orderId'
+      try {
+        const qs = await db
+          .collection('orders')
+          .where('orderId', '==', orderId)
+          .limit(1)
+          .get();
+        if (!qs.empty) {
+          ref = qs.docs[0].ref;
+          snap = qs.docs[0];
+        }
+      } catch {}
+    }
+    if (!snap.exists) {
+      // Try the user's subcollection doc id
+      try {
+        const s = await db.doc(`users/${uid}/orders/${orderId}`).get();
+        if (s.exists) {
+          const topId = s.data()?.orderId || s.data()?.id || null;
+          if (topId) {
+            const maybe = await db.doc(`orders/${topId}`).get();
+            if (maybe.exists) {
+              ref = maybe.ref;
+              snap = maybe;
+            }
+          }
+        }
+      } catch {}
+    }
     if (!snap.exists) throw new HttpsError('not-found', 'Order not found');
     const data = snap.data() || {};
     if (data.userId && data.userId !== uid && (data.user?.id && data.user.id !== uid)) {
       throw new HttpsError('permission-denied', 'Not your order');
     }
 
+    // Optional metadata
+    const returnReason = String(req.data?.reason || '').trim();
+    const returnNotes = String(req.data?.notes || '').trim();
+
     // Idempotency: if return already created, do not recreate
     if (data.returnAwb || data.returnShipmentId) {
+      // Update reason/notes if provided
+      if (returnReason || returnNotes) {
+        try {
+          await ref.set({
+            ...(returnReason ? { returnReason } : {}),
+            ...(returnNotes ? { returnNotes } : {}),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        } catch {}
+      }
       return { ok: true, already: true, awb: data.returnAwb || null, shipmentId: data.returnShipmentId || null };
     }
 
@@ -2670,7 +2712,22 @@ exports.requestReturnForOrder = onCall(
     try {
       const token = await getXpressbeesToken({ username, password });
       const orderLabel = `RET${orderId.slice(0,6).toUpperCase()}`;
-      const payload = buildXbReversePayload({ orderLabel, data });
+      const pickupOverride = (() => {
+        const p = req.data?.pickup || {};
+        if (!p || typeof p !== 'object') return null;
+        const out = {};
+        if (p.name) out.name = String(p.name);
+        if (p.phone) out.phone = String(p.phone);
+        if (p.address) out.address = String(p.address);
+        if (p.city) out.city = String(p.city);
+        if (p.state) out.state = String(p.state);
+        if (p.zip || p.pincode || p.pin) out.zip = String(p.zip || p.pincode || p.pin);
+        return Object.keys(out).length ? out : null;
+      })();
+      const payload = buildXbReversePayload({ orderLabel, data, pickupOverride });
+      if (returnReason || returnNotes) {
+        payload.remarks = [returnReason, returnNotes].filter(Boolean).join(' | ');
+      }
       const url = `${xbOrigin()}/api/shipments2`;
       let resp = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
       if (resp.status === 401 || resp.status === 403) {
@@ -2695,8 +2752,36 @@ exports.requestReturnForOrder = onCall(
         returnAwb: awb || null,
         returnShipmentId: shipmentId || null,
         returnRaw: raw || null,
+        ...(returnReason ? { returnReason } : {}),
+        ...(returnNotes ? { returnNotes } : {}),
+        ...(pickupOverride ? { returnPickup: pickupOverride } : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
+
+      // Mirror crucial fields to user's subcollection order doc for UI consistency
+      try {
+        const topId = ref.id;
+        let userOrderRef = admin.firestore().doc(`users/${uid}/orders/${topId}`);
+        let userDoc = await userOrderRef.get();
+        if (!userDoc.exists) {
+          const qs = await admin
+            .firestore()
+            .collection(`users/${uid}/orders`)
+            .where('orderId', '==', topId)
+            .limit(1)
+            .get();
+          if (!qs.empty) userOrderRef = qs.docs[0].ref;
+        }
+        await userOrderRef.set({
+          returnRequested: true,
+          returnAwb: awb || null,
+          returnShipmentId: shipmentId || null,
+          ...(returnReason ? { returnReason } : {}),
+          ...(returnNotes ? { returnNotes } : {}),
+          ...(pickupOverride ? { returnPickup: pickupOverride } : {}),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } catch (_) {}
 
       return { ok: true, awb, shipmentId };
     } catch (e) {

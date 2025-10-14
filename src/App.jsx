@@ -15,6 +15,7 @@ import PrivacyPage from "./pages/Privacy.jsx";
 import TermsOfUsePage from "./pages/TermsOfUse.jsx";
 import About from "./pages/About.jsx";
 import ReturnsPage from "./pages/Returns.jsx";
+import ReturnSuccess from "./pages/ReturnSuccess.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./components/general_components/RequireAuth.jsx";
@@ -90,6 +91,14 @@ export default function App() {
                   element={
                     <RequireAuth>
                       <ReturnsPage />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/return-success"
+                  element={
+                    <RequireAuth>
+                      <ReturnSuccess />
                     </RequireAuth>
                   }
                 />

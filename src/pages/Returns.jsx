@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { collection, onSnapshot, orderBy, query, addDoc, serverTimestamp } from "firebase/firestore";
+import { useLocation, useNavigate } from "react-router-dom";
+import { collection, onSnapshot, orderBy, query, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import SEO from "../components/general_components/SEO.jsx";
@@ -10,6 +10,7 @@ import { supabaseUploadFile, supabaseGetSignedUrl } from "../utils/supabase.js";
 
 export default function ReturnsPage() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -170,6 +171,7 @@ export default function ReturnsPage() {
     if (err) { showToast("error", err); return; }
     setSubmitting(true);
     try {
+      showToast('info', `Uploading ${Array.from(form.images||[]).length} image(s)…`);
       // Upload images to Supabase Storage
       const uploads = [];
       const files = Array.from(form.images || []);
@@ -210,8 +212,9 @@ export default function ReturnsPage() {
         status: 'requested',
       };
       // Store in a common top-level collection for ops and under user for easy access
-      await addDoc(collection(db, "refundRequests"), payload);
-      await addDoc(collection(db, "users", user.uid, "refundRequests"), payload);
+      const topRef = await addDoc(collection(db, "refundRequests"), payload);
+      showToast('info', 'Request saved. Booking pickup…');
+      await addDoc(collection(db, "users", user.uid, "refundRequests"), { ...payload, id: topRef.id });
       // Also schedule reverse pickup with XpressBees
       try {
         const orderDocId = selectedOrder.orderId || selectedOrder.id;
@@ -224,33 +227,65 @@ export default function ReturnsPage() {
           return 'other';
         })();
         const notes = [form.reason.other ? form.reason.otherText : '', form.comments].filter(Boolean).join(' | ');
-        const rr = await requestReturn(orderDocId, { reason: reasonLabel, notes });
-        if (rr?.ok) {
+        // Build pickup override from form (address string may embed pin)
+        const pickup = (() => {
+          const out = { name: form.fullName, phone: form.phone, address: form.address };
+          // Prefer existing order billing city/state/zip if present
+          if (selectedOrder?.billing?.city) out.city = selectedOrder.billing.city;
+          if (selectedOrder?.billing?.state) out.state = selectedOrder.billing.state;
+          if (selectedOrder?.billing?.zip) out.zip = selectedOrder.billing.zip;
+          // Fallback: parse pincode from the address text
+          try {
+            if (!out.zip) {
+              const pinMatch = String(form.address || '').match(/\b(\d{6})\b/);
+              if (pinMatch) out.zip = pinMatch[1];
+            }
+          } catch {}
+          return out;
+        })();
+        const rr = await requestReturn(orderDocId, { reason: reasonLabel, notes, pickup });
+        if (rr?.ok || rr?.already) {
           const awb = rr.awb;
-          showToast("success", `Pickup scheduled.${awb ? ` AWB ${awb}` : ''}`);
+          showToast("success", `Request submitted & pickup scheduled.${awb ? ` AWB ${awb}` : ''}`);
+          // Optionally update the top-level refund request record with AWB
+          try {
+            const r = doc(db, 'refundRequests', topRef.id);
+            await setDoc(r, { scheduled: true, awb: awb || null, updatedAt: serverTimestamp() }, { merge: true });
+          } catch {}
+          // Reset only after successful booking
+          setForm((f) => ({
+            ...f,
+            reason: { ...f.reason, wrongSize: false, damaged: false, differentItem: false, qualityIssue: false, other: false, otherText: "" },
+            condition: "",
+            images: [],
+            resolution: "refund",
+            refundMethod: "prepaid",
+            bank: { accountHolder: "", bankName: "", accountNumber: "", ifsc: "", upi: "" },
+            comments: "",
+            declarations: { unusedOriginal: false, deductionConsent: false, timelineConsent: false },
+            signature: "",
+            requestDate: new Date().toISOString().slice(0,10),
+          }));
+          setUploadProgress(0);
+          setSubmitting(false);
+          // Navigate to success page with AWB
+          try {
+            const oid = selectedOrder.orderId || selectedOrder.id;
+            navigate(`/return-success?awb=${encodeURIComponent(awb || '')}&orderId=${encodeURIComponent(oid)}`);
+          } catch {}
+          return;
         } else if (rr?.error) {
           showToast("error", rr.error);
         }
       } catch (e) {
         showToast("error", e.message || 'Failed to schedule pickup');
       }
-
-      showToast("success", "Request submitted. We’ll contact you in 24–48 hours.");
-      // Reset only optional fields
-      setForm((f) => ({
-        ...f,
-        reason: { ...f.reason, wrongSize: false, damaged: false, differentItem: false, qualityIssue: false, other: false, otherText: "" },
-        condition: "",
-        images: [],
-        resolution: "refund",
-        refundMethod: "prepaid",
-        bank: { accountHolder: "", bankName: "", accountNumber: "", ifsc: "", upi: "" },
-        comments: "",
-        declarations: { unusedOriginal: false, deductionConsent: false, timelineConsent: false },
-        signature: "",
-        requestDate: new Date().toISOString().slice(0,10),
-      }));
-      setUploadProgress(0);
+      // If we reach here, booking didn't succeed, but the request is saved.
+      showToast("error", "Pickup scheduling took longer than expected. We received your request and will arrange pickup.");
+      try {
+        const oid = selectedOrder.orderId || selectedOrder.id;
+        navigate(`/return-success?orderId=${encodeURIComponent(oid)}`);
+      } catch {}
     } catch (e) {
       showToast("error", e.message || "Failed to submit request");
     } finally {
@@ -470,6 +505,9 @@ export default function ReturnsPage() {
                 </div>
               </div>
 
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="mt-10 small opacity-7">Uploading evidence: {uploadProgress}%</div>
+              )}
               <div className="d-flex justify-content-end mt-15">
                 <button className="butn butn-md butn-rounded" disabled={submitting || loadingOrders || !selectedOrder} onClick={submit}>
                   {submitting ? "Submitting…" : "Submit Request"}
