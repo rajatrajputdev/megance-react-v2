@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebase.js";
 import { updateUserProfileServer } from "../services/profile.js";
 import SEO from "../components/general_components/SEO.jsx";
+import "./account-page.css";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
 import { INDIAN_STATES } from "../data/indian-states.js";
 import { friendlyOtpError } from "../utils/errors.js";
@@ -67,7 +68,8 @@ export default function Account() {
   const hasLinkedPhone = Boolean(user?.phoneNumber);
   const baseVerified = hasLinkedPhone || profile?.phoneVerified === true;
   const effectiveVerified = (baseVerified && !editingPhone) || otpVerified === true;
-  const canSave = !!form.name && !!form.email && !!form.phone && !!form.address && !!form.city && !!form.state && !!form.zip && (!editingPhone || otpVerified === true);
+  const addressOk = (form.address || '').trim().length >= 10;
+  const canSave = !!form.name && !!form.email && !!form.phone && addressOk && !!form.city && !!form.state && !!form.zip && (!editingPhone || otpVerified === true);
 
   const save = async () => {
     if (!user) return;
@@ -127,19 +129,15 @@ export default function Account() {
   return (
     <>
       <SEO title="Account" description="Manage your Megance account." image="/assets/logo.svg" type="website" twitterCard="summary" />
-      <section className="container page-section white-navbar-page">
+      <section className="container page-section white-navbar-page account-page">
         {/* Toasts handled by global provider */}
 
         <div className="row">
           <div className="col-lg-7">
-            <div className="p-20 card-like">
+            <div className="p-20 card-like glass-surface strong-elevation account-card">
               <h3 className="mb-10">Your Account</h3>
               <p className="opacity-7">Update your profile information and contact details.</p>
               <div className="row mt-10">
-                <div className="col-md-6 mb-10">
-                  <label>Name</label>
-                  <input className="form-control" name="name" value={form.name} onChange={onChange} />
-                </div>
                 <div className="col-md-6 mb-10">
                   <label>Name</label>
                   <input className="form-control" name="name" value={form.name} onChange={onChange} aria-invalid={!form.name} />
@@ -151,12 +149,7 @@ export default function Account() {
                   {!form.email && !canSave && <div className="inline-error">Email is required</div>}
                 </div>
                 <div className="col-md-6 mb-10">
-                  <label>
-                    Phone {effectiveVerified && !editingPhone && <span className="badge success ml-10">Verified</span>}
-                    {effectiveVerified && !editingPhone && (
-                      <button type="button" className="underline ml-10" onClick={() => { setEditingPhone(true); setOtpSent(false); setOtpCode(""); setOtpVerified(false); }}>Change</button>
-                    )}
-                  </label>
+                  <label>Phone</label>
                   <input
                     className="form-control"
                     name="phone"
@@ -169,6 +162,17 @@ export default function Account() {
                     aria-invalid={!effectiveVerified && !form.phone}
                   />
                   {!effectiveVerified && !form.phone && !canSave && <div className="inline-error">Phone is required</div>}
+                  {effectiveVerified && !editingPhone && (
+                    <div className="phone-verified-row">
+                      <button
+                        type="button"
+                        className="account-secondary-btn account-secondary-btn--sm"
+                        onClick={() => { setEditingPhone(true); setOtpSent(false); setOtpCode(""); setOtpVerified(false); }}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  )}
                   {(!effectiveVerified || editingPhone) && (
                     <div className="otp-section mt-6">
                       {!otpSent ? (
@@ -184,7 +188,7 @@ export default function Account() {
                           <div className="otp-inline mt-4">
                             <input className="form-control otp-code-input" placeholder="6-digit code" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={otpCode} onChange={(e)=>setOtpCode(e.target.value)} />
                             <button type="button" className="butn butn-sm butn-rounded" disabled={verifyingOtp} onClick={verifyOtp}>{verifyingOtp ? "Verifying…" : "Verify OTP"}</button>
-                            <button type="button" className="underline" disabled={sendingOtp} onClick={sendOtp}>Resend</button>
+                            <button type="button" className="account-secondary-btn account-secondary-btn--sm" disabled={sendingOtp} onClick={sendOtp}>Resend</button>
                           </div>
                         </>
                       )}
@@ -194,8 +198,8 @@ export default function Account() {
                 </div>
                 <div className="col-12 mb-10">
                   <label>Street Address</label>
-                  <input className="form-control" name="address" value={form.address} onChange={onChange} aria-invalid={!form.address} />
-                  {!form.address && !canSave && <div className="inline-error">Street address is required</div>}
+                  <input className="form-control" name="address" value={form.address} onChange={onChange} aria-invalid={!addressOk} minLength={10} />
+                  {!addressOk && <div className="inline-error">Please enter at least 10 characters</div>}
                 </div>
                 <div className="col-md-4 mb-10">
                   <label>City</label>
@@ -220,8 +224,8 @@ export default function Account() {
               </div>
 
               <div className="d-flex justify-content-between mt-10">
-                <button className="underline" onClick={logout}>Logout</button>
-                <button className="butn butn-md butn-rounded" disabled={!canSave || saving} onClick={save}>
+                <button className="account-secondary-btn" onClick={logout}>Logout</button>
+                <button className="butn butn-md butn-rounded account-primary-btn" disabled={!canSave || saving} onClick={save}>
                   {saving ? "Saving…" : "Save Changes"}
                 </button>
               </div>
@@ -229,7 +233,7 @@ export default function Account() {
             </div>
           </div>
           <div className="col-lg-5 mt-20 mt-lg-0">
-            <div className="p-20 card-like">
+            <div className="p-20 card-like glass-surface strong-elevation orders-card">
               <h4 className="mb-10">Your Orders</h4>
               {ordersLoading ? (
                 <p className="opacity-7">Loading orders…</p>
@@ -238,7 +242,7 @@ export default function Account() {
               ) : (
                 <ul className="orders-list mt-10">
                   {orders.map((o) => (
-                    <li key={o.id} className="order-item">
+                    <li key={o.id} className="order-item glass-surface">
                       <div className="d-flex justify-content-between align-items-center">
                         <div>
                           <div className="fw-600">Order #{(o.orderId || o.id).slice(0,6).toUpperCase()}</div>
@@ -247,11 +251,9 @@ export default function Account() {
                         </div>
                         <div className="text-right">
                           <div className="fw-600">₹ {o.payable}</div>
-                          <div className="mt-4">
-                            <span className="badge status status-ordered">Ordered</span>
-                          </div>
+                          <div className="mt-4"></div>
                           <div className="mt-6">
-                            <a className="underline" href={`/account/orders/${o.id}`}>View</a>
+                            <a className="account-secondary-btn account-secondary-btn--sm" href={`/account/orders/${o.id}`}>View</a>
                           </div>
                         </div>
                       </div>

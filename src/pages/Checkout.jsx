@@ -6,6 +6,8 @@ import { useNavigate, Link } from "react-router-dom";
 import { INDIAN_STATES } from "../data/indian-states.js";
 import { previewCoupon } from "../services/coupons.js";
 import SEO from "../components/general_components/SEO.jsx";
+import ConfettiBurst from "../components/general_components/ConfettiBurst.jsx";
+import "./checkout-page.css";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase.js";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
@@ -54,10 +56,13 @@ export default function CheckoutPage() {
 
   const [paying, setPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); // 'online' or 'cod'
+  const [confettiKey, setConfettiKey] = useState(0);
+  const [couponApplying, setCouponApplying] = useState(false);
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  const canPay = items.length > 0 && form.email && form.name && form.phone && form.address && form.city && form.state && form.zip;
+  const addressOk = (form.address || '').trim().length >= 10;
+  const canPay = items.length > 0 && form.email && form.name && form.phone && addressOk && form.city && form.state && form.zip;
 
   const createOrderDocs = async (payload) => {
     const orderRef = await addDoc(collection(db, "orders"), payload);
@@ -69,9 +74,11 @@ export default function CheckoutPage() {
     return orderRef.id;
   };
 
-  const handlePay = async () => {
+  const handlePay = async (methodOverride) => {
+    const chosen = methodOverride || paymentMethod;
+    if (chosen !== paymentMethod) setPaymentMethod(chosen);
     // COD path
-    if (paymentMethod === "cod") {
+    if (chosen === "cod") {
       try {
         setPaying(true);
         const payload = {
@@ -216,6 +223,7 @@ export default function CheckoutPage() {
 
   const applyCoupon = async () => {
     try {
+      setCouponApplying(true);
       setCouponError("");
       const res = await previewCoupon({ code: couponInput, amount });
       if (!res?.ok) {
@@ -233,10 +241,13 @@ export default function CheckoutPage() {
       setAppliedCoupon({ code: res.code, discount: res.discount });
       setCouponError("");
       showToast("success", `Coupon ${res.code} applied`);
+      setConfettiKey((k) => k + 1);
     } catch (_) {
       const msg = "Could not apply coupon. Try again.";
       setCouponError(msg);
       showToast("error", msg);
+    } finally {
+      setCouponApplying(false);
     }
   };
 
@@ -251,6 +262,7 @@ export default function CheckoutPage() {
     <>
     <SEO title="Checkout" description="Complete your Megance order securely with Razorpay." image="/assets/logo.svg" type="website" twitterCard="summary" />
     <section className="container pt-60 pb-60 checkout-page white-navbar-page">
+      <ConfettiBurst triggerKey={confettiKey} />
       {/* Toasts handled by global ToastProvider */}
       <div className="row mb-20">
         <div className="col-12 d-flex justify-content-between align-items-center">
@@ -269,7 +281,7 @@ export default function CheckoutPage() {
       ) : (
         <div className="row">
           <div className="col-lg-7 mb-20">
-            <div className="p-20 card-like">
+            <div className="p-20 card-like glass-surface strong-elevation">
               <h5>Billing Details</h5>
               <div className="row mt-10">
                 <div className="col-md-6 mb-10">
@@ -289,8 +301,10 @@ export default function CheckoutPage() {
                 </div>
                 <div className="col-12 mb-10">
                   <label>Address</label>
-                  <input className="form-control" name="address" value={form.address} onChange={onChange} aria-invalid={!form.address} />
-                  {!form.address && !canPay && <div className="inline-error">Address is required</div>}
+                  <input className="form-control" name="address" value={form.address} onChange={onChange} aria-invalid={!addressOk} minLength={10} />
+                  {!addressOk && (
+                    <div className="inline-error">Please enter at least 10 characters for the address</div>
+                  )}
                 </div>
                 <div className="col-md-4 mb-10">
                   <label>City</label>
@@ -316,9 +330,9 @@ export default function CheckoutPage() {
             </div>
           </div>
           <div className="col-lg-5">
-            <div className="p-20 card-like summary-box">
+            <div className="p-20 card-like summary-box glass-surface strong-elevation">
               <h5>Order Summary</h5>
-              <ul className="mt-10">
+              <ul className="mt-10 summary-items">
                 {items.map((x) => (
                   <li key={x.id} className="d-flex justify-content-between mb-5">
                     <span>
@@ -338,34 +352,68 @@ export default function CheckoutPage() {
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value)}
                     />
-                    <button className="butn butn-md butn-rounded" onClick={applyCoupon}>Apply</button>
+                    <button
+                      className="butn butn-md butn-rounded glow-primary coupon-apply-btn"
+                      onClick={applyCoupon}
+                      disabled={couponApplying || !couponInput}
+                      title={couponApplying ? 'Applying…' : (!couponInput ? 'Enter a coupon code' : 'Apply coupon')}
+                    >
+                      {couponApplying ? 'Applying…' : 'Apply'}
+                    </button>
                     {couponError && <div className="inline-error" style={{marginTop:8}}>{couponError}</div>}
                   </div>
                 ) : (
-                  <div className="d-flex justify-content-between align-items-center">
+                  <div className="d-flex justify-content-between align-items-center coupon-applied-row">
                     <div className="coupon-success">
-                      <span className="chk"></span>
-                      <span>Applied {appliedCoupon.code}</span>
+                      <span className="chk" aria-hidden="true"></span>
+                      <span className="coupon-success-text">Applied {appliedCoupon.code}</span>
                     </div>
-                    <button className="underline" onClick={removeCoupon}>Remove</button>
+                    <button className="coupon-remove-btn" onClick={removeCoupon}>
+                      Remove
+                    </button>
                   </div>
                 )}
               </div>
               <div className="mb-10">
                 <label className="label-sm">Payment Method</label>
-                <div className="d-flex gap-10 mt-6" role="radiogroup" aria-label="Payment Method">
-                  <label style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                    <input type="radio" name="pm" value="online" checked={paymentMethod==='online'} onChange={()=>setPaymentMethod('online')} />
-                    <span>Online (Razorpay)</span>
-                  </label>
-                  <label style={{display:'inline-flex',alignItems:'center',gap:6}}>
-                    <input type="radio" name="pm" value="cod" checked={paymentMethod==='cod'} onChange={()=>setPaymentMethod('cod')} />
+                <div className="pay-methods mt-6" role="group" aria-label="Payment Method">
+                  <button
+                    type="button"
+                    className="pay-method-btn"
+                    onClick={() => handlePay('online')}
+                    disabled={paying || !canPay}
+                    title={!canPay ? 'Fill all billing fields' : 'Pay securely with Razorpay'}
+                  >
+                    <span className="pm-icon" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 17L17 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        <path d="M14 6H18V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="2" opacity="0.45"/>
+                      </svg>
+                    </span>
+                    <span>Pay with Razorpay</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="pay-method-btn"
+                    onClick={() => handlePay('cod')}
+                    disabled={paying || !canPay}
+                    title={!canPay ? 'Fill all billing fields' : 'Place order with Cash on Delivery'}
+                  >
+                    <span className="pm-icon" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="2"/>
+                        <circle cx="8" cy="12" r="2.5" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M14 12h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        <path d="M6 3h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.5"/>
+                      </svg>
+                    </span>
                     <span>Cash on Delivery</span>
-                  </label>
+                  </button>
                 </div>
               </div>
               <div className="d-flex justify-content-between fw-600">
-                <span>Total</span>
+                <span>Subtotal</span>
                 <span>₹ {amount}</span>
               </div>
               {discount > 0 && (
@@ -374,25 +422,14 @@ export default function CheckoutPage() {
                   <span>- ₹ {discount}</span>
                 </div>
               )}
-              <div className="d-flex justify-content-between">
-                <span>GST (18%)</span>
-                <span>₹ {gst}</span>
-              </div>
               <div className="d-flex justify-content-between fw-600 mt-10">
-                <span>Payable</span>
+                <span>Payable (incl. GST)</span>
                 <span>₹ {payable}</span>
               </div>
-              <button
-                disabled={!canPay || paying}
-                className="butn butn-md butn-rounded d-block mt-20 w-100"
-                onClick={handlePay}
-                title={!canPay ? "Fill all billing fields" : (paying ? "Processing…" : (paymentMethod==='cod' ? 'Place Order (COD)' : 'Pay with Razorpay'))}
-              >
-                {paying ? "Processing…" : (paymentMethod === 'cod' ? 'Place Order' : 'Pay with Razorpay')}
-              </button>
               {!canPay && (
                 <p className="inline-hint">Fill all billing details to proceed</p>
               )}
+              <p className="inline-hint mt-6">Prices are inclusive of GST.</p>
             </div>
           </div>
         </div>

@@ -171,6 +171,15 @@ export default function Navbar() {
                   </div>
                 </li>
               )}
+              {!user && (
+                <li>
+                  <div className="o-hidden">
+                    <NavLink to="/login" className="link" onClick={closeMenu}>
+                      <span className="fill-text" data-text="Login">Login</span>
+                    </NavLink>
+                  </div>
+                </li>
+              )}
               <li>
                 <div className="o-hidden">
                   <NavLink to="/returns" className="link" onClick={closeMenu}>

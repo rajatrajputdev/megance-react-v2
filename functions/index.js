@@ -149,6 +149,12 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
     ? Math.round(Number(data.gst))
     : Math.round(base * 0.18);
   const payable = Math.round(Number(data.payable) || base + gst);
+  // Some courier integrations validate collectable_amount against their computed
+  // "order amount" (often derived from items) and may subtract the provided
+  // discount again. To avoid "collectable amount should be <= order amount"
+  // for COD when GST is added client-side, set invoice/order amount high enough
+  // to cover the payable + discount (i.e., base + GST).
+  const invoiceValue = Math.max(0, payable + discount); // equals amount + gst
 
   const dwKg = Number(process.env.XPRESSBEES_DEFAULT_WEIGHT || 0.7);
   const grams = kgToGrams(dwKg);
@@ -196,8 +202,9 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
   return {
     order_number: trunc(orderLabel, 20),
     payment_type,
-    order_amount: payable,
-    discount: discount || 0,
+    order_amount: invoiceValue,
+    // Discount already reflected in invoiceValue; avoid double subtracting
+    discount: 0,
     shipping_charges: Number(process.env.XPRESSBEES_SHIPPING_CHARGES || 0),
     cod_charges: Number(process.env.XPRESSBEES_COD_CHARGES || 0),
     ...(process.env.XPRESSBEES_COURIER_ID

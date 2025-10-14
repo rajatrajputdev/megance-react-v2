@@ -1,0 +1,32 @@
+.confetti-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999999; /* above cards, below modals if any */
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: 8vh; /* start a bit below navbar */
+  border-radius: 2px;
+  opacity: 0.95;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.12));
+  animation-name: confetti-fall, confetti-rotate;
+  animation-timing-function: cubic-bezier(.2,.8,.2,1), linear;
+  animation-iteration-count: 1, infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes confetti-fall {
+  0% { transform: translate3d(0,-20px,0) rotate(0deg); opacity: 0.9; }
+  80% { opacity: 0.95; }
+  100% { transform: translate3d(0, 95vh, 0) rotate(360deg); opacity: 0; }
+}
+
+@keyframes confetti-rotate {
+  0% { filter: drop-shadow(0 2px 2px rgba(0,0,0,0.12)); }
+  50% { filter: drop-shadow(0 6px 6px rgba(0,0,0,0.14)); }
+  100% { filter: drop-shadow(0 2px 2px rgba(0,0,0,0.12)); }
+}
+

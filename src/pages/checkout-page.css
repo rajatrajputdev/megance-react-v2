@@ -1,0 +1,139 @@
+/* ===== Checkout page polish (aligned with Login + Cart) ===== */
+
+.checkout-page { max-width: 1120px; margin: 0 auto; padding-top: 130px; }
+
+/* Card surface: reuse cart glass feel */
+.checkout-page .card-like {
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
+
+/* Names aligned with cart for consistency */
+.glass-surface {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
+.strong-elevation {
+  box-shadow: 0 14px 30px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.05);
+}
+
+/* Inputs */
+.checkout-page .form-control {
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.9);
+}
+
+/* Coupon row */
+.coupon-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Coupon applied chip */
+.coupon-applied-row { margin-top: 6px; }
+.coupon-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #b9e6c9;
+  background: #edf9f1;
+  color: #0f7a3f;
+  font-weight: 600;
+}
+.coupon-success .chk {
+  width: 16px; height: 16px; border-radius: 50%; background: #16a34a; display: inline-block; position: relative;
+}
+.coupon-success .chk::after {
+  content: ""; position: absolute; left: 4px; top: 2px; width: 8px; height: 10px; border: 2px solid #fff; border-top: 0; border-left: 0; transform: rotate(45deg);
+}
+.coupon-success-text { font-size: 13px; }
+
+/* Micro-interaction for CTA hover */
+.glow-primary {
+  transition: box-shadow .25s cubic-bezier(.25,.8,.25,1), transform .2s ease;
+}
+.glow-primary:hover {
+  box-shadow: 0 12px 28px rgba(0,0,0,0.15), 0 0 0 3px rgba(0,0,0,0.06) inset;
+  transform: translateY(-1px);
+}
+
+/* Small labels */
+.checkout-page .label-sm { font-size: 13px; opacity: .85; }
+
+/* Sticky summary already handled by .summary-box in app overrides */
+
+@media (max-width: 768px) {
+  .checkout-page { padding-left: 10px; padding-right: 10px; }
+}
+
+/* Primary black buttons with disabled grey while processing */
+.checkout-primary-btn {
+  background: #000 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 12px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  padding: 14px;
+  transition: background .2s ease, box-shadow .25s cubic-bezier(.25,.8,.25,1), transform .2s ease;
+}
+.checkout-primary-btn:hover { box-shadow: 0 12px 28px rgba(0,0,0,.15); transform: translateY(-1px); }
+.checkout-primary-btn[disabled] { background: #777 !important; box-shadow: none; transform: none; cursor: not-allowed; }
+
+.coupon-apply-btn {
+  background: #000 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.coupon-apply-btn[disabled] { background: #777 !important; cursor: not-allowed; }
+
+/* Payment method button group (replaces radios) */
+.pay-methods { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.pay-method-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #000;
+  background: #000;
+  color: #fff;
+  font-weight: 700;
+  transition: box-shadow .2s ease, transform .2s ease, background .2s ease, color .2s ease;
+}
+.pay-method-btn .pm-icon { display: inline-flex; }
+.pay-method-btn:hover { box-shadow: 0 12px 26px rgba(0,0,0,.22); transform: translateY(-1px); }
+.pay-method-btn.active { box-shadow: 0 0 0 2px rgba(255,255,255,0.2) inset, 0 12px 28px rgba(0,0,0,.28); }
+.pay-method-btn[disabled] { opacity: .8; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Summary items list: remove default UL padding */
+.summary-items { list-style: none; padding-left: 0; margin: 0; }
+
+/* Coupon remove button (consistent look) */
+.coupon-remove-btn {
+  background: #000 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+.coupon-remove-btn:hover { box-shadow: 0 10px 22px rgba(0,0,0,.18); transform: translateY(-1px); }
+.coupon-remove-btn:disabled { background: #777 !important; cursor: not-allowed; transform: none; box-shadow: none; }
