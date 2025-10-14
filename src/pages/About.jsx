@@ -11,9 +11,9 @@ const About = () => {
         {/* Hero Image Section */}
         <div className="about-hero-image">
           <img
-            src="https://picsum.photos/1920/1080"
+            src="/assets/imgs/works/aboutusbanner.png"
             alt="About Us Hero"
-            style={{ width: '100%', height: '600px', objectFit: 'cover' }}
+            
           />
         </div>
 

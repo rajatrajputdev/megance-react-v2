@@ -62,8 +62,12 @@ export default function Shop() {
   return (
     <>
       <SEO title="Shop" description="Explore featured Megance products and find your perfect pair." image="/assets/logo.svg" type="website" twitterCard="summary" />
-       <section className="shop-top-banner mt-10" style={{ backgroundImage: "url('/assets/imgs/works/topbanner.png')" }} aria-label="Megance full screen visual" />
-
+       {/* <section className="shop-top-banner mt-10" style={{ backgroundImage: "url('/assets/imgs/works/topbanner.png')" }} aria-label="Megance full screen visual" /> */}
+<section
+      className="shop-top-banner mt-50"
+      aria-label="Megance full screen visual"
+      role="img"
+    />
       <section className="container page-section shop-page mt-30">
         <div className="row align-items-end">
           <div className="col-lg-8">

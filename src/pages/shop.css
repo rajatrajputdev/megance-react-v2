@@ -109,3 +109,26 @@
 @keyframes shimmer {
   100% { transform: translateX(100%); }
 }
+
+/* src/components/shop-top-banner.css */
+
+/* Desktop / Laptop (d
+efault) */
+.shop-top-banner {
+padding-top: 40px;
+  width: 100%;
+  min-height: 35vh;       /* adjust if you want a fixed height (e.g., 520px) */
+  background-image: url('/assets/imgs/works/topbanner.png');
+  /* background-size: cover; */
+  /* background-position: center center; */
+  background-repeat: no-repeat;
+  display: block;
+}
+
+/* Phone */
+@media (max-width: 768px) {
+  .shop-top-banner {
+    min-height: 150px;     /* tweak for mobile aspect */
+    background-image: url('/assets/imgs/works/shopmob.png');
+  }
+}
