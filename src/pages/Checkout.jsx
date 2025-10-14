@@ -52,7 +52,8 @@ export default function CheckoutPage() {
   const discount = useMemo(() => Number(appliedCoupon?.discount || 0), [amount, appliedCoupon]);
   const netAmount = useMemo(() => Math.max(0, amount - discount), [amount, discount]);
   const gst = useMemo(() => Math.round(netAmount * 0.18), [netAmount]);
-  const payable = useMemo(() => netAmount + gst, [netAmount, gst]);
+  // const payable = useMemo(() => netAmount + gst, [netAmount, gst]);
+  const payable =netAmount ;
 
   const [paying, setPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); // 'online' or 'cod'
@@ -229,7 +230,7 @@ export default function CheckoutPage() {
       if (!res?.ok) {
         const reason = res?.reason || 'Invalid coupon code';
         const msg = (
-          reason === 'amount_not_eligible' ? 'Not eligible for this amount' :
+          reason === 'amount_not_eligible' ? 'Not eligible for this account' :
           reason === 'max_uses_reached' ? 'Coupon usage limit reached' :
           reason === 'user_limit_reached' ? 'You have already used this coupon' :
           reason === 'inactive' ? 'Coupon expired or inactive' : 'Invalid coupon code'
@@ -264,7 +265,7 @@ export default function CheckoutPage() {
     <section className="container pt-60 pb-60 checkout-page white-navbar-page">
       <ConfettiBurst triggerKey={confettiKey} />
       {/* Toasts handled by global ToastProvider */}
-      <div className="row mb-20">
+      <div className="row mb-20 mt-20">
         <div className="col-12 d-flex justify-content-between align-items-center">
           <h2>Checkout</h2>
           {!user && <Link to="/login" className="underline">Login</Link>}
@@ -430,6 +431,9 @@ export default function CheckoutPage() {
                 <p className="inline-hint">Fill all billing details to proceed</p>
               )}
               <p className="inline-hint mt-6">Prices are inclusive of GST.</p>
+              <p className="inline-hint mt-6">Disclaimer</p>
+              <p className="inline-hint mt-6">There is no Exchange Policy </p>
+              <p className="inline-hint mt-6">In case of Returns, Handling fees of ₹450 will be non-refundable to users </p>
             </div>
           </div>
         </div>

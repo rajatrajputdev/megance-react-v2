@@ -273,6 +273,11 @@
 }
 @keyframes pd-shimmer { 100% { transform: translateX(100%); } }
 
+.size_guide{
+  width: 300px;
+  height: auto;
+
+}
 /* Responsive tweaks */
 @media (max-width: 576px) {
   .product-page-wrap { padding: 20px 16px; }

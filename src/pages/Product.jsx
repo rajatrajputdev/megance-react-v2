@@ -530,8 +530,8 @@ const onMediaMove = (e) => {
             )}
 <div className="mt-20">
                 <div className="filter-pills">
-                 <div>
-                  <img src="/assets/imgs/size.jpg" alt="Size Chart" />
+                 <div className="size_guide">
+                  <img src="/assets/imgs/size.jpeg" alt="Size Chart" />
                  </div>
                 </div>
               </div>
@@ -682,19 +682,33 @@ const onMediaMove = (e) => {
               <h3>Specifications</h3>
               <ul className="spec-list mt-10">
                 <li>
-                  <strong>Upper:</strong> Breathable knit mesh
+                  <strong>Upper Material:</strong> Premium full suede upper with genuine leather M branding
                 </li>
                 <li>
-                  <strong>Midsole:</strong> Responsive EVA foam
+                  <strong>Lining:</strong> Breathable inner lining for sweat-free comfort
                 </li>
                 <li>
-                  <strong>Outsole:</strong> High-traction rubber
+                  <strong>Insole:</strong> Ergonomic PU foam insole providing stable arch support and resilience
                 </li>
                 <li>
-                  <strong>Fit:</strong> True to size
+                  <strong>Outsole:</strong> Lightweight rubber sole designed for smooth urban movement
                 </li>
                 <li>
-                  <strong>Weight:</strong> ~280g (UK 9)
+                  <strong>Fit:</strong> True to size – crafted for everyday wearability and comfort
+
+
+                </li>
+                <li>
+                  <strong>Weight:</strong> Approx. 315g per shoe
+                </li>
+                <li>
+                  <strong>Care Guide:</strong> <br/> Protect with suede spray before first wear; clean using a suede brush or soft cloth
+                </li>
+                <li>
+                  <strong>Sustainability:</strong> <br/> Each MEGANCE sneaker is crafted in small batches using ethically sourced suede and leather, with eco-friendly packaging.
+                </li>
+                <li>
+                  <strong>Packaging:</strong> <br/> Delivered in a recyclable luxury box featuring the embossed MEGANCE emblem and dust bag for protection with extra laces provided in the box for unique styling.
                 </li>
               </ul>
             </div>
