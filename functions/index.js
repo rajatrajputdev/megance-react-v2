@@ -25,6 +25,10 @@ try {
 } catch (_) {}
 
 const REGION = process.env.FUNCTIONS_REGION || "asia-south2";
+// Company constants for invoices
+const MEGANCE_GSTIN = process.env.MEGANCE_GSTIN || "27AAACB2230M1Z5"; // dummy-format GSTIN
+const MEGANCE_LOGO_URL = process.env.MEGANCE_LOGO_URL ||
+  "https://megance.in/assets/imgs/megance_logo_w.png";
 
 // Owner email to receive order copies
 const OWNER_EMAIL = "megancetech@gmail.com";
@@ -1854,6 +1858,7 @@ exports.getOrderInvoicePdf = onRequest(
           ? data.createdAt.toDate()
           : new Date();
 
+      // Build professional invoice
       res.setHeader("content-type", "application/pdf");
       res.setHeader(
         "content-disposition",
@@ -1862,86 +1867,153 @@ exports.getOrderInvoicePdf = onRequest(
       const doc = new PDFDocument({ size: "A4", margin: 40 });
       doc.pipe(res);
 
-      doc
-        .fontSize(18)
-        .text("Megance", { continued: true })
-        .fontSize(12)
-        .text("  • Invoice", { align: "left" });
-      doc.moveDown(0.5);
-      doc
-        .fontSize(10)
-        .fillColor("#666")
-        .text(
-          `Order: #${orderId
-            .slice(0, 6)
-            .toUpperCase()}    Date: ${created.toLocaleString()}    Payment: ${(
-            data.paymentMethod || (data.paymentId ? "online" : "cod")
-          ).toUpperCase()}`
-        );
-      doc.moveDown(1);
-      doc.fillColor("#111").fontSize(12).text("Bill To:");
-      doc.fontSize(10).text(`${billing.name || ""}`);
-      doc.text(`${billing.email || ""}`);
-      doc.text(`${billing.phone || ""}`);
-      doc.text(
-        `${[billing.address, billing.city, billing.state, billing.zip]
-          .filter(Boolean)
-          .join(", ")}`
-      );
+      // Header with dark bar + logo
+      const pageWidth = doc.page.width;
+      const headerH = 54;
+      const headerX = 40;
+      const headerY = 40;
+      const headerW = pageWidth - 80;
+      doc.save();
+      doc.rect(headerX, headerY, headerW, headerH).fill("#111");
+      doc.fillColor("#fff").fontSize(18).text("Megance", headerX + 16, headerY + 16);
+      try {
+        const resp = await fetch(MEGANCE_LOGO_URL);
+        if (resp.ok) {
+          const buf = Buffer.from(await resp.arrayBuffer());
+          const imgW = 140;
+          const imgH = 36;
+          doc.image(buf, headerX + headerW - imgW - 12, headerY + (headerH - imgH) / 2, {
+            width: imgW,
+            height: imgH,
+          });
+        }
+      } catch (_) {}
+      doc.restore();
 
-      doc.moveDown(1);
-      // Table header
-      doc.fontSize(12).text("Item", 40, doc.y, { continued: true });
-      doc.text("Qty", 340, undefined, { continued: true });
-      doc.text("Amount", 420);
-      doc
-        .moveTo(40, doc.y + 4)
-        .lineTo(555, doc.y + 4)
-        .strokeColor("#ddd")
-        .stroke();
-      doc.moveDown(0.5);
+      // Invoice meta and company info
+      const invDate = created;
+      const invNo = `MG-${invDate.getFullYear().toString().slice(-2)}${String(
+        invDate.getMonth() + 1
+      ).padStart(2, "0")}${String(invDate.getDate()).padStart(2, "0")}-${orderId
+        .slice(0, 4)
+        .toUpperCase()}`;
+      const y0 = headerY + headerH + 16;
+      doc.fillColor("#111").fontSize(12).text("Invoice", headerX, y0);
+      doc.fontSize(10).fillColor("#666");
+      doc.text(`Invoice No: ${invNo}`, headerX, y0 + 18);
+      doc.text(`Date: ${invDate.toLocaleDateString()}`, headerX, y0 + 34);
+      doc.text(`GSTIN: ${MEGANCE_GSTIN}`, headerX, y0 + 50);
 
-      let total = 0;
+      // Payment meta
+      const pm = String(
+        data.paymentMethod || (data.paymentId ? "online" : "cod")
+      ).toUpperCase();
+      doc.text(`Payment: ${pm}`, headerX + 220, y0 + 18);
+      doc.text(`Order: #${orderId.slice(0, 8).toUpperCase()}`, headerX + 220, y0 + 34);
+
+      // Bill To
+      const cardY = y0 + 70;
+      const pageW = headerW;
+      doc.roundedRect(headerX, cardY, pageW, 74, 8).stroke("#e5e5e5");
+      doc.fontSize(12).fillColor("#111").text("Bill To", headerX + 12, cardY + 10);
+      doc.fontSize(10).fillColor("#111").text(`${billing.name || ""}`, headerX + 12, cardY + 30);
+      if (billing.email) doc.fillColor("#666").text(`${billing.email}`, headerX + 12, cardY + 44);
+      const addr = [billing.address, billing.city, billing.state, billing.zip]
+        .filter(Boolean)
+        .join(", ");
+      if (addr) doc.fillColor("#666").text(addr, headerX + 220, cardY + 30, { width: pageW - 240 });
+
+      // Items table header
+      let ty = cardY + 90;
+      const rowH = 20;
+      const col1 = headerX + 12; // item name
+      const colQty = headerX + pageW - 220; // qty
+      const colAmt = headerX + pageW - 120; // amount
+      doc
+        .roundedRect(headerX, ty, pageW, rowH, 6)
+        .fillAndStroke("#fafafa", "#eaeaea");
+      doc.fillColor("#111").fontSize(11).text("Item", col1, ty + 5);
+      doc.text("Qty", colQty, ty + 5);
+      doc.text("Amount", colAmt, ty + 5);
+      ty += rowH + 6;
+
+      // Items
+      let subtotal = 0;
       items.forEach((it) => {
         const unit = Number(it.price) || 0;
         const qty = Number(it.qty) || 0;
         const amt = unit * qty;
-        total += amt;
+        subtotal += amt;
         doc
           .fontSize(10)
           .fillColor("#111")
-          .text(String(it.name || ""), 40, doc.y, { width: 280 });
-        doc.text(String(qty), 340, undefined);
-        doc.text(`₹ ${amt}`, 420, undefined);
+          .text(String(it.name || ""), col1, ty, { width: pageW - 260 });
+        doc.text(String(qty), colQty, ty);
+        doc.text(`₹ ${amt.toFixed(2)}`, colAmt, ty);
+        ty += rowH;
         if (it.description) {
           doc
             .fillColor("#666")
             .fontSize(9)
-            .text(String(it.description).slice(0, 140), 40, doc.y, {
-              width: 520,
+            .text(String(it.description).slice(0, 140), col1, ty - 6, {
+              width: pageW - 40,
             });
+          ty += 4;
         }
-        doc.moveDown(0.6);
       });
 
-      doc.moveDown(0.5);
-      doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#ddd").stroke();
-      doc.moveDown(0.5);
+      // Divider
+      ty += 2;
+      doc.moveTo(headerX, ty).lineTo(headerX + pageW, ty).stroke("#eaeaea");
+      ty += 10;
+
+      // Totals
       const discount = Number(data.discount || 0);
-      const net = Math.max(0, total - discount);
+      const net = Math.max(0, subtotal - discount);
+      const shippingCharge = Number(
+        data.shipping || data.shippingCharge || data.shipping_charges || 0
+      );
       const tax =
         typeof data.gst === "number"
           ? Number(data.gst)
           : Math.round(net * 0.18);
-      const payable = Number(data.payable || net + tax);
+      const payable = Number(
+        data.payable || net + tax + (Number.isFinite(shippingCharge) ? shippingCharge : 0)
+      );
+      // Show lines
+      const rightX = colAmt;
+      const line = (label, value, opts = {}) => {
+        doc.fontSize(11).fillColor("#111").text(label, colQty - 120, ty);
+        doc.text(value, rightX, ty);
+        ty += rowH - 2;
+      };
+      line("MRP (Subtotal)", `₹ ${subtotal.toFixed(2)}`);
+      if (discount > 0) line("Discount", `- ₹ ${discount.toFixed(2)}`);
+      const gstPercentDisp = data.gstPercent
+        ? `${Number(data.gstPercent)}%`
+        : "18%";
+      line(`GST (${gstPercentDisp})`, `₹ ${tax.toFixed(2)}`);
+      line("Shipping", shippingCharge ? `₹ ${shippingCharge.toFixed(2)}` : "Free");
+      // Total accent row
+      ty += 2;
       doc
-        .fontSize(11)
-        .fillColor("#111")
-        .text(`Subtotal: ₹ ${total}`, { align: "right" });
-      if (discount > 0)
-        doc.text(`Discount: - ₹ ${discount}`, { align: "right" });
-      doc.text(`GST (18%): ₹ ${tax}`, { align: "right" });
-      doc.fontSize(12).text(`Total: ₹ ${payable}`, { align: "right" });
+        .roundedRect(headerX, ty - 6, pageW, rowH, 6)
+        .fillAndStroke("#111", "#111");
+      doc.fillColor("#fff").fontSize(12).text("Total", colQty - 120, ty);
+      doc.text(`₹ ${payable.toFixed(2)}`, rightX, ty);
+      ty += rowH + 8;
+
+      // Notes
+      doc.fillColor("#666").fontSize(9).text("Notes:", headerX, ty);
+      ty += 14;
+      doc
+        .fontSize(9)
+        .fillColor("#666")
+        .text("GST shown here may be dummy for now.", headerX, ty);
+      ty += 12;
+      doc.fontSize(9).fillColor("#666").text("Shipping is free on all orders.", headerX, ty);
+      ty += 12;
+      doc.fontSize(9).fillColor("#666").text("Discount is optional and may be 0.", headerX, ty);
 
       doc.end();
     } catch (e) {
@@ -1985,7 +2057,7 @@ exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
   }
   const doc = new _PDF({ size: "A4", margin: 40 });
   const chunks = [];
-  return await new Promise((resolve, reject) => {
+  return await new Promise(async (resolve, reject) => {
     doc.on("data", (c) => chunks.push(c));
     doc.on("error", (e) =>
       reject(new HttpsError("internal", e?.message || "PDF error"))
@@ -2000,78 +2072,143 @@ exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
       });
     });
 
-    doc
-      .fontSize(18)
-      .text("Megance", { continued: true })
-      .fontSize(12)
-      .text("  • Invoice", { align: "left" });
-    doc.moveDown(0.5);
-    doc
-      .fontSize(10)
-      .fillColor("#666")
-      .text(
-        `Order: #${orderId
-          .slice(0, 6)
-          .toUpperCase()}    Date: ${created.toLocaleString()}    Payment: ${(
-          data.paymentMethod || (data.paymentId ? "online" : "cod")
-        ).toUpperCase()}`
-      );
-    doc.moveDown(1);
-    doc.fillColor("#111").fontSize(12).text("Bill To:");
-    doc.fontSize(10).text(`${billing.name || ""}`);
-    doc.text(`${billing.email || ""}`);
-    doc.text(`${billing.phone || ""}`);
-    doc.text(
-      `${[billing.address, billing.city, billing.state, billing.zip]
-        .filter(Boolean)
-        .join(", ")}`
-    );
+    // Header with dark bar + logo
+    const pageWidth = doc.page.width;
+    const headerH = 54;
+    const headerX = 40;
+    const headerY = 40;
+    const headerW = pageWidth - 80;
+    doc.save();
+    doc.rect(headerX, headerY, headerW, headerH).fill("#111");
+    doc.fillColor("#fff").fontSize(18).text("Megance", headerX + 16, headerY + 16);
+    try {
+      const resp = await fetch(MEGANCE_LOGO_URL);
+      if (resp.ok) {
+        const buf = Buffer.from(await resp.arrayBuffer());
+        const imgW = 140;
+        const imgH = 36;
+        doc.image(buf, headerX + headerW - imgW - 12, headerY + (headerH - imgH) / 2, {
+          width: imgW,
+          height: imgH,
+        });
+      }
+    } catch (_) {}
+    doc.restore();
 
-    doc.moveDown(1);
-    doc.fontSize(12).text("Item", 40, doc.y, { continued: true });
-    doc.text("Qty", 340, undefined, { continued: true });
-    doc.text("Amount", 420);
-    doc
-      .moveTo(40, doc.y + 4)
-      .lineTo(555, doc.y + 4)
-      .strokeColor("#ddd")
-      .stroke();
-    doc.moveDown(0.5);
+    // Invoice meta
+    const invNo = `MG-${created.getFullYear().toString().slice(-2)}${String(
+      created.getMonth() + 1
+    ).padStart(2, "0")}${String(created.getDate()).padStart(2, "0")}-${orderId
+      .slice(0, 4)
+      .toUpperCase()}`;
+    const y0 = headerY + headerH + 16;
+    doc.fillColor("#111").fontSize(12).text("Invoice", headerX, y0);
+    doc.fontSize(10).fillColor("#666");
+    doc.text(`Invoice No: ${invNo}`, headerX, y0 + 18);
+    doc.text(`Date: ${created.toLocaleDateString()}`, headerX, y0 + 34);
+    doc.text(`GSTIN: ${MEGANCE_GSTIN}`, headerX, y0 + 50);
+    const pm = String(
+      data.paymentMethod || (data.paymentId ? "online" : "cod")
+    ).toUpperCase();
+    doc.text(`Payment: ${pm}`, headerX + 220, y0 + 18);
+    doc.text(`Order: #${orderId.slice(0, 8).toUpperCase()}`, headerX + 220, y0 + 34);
 
-    let total = 0;
+    // Bill To
+    const cardY = y0 + 70;
+    const pageW = headerW;
+    doc.roundedRect(headerX, cardY, pageW, 74, 8).stroke("#e5e5e5");
+    doc.fontSize(12).fillColor("#111").text("Bill To", headerX + 12, cardY + 10);
+    doc.fontSize(10).fillColor("#111").text(`${billing.name || ""}`, headerX + 12, cardY + 30);
+    if (billing.email) doc.fillColor("#666").text(`${billing.email}`, headerX + 12, cardY + 44);
+    const addr = [billing.address, billing.city, billing.state, billing.zip]
+      .filter(Boolean)
+      .join(", ");
+    if (addr) doc.fillColor("#666").text(addr, headerX + 220, cardY + 30, { width: pageW - 240 });
+
+    // Table header
+    let ty = cardY + 90;
+    const rowH = 20;
+    const col1 = headerX + 12;
+    const colQty = headerX + pageW - 220;
+    const colAmt = headerX + pageW - 120;
+    doc
+      .roundedRect(headerX, ty, pageW, rowH, 6)
+      .fillAndStroke("#fafafa", "#eaeaea");
+    doc.fillColor("#111").fontSize(11).text("Item", col1, ty + 5);
+    doc.text("Qty", colQty, ty + 5);
+    doc.text("Amount", colAmt, ty + 5);
+    ty += rowH + 6;
+
+    // Items
+    let subtotal = 0;
     items.forEach((it) => {
       const unit = Number(it.price) || 0;
       const qty = Number(it.qty) || 0;
       const amt = unit * qty;
-      total += amt;
+      subtotal += amt;
       doc
         .fontSize(10)
         .fillColor("#111")
-        .text(String(it.name || ""), 40, doc.y, { width: 280 });
-      doc.text(String(qty), 340, undefined);
-      doc.text(`₹ ${amt}`, 420, undefined);
+        .text(String(it.name || ""), col1, ty, { width: pageW - 260 });
+      doc.text(String(qty), colQty, ty);
+      doc.text(`₹ ${amt.toFixed(2)}`, colAmt, ty);
+      ty += rowH;
       if (it.description) {
         doc
           .fillColor("#666")
           .fontSize(9)
-          .text(String(it.description).slice(0, 140), 40, doc.y, {
-            width: 520,
+          .text(String(it.description).slice(0, 140), col1, ty - 6, {
+            width: pageW - 40,
           });
+        ty += 4;
       }
-      doc.moveDown(0.6);
     });
 
-    doc.moveDown(0.5);
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#ddd").stroke();
-    doc.moveDown(0.5);
+    // Divider
+    ty += 2;
+    doc.moveTo(headerX, ty).lineTo(headerX + pageW, ty).stroke("#eaeaea");
+    ty += 10;
+
+    // Totals
     const discount = Number(data.discount || 0);
-    const payable = Number(data.payable || total - discount);
+    const net = Math.max(0, subtotal - discount);
+    const shippingCharge = Number(
+      data.shipping || data.shippingCharge || data.shipping_charges || 0
+    );
+    const tax =
+      typeof data.gst === "number" ? Number(data.gst) : Math.round(net * 0.18);
+    const payable = Number(
+      data.payable || net + tax + (Number.isFinite(shippingCharge) ? shippingCharge : 0)
+    );
+    const rightX = colAmt;
+    const line = (label, value) => {
+      doc.fontSize(11).fillColor("#111").text(label, colQty - 120, ty);
+      doc.text(value, rightX, ty);
+      ty += rowH - 2;
+    };
+    line("MRP (Subtotal)", `₹ ${subtotal.toFixed(2)}`);
+    if (discount > 0) line("Discount", `- ₹ ${discount.toFixed(2)}`);
+    const gstPercentDisp = data.gstPercent
+      ? `${Number(data.gstPercent)}%`
+      : "18%";
+    line(`GST (${gstPercentDisp})`, `₹ ${tax.toFixed(2)}`);
+    line("Shipping", shippingCharge ? `₹ ${shippingCharge.toFixed(2)}` : "Free");
+    ty += 2;
     doc
-      .fontSize(11)
-      .fillColor("#111")
-      .text(`Subtotal: ₹ ${total}`, { align: "right" });
-    if (discount > 0) doc.text(`Discount: - ₹ ${discount}`, { align: "right" });
-    doc.fontSize(12).text(`Total: ₹ ${payable}`, { align: "right" });
+      .roundedRect(headerX, ty - 6, pageW, rowH, 6)
+      .fillAndStroke("#111", "#111");
+    doc.fillColor("#fff").fontSize(12).text("Total", colQty - 120, ty);
+    doc.text(`₹ ${payable.toFixed(2)}`, rightX, ty);
+    ty += rowH + 8;
+
+    // Notes
+    doc.fillColor("#666").fontSize(9).text("Notes:", headerX, ty);
+    ty += 14;
+    doc.fontSize(9).fillColor("#666").text("GST shown here may be dummy for now.", headerX, ty);
+    ty += 12;
+    doc.fontSize(9).fillColor("#666").text("Shipping is free on all orders.", headerX, ty);
+    ty += 12;
+    doc.fontSize(9).fillColor("#666").text("Discount is optional and may be 0.", headerX, ty);
 
     doc.end();
   });
