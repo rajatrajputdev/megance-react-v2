@@ -22,6 +22,9 @@
 .rh-news-legal { grid-column: 1 / -1; color: #777; margin-top: -2px; }
 .rh-news-legal a { text-decoration: underline; }
 
+/* Avoid scroll anchoring jumps when the form shows success/error below */
+.rh-newsletter, .rh-news-form { overflow-anchor: none; }
+
 /* Links */
 .rh-links { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; padding: 28px 0; }
 .rh-col h6 { margin: 0 0 10px 0; font-weight: 700; font-size: 14px; letter-spacing: .4px; text-transform: uppercase; }

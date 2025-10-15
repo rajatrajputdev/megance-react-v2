@@ -1,8 +1,37 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import "./footer.css";
+import { subscribeNewsletter } from "../../services/newsletter.js";
+import { currentScrollY, restoreScroll, pauseSmoother } from "../../utils/scroll.js";
 
 export default function Footer() {
   const year = new Date().getFullYear();
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    setMsg("");
+    setErr("");
+    const prevY = currentScrollY();
+    pauseSmoother(true);
+    const val = String(email || "").trim();
+    if (!val || !val.includes("@")) { setErr("Enter a valid email"); requestAnimationFrame(() => { restoreScroll(prevY); pauseSmoother(false); }); return; }
+    setLoading(true);
+    try {
+      await subscribeNewsletter({ email: val, source: "footer" });
+      setMsg("Thanks for subscribing!");
+      setEmail("");
+    } catch (e) {
+      setErr(e?.message || "Could not subscribe. Try again.");
+    } finally {
+      setLoading(false);
+      requestAnimationFrame(() => { restoreScroll(prevY); pauseSmoother(false); });
+    }
+  };
+
   return (
     <footer className="rh-footer">
       <div className="rh-container">
@@ -21,12 +50,27 @@ export default function Footer() {
             <h4>Be the first to know</h4>
             <p>Sign up to receive updates on drops, restocks and more.</p>
           </div>
-          <form className="rh-news-form" onSubmit={(e) => e.preventDefault()} aria-label="Newsletter signup">
-            <input type="email" placeholder="Enter your email" aria-label="Email address" required />
-            <button type="submit" aria-label="Subscribe">
-              <span>Subscribe</span>
+          <form className="rh-news-form" onSubmit={onSubmit} aria-label="Newsletter signup">
+            <input
+              type="email"
+              placeholder="Enter your email"
+              aria-label="Email address"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => pauseSmoother(true)}
+              onBlur={() => pauseSmoother(false)}
+              aria-invalid={!!err}
+              aria-describedby={err ? "footer-newsletter-error" : undefined}
+            />
+            <button type="submit" aria-label="Subscribe" disabled={loading}
+              onMouseDown={(ev) => { ev.preventDefault(); }}
+            >
+              <span>{loading ? "Subscribing…" : "Subscribe"}</span>
             </button>
           </form>
+          {msg && <div role="status" style={{ color: '#1aa34a', marginTop: 8 }}>{msg}</div>}
+          {err && <div id="footer-newsletter-error" role="alert" style={{ color: '#d33', marginTop: 8 }}>{err}</div>}
           <div className="rh-news-legal">
             <small>By subscribing, you agree to our <Link to="/terms">Terms</Link> and <Link to="/privacy">Privacy Policy</Link>.</small>
           </div>

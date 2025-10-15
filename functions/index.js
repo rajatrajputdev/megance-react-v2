@@ -2576,6 +2576,78 @@ exports.updateUserProfileCallable = onCall({ region: REGION }, async (req) => {
     throw new HttpsError("internal", e?.message || "Internal error");
   }
 });
+// Newsletter subscription (callable): accepts { email, name?, source? }
+exports.subscribeNewsletter = onCall({ region: REGION }, async (req) => {
+  try {
+    const data = req?.data || {};
+    const raw = (data.email || "").toString().trim();
+    const email = raw.toLowerCase();
+    if (!email || !email.includes("@") || email.length > 190) {
+      throw new HttpsError("invalid-argument", "Invalid email");
+    }
+    const name = (data.name || "").toString().trim().slice(0, 120);
+    const source = (data.source || "web").toString().trim().slice(0, 60);
+    const uid = req?.auth?.uid || null;
+
+    const id = crypto.createHash("sha1").update(email).digest("hex");
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const ref = admin.firestore().doc(`newsletter_subscribers/${id}`);
+    const payload = {
+      email,
+      ...(name ? { name } : {}),
+      ...(uid ? { uid } : {}),
+      sources: admin.firestore.FieldValue.arrayUnion(source || "web"),
+      updatedAt: now,
+    };
+    const snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({ ...payload, createdAt: now }, { merge: true });
+    } else {
+      await ref.set(payload, { merge: true });
+    }
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    throw new HttpsError("internal", e?.message || "Internal error");
+  }
+});
+
+// Public HTTP variant (no auth) for environments calling via base URL
+exports.subscribeNewsletterPublic = onRequest({ region: REGION, cors: true }, async (req, res) => {
+  try {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method Not Allowed" });
+      return;
+    }
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const raw = (body.email || "").toString().trim();
+    const email = raw.toLowerCase();
+    if (!email || !email.includes("@") || email.length > 190) {
+      res.status(400).json({ error: "Invalid email" });
+      return;
+    }
+    const name = (body.name || "").toString().trim().slice(0, 120);
+    const source = (body.source || "web").toString().trim().slice(0, 60);
+    const id = crypto.createHash("sha1").update(email).digest("hex");
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const ref = admin.firestore().doc(`newsletter_subscribers/${id}`);
+    const payload = {
+      email,
+      ...(name ? { name } : {}),
+      sources: admin.firestore.FieldValue.arrayUnion(source || "web"),
+      updatedAt: now,
+    };
+    const snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({ ...payload, createdAt: now }, { merge: true });
+    } else {
+      await ref.set(payload, { merge: true });
+    }
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || "Internal error" });
+  }
+});
 function xbOrigin(rawBase) {
   try {
     const raw = (
