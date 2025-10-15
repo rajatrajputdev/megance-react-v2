@@ -2201,11 +2201,7 @@ exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
     // Notes
     doc.fillColor("#666").fontSize(9).text("Notes:", headerX, ty);
     ty += 14;
-    doc.fontSize(9).fillColor("#666").text("GST shown here may be dummy for now.", headerX, ty);
-    ty += 12;
     doc.fontSize(9).fillColor("#666").text("Shipping is free on all orders.", headerX, ty);
-    ty += 12;
-    doc.fontSize(9).fillColor("#666").text("Discount is optional and may be 0.", headerX, ty);
 
     doc.end();
   });

@@ -96,7 +96,7 @@ export function AuthProvider({ children }) {
       const cred = await signInWithPopup(auth, provider);
       return cred.user;
     } catch (e) {
-      const code = (e && (e as any).code) || '';
+      const code = e || '';
       if (code === 'auth/operation-not-supported-in-this-environment' || code === 'auth/popup-blocked') {
         maybeStorePostLogin();
         await signInWithRedirect(auth, provider);
