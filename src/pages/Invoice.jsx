@@ -128,8 +128,8 @@ export default function InvoicePage() {
                     <div>Amount</div>
                   </div>
                   <div className="inv-tr">
-                    <div>MRP</div>
-                    <div>{fmtINR(calc.sub)}</div>
+                    <div>Subtotal</div>
+                    <div>{fmtINR(Math.max(0, (calc.total || 0) - (calc.gstAmount || 0)))}</div>
                   </div>
                   <div className="inv-tr">
                     <div>Discount</div>
@@ -170,4 +170,3 @@ export default function InvoicePage() {
     </>
   );
 }
-

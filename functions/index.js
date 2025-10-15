@@ -1984,7 +1984,9 @@ exports.getOrderInvoicePdf = onRequest(
         doc.text(value, rightX, ty);
         ty += rowH - 2;
       };
-      line("MRP (Subtotal)", `₹ ${subtotal.toFixed(2)}`);
+      // Subtotal should be Total (amount) minus GST
+      const displaySubtotal = Math.max(0, payable - tax);
+      line("Subtotal", `₹ ${displaySubtotal.toFixed(2)}`);
       if (discount > 0) line("Discount", `- ₹ ${discount.toFixed(2)}`);
       const gstPercentDisp = data.gstPercent
         ? `${Number(data.gstPercent)}%`
@@ -2183,7 +2185,9 @@ exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
       doc.text(value, rightX, ty);
       ty += rowH - 2;
     };
-    line("MRP (Subtotal)", `₹ ${subtotal.toFixed(2)}`);
+    // Subtotal should be Total (amount) minus GST
+    const displaySubtotal = Math.max(0, payable - tax);
+    line("Subtotal", `₹ ${displaySubtotal.toFixed(2)}`);
     if (discount > 0) line("Discount", `- ₹ ${discount.toFixed(2)}`);
     const gstPercentDisp = data.gstPercent
       ? `${Number(data.gstPercent)}%`
