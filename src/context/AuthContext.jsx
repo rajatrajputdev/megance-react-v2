@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { auth, db } from "../firebase.js";
-import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, linkWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, linkWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 
 const AuthContext = createContext(null);
@@ -33,6 +33,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     // Ensure session persistence across reloads (production behavior)
     try { setPersistence(auth, browserLocalPersistence).catch(() => {}); } catch {}
+    // Proactively resolve any pending redirect result to surface errors early
+    try { getRedirectResult(auth).catch(() => {}); } catch {}
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setInitializing(false);
@@ -66,11 +68,42 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Google-only sign in
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (opts = {}) => {
     setError(null);
     const provider = new GoogleAuthProvider();
-    const cred = await signInWithPopup(auth, provider);
-    return cred.user;
+    const preferRedirect = (() => {
+      try {
+        if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+        const ua = navigator.userAgent || '';
+        const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isStandalonePWA = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (navigator && (navigator).standalone === true);
+        const isInAppBrowser = /(FBAN|FBAV|Instagram|Line|Twitter|GSA|OkHttp)/i.test(ua);
+        return isIOS || isStandalonePWA || isInAppBrowser;
+      } catch { return false; }
+    })();
+
+    const maybeStorePostLogin = () => {
+      try { if (opts?.postLoginPath) sessionStorage.setItem('postLoginPath', String(opts.postLoginPath)); } catch {}
+    };
+
+    if (preferRedirect) {
+      maybeStorePostLogin();
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+
+    try {
+      const cred = await signInWithPopup(auth, provider);
+      return cred.user;
+    } catch (e) {
+      const code = (e && (e as any).code) || '';
+      if (code === 'auth/operation-not-supported-in-this-environment' || code === 'auth/popup-blocked') {
+        maybeStorePostLogin();
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
+      throw e;
+    }
   };
 
   // Fully clear any existing reCAPTCHA instance and its DOM container

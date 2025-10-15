@@ -40,14 +40,30 @@ export default function LoginPage() {
   const onGoogle = async () => {
     setErr("");
     try {
-      await signInWithGoogle();
-      navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
+      await signInWithGoogle({ postLoginPath: `/setup?from=${encodeURIComponent(from)}` });
+      // Popup flow returns immediately with user; redirect flow leaves the page.
+      // If popup succeeded, navigate now. If redirect chosen, the stored postLoginPath will handle it after return.
+      if (auth.currentUser) {
+        navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
+      }
     } catch (e) {
       const msg = e?.message || "Unable to sign in with Google";
       setErr(msg);
       showToast("error", msg);
     }
   };
+
+  // After redirect sign-in completes, navigate using stored target if available
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const target = sessionStorage.getItem('postLoginPath');
+      if (target) {
+        sessionStorage.removeItem('postLoginPath');
+        navigate(target, { replace: true });
+      }
+    } catch {}
+  }, [user, navigate]);
 
   if (user) {
     return (
