@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebase.js";
@@ -25,9 +25,12 @@ export default function Account() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [otpInfo, setOtpInfo] = useState("");
   const [editingPhone, setEditingPhone] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const otpBlockRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
@@ -96,13 +99,19 @@ export default function Account() {
   const sendOtp = async () => {
     setSendingOtp(true);
     try {
+      setOtpError(""); setOtpInfo("");
       if (editingPhone || baseVerified) await startChangePhone(form.phone);
       else await startLinkPhone(form.phone);
       setOtpCode("");
       setOtpSent(true);
-      showToast("info", "OTP sent");
+      setOtpInfo("OTP sent to your phone");
+      showToast("info", "OTP sent to your phone");
     } catch (e) {
-      showToast("error", friendlyOtpError(e, 'send'));
+      try { console.error('[OTP][send] error', e?.code || e, e); } catch {}
+      const msg = friendlyOtpError(e, 'send');
+      setOtpError(msg);
+      showToast("error", msg);
+      try { otpBlockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
     } finally {
       setSendingOtp(false);
     }
@@ -111,19 +120,32 @@ export default function Account() {
   const verifyOtp = async () => {
     setVerifyingOtp(true);
     try {
+      setOtpError(""); setOtpInfo("");
       let u;
       if (editingPhone || baseVerified) u = await confirmChangePhone(otpCode);
       else u = await confirmLinkPhone(otpCode);
       setOtpVerified(true);
       setEditingPhone(false);
       try { if (u?.phoneNumber) setForm((f) => ({ ...f, phone: u.phoneNumber })); } catch {}
+      setOtpInfo("Phone verified");
       showToast("success", "Phone verified");
     } catch (e) {
-      showToast("error", friendlyOtpError(e, 'verify'));
+      try { console.error('[OTP][verify] error', e?.code || e, e); } catch {}
+      const msg = friendlyOtpError(e, 'verify');
+      setOtpError(msg);
+      showToast("error", msg);
       setOtpCode("");
+      try { otpBlockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
     } finally {
       setVerifyingOtp(false);
     }
+  };
+
+  const onOtpInput = (e) => {
+    try {
+      const v = String(e.target.value || '').replace(/\D/g, '').slice(0, 6);
+      setOtpCode(v);
+    } catch { setOtpCode(''); }
   };
 
   return (
@@ -174,22 +196,26 @@ export default function Account() {
                     </div>
                   )}
                   {(!effectiveVerified || editingPhone) && (
-                    <div className="otp-section mt-6">
+                    <div className="otp-section mt-6" ref={otpBlockRef}>
                       {!otpSent ? (
                         <>
                           <div className="form-hint">We’ll send a one-time code to verify this number.</div>
                           <button type="button" className="butn butn-sm butn-rounded mt-6" disabled={sendingOtp} onClick={sendOtp}>
                             {sendingOtp ? "Sending…" : "Send OTP"}
                           </button>
+                          {otpInfo && <div className="alert info mt-6" role="status" aria-live="polite">{otpInfo}</div>}
+                          {otpError && <div className="alert error mt-6" role="alert" aria-live="assertive">{otpError}</div>}
                         </>
                       ) : (
                         <>
                           <label className="mt-4">Enter OTP Code</label>
                           <div className="otp-inline mt-4">
-                            <input className="form-control otp-code-input" placeholder="6-digit code" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={otpCode} onChange={(e)=>setOtpCode(e.target.value)} />
+                            <input className="form-control otp-code-input" placeholder="6-digit code" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={otpCode} onChange={onOtpInput} />
                             <button type="button" className="butn butn-sm butn-rounded" disabled={verifyingOtp} onClick={verifyOtp}>{verifyingOtp ? "Verifying…" : "Verify OTP"}</button>
                             <button type="button" className="account-secondary-btn account-secondary-btn--sm" disabled={sendingOtp} onClick={sendOtp}>Resend</button>
                           </div>
+                          {otpInfo && <div className="alert info mt-6" role="status" aria-live="polite">{otpInfo}</div>}
+                          {otpError && <div className="alert error mt-6" role="alert" aria-live="assertive">{otpError}</div>}
                         </>
                       )}
                     </div>

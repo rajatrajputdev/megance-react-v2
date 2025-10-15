@@ -104,6 +104,8 @@ export default function Setup() {
       setOtpSent(true);
       setMsg("OTP sent to your phone");
     } catch (e) {
+      // Surface debug info in console for troubleshooting recaptcha/OTP issues
+      try { console.error('[OTP][send] error', e?.code || e, e); } catch {}
       setErr(friendlyOtpError(e, 'send'));
     } finally {
       setSendingOtp(false);
@@ -119,11 +121,20 @@ export default function Setup() {
       setOtpVerified(true);
       setMsg("Phone verified");
     } catch (e) {
+      // Helpful console for non-UI debugging
+      try { console.error('[OTP][verify] error', e?.code || e, e); } catch {}
       setErr(friendlyOtpError(e, 'verify'));
       setOtpCode("");
     } finally {
       setVerifyingOtp(false);
     }
+  };
+
+  const onOtpInput = (e) => {
+    try {
+      const v = String(e.target.value || '').replace(/\D/g, '').slice(0, 6);
+      setOtpCode(v);
+    } catch { setOtpCode(''); }
   };
 
   return (
@@ -175,7 +186,7 @@ export default function Setup() {
                                 pattern="[0-9]*"
                                 maxLength={6}
                                 value={otpCode}
-                                onChange={(e) => setOtpCode(e.target.value)}
+                                onChange={onOtpInput}
                                 ref={otpInputRef}
                               />
                               <button type="button" className="butn butn-sm butn-rounded" disabled={verifyingOtp} onClick={verifyOtp}>{verifyingOtp ? "Verifying…" : "Verify OTP"}</button>
@@ -224,8 +235,8 @@ export default function Setup() {
                   <div className="inline-hint mt-6">Fill all fields marked above to continue.</div>
                 )}
                 {/* Recaptcha host is mounted globally; no per-page container needed */}
-                {msg && <div className="alert success mt-10">{msg}</div>}
-                {err && <div className="alert error mt-10">{err}</div>}
+                {msg && <div className="alert success mt-10" role="status" aria-live="polite">{msg}</div>}
+                {err && <div className="alert error mt-10" role="alert" aria-live="assertive">{err}</div>}
               </div>
             </div>
           </div>
