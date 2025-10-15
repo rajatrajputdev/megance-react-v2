@@ -82,11 +82,13 @@ export function AuthProvider({ children }) {
       } catch { return false; }
     })();
 
+    const forceRedirect = opts?.forceRedirect === true;
+
     const maybeStorePostLogin = () => {
       try { if (opts?.postLoginPath) sessionStorage.setItem('postLoginPath', String(opts.postLoginPath)); } catch {}
     };
 
-    if (preferRedirect) {
+    if (forceRedirect || preferRedirect) {
       maybeStorePostLogin();
       await signInWithRedirect(auth, provider);
       return null;

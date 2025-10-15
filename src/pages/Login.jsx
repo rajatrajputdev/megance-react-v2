@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"; 
+import { useState, useEffect, useMemo } from "react"; 
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation } from "react-router-dom";
 import SEO from "../components/general_components/SEO.jsx";
@@ -23,6 +23,15 @@ export default function LoginPage() {
   const desktopImage = "/assets/imgs/login/l1.png"; // 🔁 Replace later
   const mobileImage = "/assets/imgs/login/l1mob.png"; // 🔁 Replace later
   const [bgImage, setBgImage] = useState(desktopImage);
+  const envHints = useMemo(() => {
+    try {
+      const ua = navigator.userAgent || '';
+      const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isStandalonePWA = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (navigator && (navigator).standalone === true);
+      const isInApp = /(FBAN|FBAV|Instagram|Line|Twitter|GSA|OkHttp)/i.test(ua);
+      return { isIOS, isStandalonePWA, isInApp };
+    } catch { return { isIOS: false, isStandalonePWA: false, isInApp: false }; }
+  }, []);
 
   useEffect(() => {
     const updateImage = () => {
@@ -37,17 +46,29 @@ export default function LoginPage() {
     return () => window.removeEventListener("resize", updateImage);
   }, []);
 
-  const onGoogle = async () => {
+  const onGoogle = async (forceRedirect = false) => {
     setErr("");
     try {
-      await signInWithGoogle({ postLoginPath: `/setup?from=${encodeURIComponent(from)}` });
+      await signInWithGoogle({ postLoginPath: `/setup?from=${encodeURIComponent(from)}`, forceRedirect });
       // Popup flow returns immediately with user; redirect flow leaves the page.
       // If popup succeeded, navigate now. If redirect chosen, the stored postLoginPath will handle it after return.
       if (auth.currentUser) {
         navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
       }
     } catch (e) {
-      const msg = e?.message || "Unable to sign in with Google";
+      const code = e?.code || '';
+      let msg = "";
+      if (String(code).includes('unauthorized-domain')) {
+        msg = "Sign-in is not available on this domain.";
+      } else if (String(code).includes('popup-blocked')) {
+        msg = "Popup blocked. Use the redirect option below.";
+      } else if (String(code).includes('operation-not-supported-in-this-environment')) {
+        msg = "This browser blocks Google popups. Use redirect below.";
+      } else if (String(code).includes('cancelled-popup-request') || String(code).includes('popup-closed-by-user')) {
+        msg = "The sign-in window was closed before completing.";
+      } else {
+        msg = e?.message || "Unable to sign in with Google.";
+      }
       setErr(msg);
       showToast("error", msg);
     }
@@ -89,7 +110,8 @@ export default function LoginPage() {
           <h2 className="auth-title">Welcome Back</h2>
           <p className="auth-subtext">Sign in to continue your journey.</p>
 
-          <button className="google-btn" onClick={onGoogle}>
+          {/* Primary CTA: decide best mode based on environment */}
+          <button className="google-btn" onClick={() => onGoogle(envHints.isIOS || envHints.isStandalonePWA || envHints.isInApp)}>
             <span className="google-icon">
               <svg width="18" height="18" viewBox="0 0 533.5 544.3">
                 <path fill="#4285F4" d="M533.5,278.4c0-17.4-1.5-34.1-4.3-50.3H272v95.3h147c-6.3,33.7-25,62.1-53.5,81.2l86.4,67.1 c50.4-46.5,81.6-115,81.6-193.3z"/>
@@ -100,6 +122,20 @@ export default function LoginPage() {
             </span>
             Continue with Google
           </button>
+
+          {/* Secondary: explicit redirect option for stubborn browsers */}
+          <div className="mt-20" style={{textAlign:'center'}}>
+            <button className="butn butn-md butn-rounded" onClick={() => onGoogle(true)}>
+              Continue via Redirect
+            </button>
+            <div className="inline-hint mt-6" aria-live="polite">
+              {envHints.isInApp
+                ? 'If using Instagram or Facebook browser, tap ••• and open in Safari if redirect does not start.'
+                : envHints.isIOS
+                ? 'iOS may block popups. Redirect opens Google in this tab.'
+                : 'If a popup is blocked, use redirect instead.'}
+            </div>
+          </div>
 
           {err && <div className="auth-error">{err}</div>}
         </div>
