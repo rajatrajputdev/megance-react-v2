@@ -85,7 +85,13 @@ export function AuthProvider({ children }) {
     const forceRedirect = opts?.forceRedirect === true;
 
     const maybeStorePostLogin = () => {
-      try { if (opts?.postLoginPath) sessionStorage.setItem('postLoginPath', String(opts.postLoginPath)); } catch {}
+      try {
+        if (opts?.postLoginPath) {
+          const path = String(opts.postLoginPath);
+          try { sessionStorage.setItem('postLoginPath', path); } catch {}
+          try { localStorage.setItem('postLoginPath', path); } catch {}
+        }
+      } catch {}
     };
 
     if (forceRedirect || preferRedirect) {
