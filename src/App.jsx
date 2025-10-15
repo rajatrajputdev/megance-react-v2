@@ -26,6 +26,7 @@ import Analytics from "./components/general_components/Analytics.jsx";
 import ErrorBoundary from "./components/general_components/ErrorBoundary.jsx";
 import { ToastProvider } from "./components/general_components/ToastProvider.jsx";
 import RecaptchaHost from "./components/general_components/RecaptchaHost.jsx";
+import ScrollToTop from "./components/general_components/ScrollToTop.jsx";
 import { useEffect } from "react";
 import { loadRazorpay } from "./utils/razorpay";
 
@@ -37,15 +38,34 @@ export default function App() {
       if (shouldPreload) loadRazorpay().catch(() => {});
     } catch {}
   }, []);
+  const handleScrollTop = (e) => {
+    e?.preventDefault?.();
+    try {
+      if (typeof window !== 'undefined' && window.ScrollSmoother && window.ScrollSmoother.get) {
+        const smoother = window.ScrollSmoother.get();
+        if (smoother && typeof smoother.scrollTo === 'function') {
+          smoother.scrollTo(0, true);
+          return;
+        }
+      }
+    } catch {}
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    } catch {
+      try { window.scrollTo(0, 0); } catch {}
+    }
+  };
   return (
     <BrowserRouter>
       <AuthProvider>
         <CartProvider>
           <Loader />
           <Analytics />
+          {/* Ensure window scrolls to top on route change */}
+          <ScrollToTop />
           <div className="cursor"></div>
 
-          <div className="progress-wrap cursor-pointer">
+          <div className="progress-wrap cursor-pointer" onClick={handleScrollTop}>
             <svg className="progress-circle svg-content" width="100%" height="100%" viewBox="-1 -1 102 102">
               <path d="M50,1 a49,49 0 0,1 0,98 a49,49 0 0,1 0,-98" />
             </svg>
@@ -84,7 +104,7 @@ export default function App() {
                 <Route path="/order-success" element={<OrderSuccess />} />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
-                <Route path="/terms-of-use" element={<TermsPage />} />
+                <Route path="/terms-of-use" element={<TermsOfUsePage />} />
                 <Route path="/about-us" element={<About />} />
                 <Route
                   path="/returns"

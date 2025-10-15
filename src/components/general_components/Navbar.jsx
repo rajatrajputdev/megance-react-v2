@@ -151,7 +151,7 @@ export default function Navbar() {
                   </ul>
                 </div>
               </li>
-              <li>
+              {/* <li>
                 <div className="o-hidden">
                   <NavLink to="/" className="link" onClick={closeMenu}>
                     <span className="fill-text" data-text="Contact Us">
@@ -159,7 +159,7 @@ export default function Navbar() {
                     </span>
                   </NavLink>
                 </div>
-              </li>
+              </li> */}
               {user && (
                 <li>
                   <div className="o-hidden">
@@ -180,7 +180,7 @@ export default function Navbar() {
                   </div>
                 </li>
               )}
-              <li>
+              {/* <li>
                 <div className="o-hidden">
                   <NavLink to="/returns" className="link" onClick={closeMenu}>
                     <span className="fill-text" data-text="Returns">
@@ -188,7 +188,7 @@ export default function Navbar() {
                     </span>
                   </NavLink>
                 </div>
-              </li>
+              </li> */}
             </ul>
           </div>
           {/* <div className="cont-info valign">
