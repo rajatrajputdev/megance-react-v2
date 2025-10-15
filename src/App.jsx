@@ -26,7 +26,6 @@ import Analytics from "./components/general_components/Analytics.jsx";
 import ErrorBoundary from "./components/general_components/ErrorBoundary.jsx";
 import { ToastProvider } from "./components/general_components/ToastProvider.jsx";
 import RecaptchaHost from "./components/general_components/RecaptchaHost.jsx";
-import PostLoginNavigator from "./components/general_components/PostLoginNavigator.jsx";
 import ScrollToTop from "./components/general_components/ScrollToTop.jsx";
 import { useEffect } from "react";
 import { loadRazorpay } from "./utils/razorpay";
@@ -76,7 +75,6 @@ export default function App() {
           <ErrorBoundary>
           <ToastProvider>
           <RecaptchaHost />
-          <PostLoginNavigator />
           <div id="smooth-wrapper">
             <div id="smooth-content">
               <Routes>

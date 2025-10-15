@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState(null);
-  const [redirectError, setRedirectError] = useState(null);
   const [profile, setProfile] = useState(null); // Firestore user profile doc data
   const [profileLoading, setProfileLoading] = useState(false);
   const profileUnsubRef = React.useRef(null);
@@ -35,11 +34,7 @@ export function AuthProvider({ children }) {
     // Ensure session persistence across reloads (production behavior)
     try { setPersistence(auth, browserLocalPersistence).catch(() => {}); } catch {}
     // Proactively resolve any pending redirect result to surface errors early
-    try {
-      getRedirectResult(auth)
-        .then(() => { try { setRedirectError(null); } catch {} })
-        .catch((e) => { try { setError(e); setRedirectError(e); } catch {} });
-    } catch {}
+    try { getRedirectResult(auth).catch(() => {}); } catch {}
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setInitializing(false);
@@ -87,19 +82,11 @@ export function AuthProvider({ children }) {
       } catch { return false; }
     })();
 
-    const forceRedirect = opts?.forceRedirect === true;
-
     const maybeStorePostLogin = () => {
-      try {
-        if (opts?.postLoginPath) {
-          const path = String(opts.postLoginPath);
-          try { sessionStorage.setItem('postLoginPath', path); } catch {}
-          try { localStorage.setItem('postLoginPath', path); } catch {}
-        }
-      } catch {}
+      try { if (opts?.postLoginPath) sessionStorage.setItem('postLoginPath', String(opts.postLoginPath)); } catch {}
     };
 
-    if (forceRedirect || preferRedirect) {
+    if (preferRedirect) {
       maybeStorePostLogin();
       await signInWithRedirect(auth, provider);
       return null;
@@ -223,7 +210,6 @@ export function AuthProvider({ children }) {
       user,
       initializing,
       error,
-      redirectError,
       // profile
       profile,
       profileLoading,
@@ -237,7 +223,7 @@ export function AuthProvider({ children }) {
       // common
       logout,
     }),
-    [user, initializing, error, redirectError, profile, profileLoading]
+    [user, initializing, error, profile, profileLoading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
