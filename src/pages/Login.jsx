@@ -12,6 +12,7 @@ export default function LoginPage() {
     user,
     signInWithGoogle,
     logout,
+    redirectError,
   } = useAuth();
   const [err, setErr] = useState("");
   const { showToast } = useToast();
@@ -85,6 +86,19 @@ export default function LoginPage() {
       }
     } catch {}
   }, [user, navigate]);
+
+  // Surface redirect errors after returning from Google
+  useEffect(() => {
+    if (!redirectError) return;
+    const code = redirectError?.code || '';
+    let msg = '';
+    if (String(code).includes('unauthorized-domain')) msg = 'Sign-in is not available on this domain.';
+    else if (String(code).includes('operation-not-supported-in-this-environment')) msg = 'This browser blocks Google sign-in. Use the redirect option below or open in your default browser.';
+    else if (String(code).includes('popup-blocked')) msg = 'Popup blocked. Use the redirect option below.';
+    else msg = redirectError?.message || 'Could not complete Google sign-in.';
+    setErr(msg);
+    showToast('error', msg);
+  }, [redirectError]);
 
   if (user) {
     return (
