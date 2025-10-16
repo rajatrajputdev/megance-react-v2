@@ -25,7 +25,8 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     email: (profile?.email || user?.email) || "",
     name: (profile?.name || user?.displayName) || "",
-    phone: profile?.phone || "",
+    // Prefer profile phone; fallback to verified auth phone
+    phone: (profile?.phone || user?.phoneNumber) || "",
     address: profile?.address || "",
     city: profile?.city || "",
     state: profile?.state || "",
@@ -33,15 +34,17 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
+    // Prefill only empty fields from profile/auth without overriding user's typed input
     setForm((f) => ({
       ...f,
-      email: (profile?.email || user?.email) || f.email,
-      name: (profile?.name || user?.displayName) || f.name,
-      phone: profile?.phone || f.phone,
-      address: profile?.address || f.address,
-      city: profile?.city || f.city,
-      state: profile?.state || f.state,
-      zip: profile?.zip || f.zip,
+      email: f.email || (profile?.email || user?.email) || "",
+      name: f.name || (profile?.name || user?.displayName) || "",
+      // Use auth phone if profile missing it (RequireProfile ensures phone is linked)
+      phone: f.phone || profile?.phone || user?.phoneNumber || "",
+      address: f.address || profile?.address || "",
+      city: f.city || profile?.city || "",
+      state: f.state || profile?.state || "",
+      zip: f.zip || profile?.zip || "",
     }));
   }, [user, profile]);
 
@@ -52,18 +55,30 @@ export default function CheckoutPage() {
   const discount = useMemo(() => Number(appliedCoupon?.discount || 0), [amount, appliedCoupon]);
   const netAmount = useMemo(() => Math.max(0, amount - discount), [amount, discount]);
   const gst = useMemo(() => Math.round(netAmount * 0.18), [netAmount]);
-  // const payable = useMemo(() => netAmount + gst, [netAmount, gst]);
-  const payable =netAmount ;
+  // Payable should always include GST for accurate COD collection and display
+  const payable = useMemo(() => netAmount + gst, [netAmount, gst]);
 
   const [paying, setPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); // 'online' or 'cod'
   const [confettiKey, setConfettiKey] = useState(0);
   const [couponApplying, setCouponApplying] = useState(false);
+  // If profile has address, don’t force re-entry: show summary unless user opts to edit
+  const hasProfileAddress = useMemo(
+    () => Boolean((profile?.address || '').trim() && profile?.city && profile?.state && profile?.zip),
+    [profile]
+  );
+  const [showAddressEdit, setShowAddressEdit] = useState(false);
+  useEffect(() => {
+    // Default to summary view when profile already has an address
+    setShowAddressEdit(!hasProfileAddress);
+  }, [hasProfileAddress]);
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   const addressOk = (form.address || '').trim().length >= 10;
-  const canPay = items.length > 0 && form.email && form.name && form.phone && addressOk && form.city && form.state && form.zip;
+  // Allow proceeding if phone is present either in form or in auth
+  const phoneOk = Boolean((form.phone || '').trim() || (user?.phoneNumber || ''));
+  const canPay = items.length > 0 && form.email && form.name && phoneOk && addressOk && form.city && form.state && form.zip;
 
   const createOrderDocs = async (payload) => {
     const orderRef = await addDoc(collection(db, "orders"), payload);
@@ -96,7 +111,8 @@ export default function CheckoutPage() {
           billing: {
             name: form.name,
             email: form.email,
-            phone: form.phone,
+            // Persist a reliable phone even if user didn’t type it again
+            phone: form.phone || user?.phoneNumber || "",
             address: form.address,
             city: form.city,
             state: form.state,
@@ -145,7 +161,7 @@ export default function CheckoutPage() {
         amount: payable,
         name: "Megance",
         description: `Payment for ${items.length} item(s)`,
-        prefill: { name: form.name, email: form.email, contact: form.phone },
+        prefill: { name: form.name, email: form.email, contact: form.phone || user?.phoneNumber || "" },
         notes: { address: `${form.address}, ${form.city}, ${form.state} ${form.zip}` },
         onSuccess: async (resp) => {
           try {
@@ -164,7 +180,8 @@ export default function CheckoutPage() {
               billing: {
                 name: form.name,
                 email: form.email,
-                phone: form.phone,
+                // Persist a reliable phone even if user didn’t type it again
+                phone: form.phone || user?.phoneNumber || "",
                 address: form.address,
                 city: form.city,
                 state: form.state,
@@ -297,36 +314,55 @@ export default function CheckoutPage() {
                 </div>
                 <div className="col-md-6 mb-10">
                   <label>Phone</label>
-                  <input className="form-control" name="phone" value={form.phone} onChange={onChange} inputMode="tel" aria-invalid={!form.phone} />
-                  {!form.phone && !canPay && <div className="inline-error">Phone is required</div>}
+                  <input className="form-control" name="phone" value={form.phone} onChange={onChange} inputMode="tel" aria-invalid={!phoneOk} />
+                  {!phoneOk && !canPay && <div className="inline-error">Phone is required</div>}
                 </div>
-                <div className="col-12 mb-10">
-                  <label>Address</label>
-                  <input className="form-control" name="address" value={form.address} onChange={onChange} aria-invalid={!addressOk} minLength={10} />
-                  {!addressOk && (
-                    <div className="inline-error">Please enter at least 10 characters for the address</div>
-                  )}
-                </div>
-                <div className="col-md-4 mb-10">
-                  <label>City</label>
-                  <input className="form-control" name="city" value={form.city} onChange={onChange} aria-invalid={!form.city} />
-                  {!form.city && !canPay && <div className="inline-error">City is required</div>}
-                </div>
-                <div className="col-md-4 mb-10">
-                  <label>State</label>
-                  <select className="form-control" name="state" value={form.state} onChange={onChange} aria-invalid={!form.state}>
-                    <option value="">Select State/UT</option>
-                    {INDIAN_STATES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  {!form.state && !canPay && <div className="inline-error">State is required</div>}
-                </div>
-                <div className="col-md-4 mb-10">
-                  <label>PIN Code</label>
-                  <input className="form-control" name="zip" value={form.zip} onChange={onChange} aria-invalid={!form.zip} />
-                  {!form.zip && !canPay && <div className="inline-error">PIN code is required</div>}
-                </div>
+                {(!showAddressEdit && hasProfileAddress) ? (
+                  <div className="col-12 mb-10">
+                    <label>Delivery Address</label>
+                    <div className="glass-surface p-15" style={{borderRadius: 10, border: '1px solid rgba(0,0,0,0.08)'}}>
+                      <div className="fw-600">{form.name}</div>
+                      <div className="opacity-7" style={{marginTop: 2}}>{form.phone || user?.phoneNumber || ''}</div>
+                      <div style={{marginTop: 6}}>
+                        <div>{form.address}</div>
+                        <div>{[form.city, form.state, form.zip].filter(Boolean).join(', ')}</div>
+                      </div>
+                      <div className="mt-8 d-flex justify-content-end">
+                        <button type="button" className="underline" onClick={() => setShowAddressEdit(true)}>Edit address</button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="col-12 mb-10">
+                      <label>Address</label>
+                      <input className="form-control" name="address" value={form.address} onChange={onChange} aria-invalid={!addressOk} minLength={10} />
+                      {!addressOk && (
+                        <div className="inline-error">Please enter at least 10 characters for the address</div>
+                      )}
+                    </div>
+                    <div className="col-md-4 mb-10">
+                      <label>City</label>
+                      <input className="form-control" name="city" value={form.city} onChange={onChange} aria-invalid={!form.city} />
+                      {!form.city && !canPay && <div className="inline-error">City is required</div>}
+                    </div>
+                    <div className="col-md-4 mb-10">
+                      <label>State</label>
+                      <select className="form-control" name="state" value={form.state} onChange={onChange} aria-invalid={!form.state}>
+                        <option value="">Select State/UT</option>
+                        {INDIAN_STATES.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      {!form.state && !canPay && <div className="inline-error">State is required</div>}
+                    </div>
+                    <div className="col-md-4 mb-10">
+                      <label>PIN Code</label>
+                      <input className="form-control" name="zip" value={form.zip} onChange={onChange} aria-invalid={!form.zip} />
+                      {!form.zip && !canPay && <div className="inline-error">PIN code is required</div>}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

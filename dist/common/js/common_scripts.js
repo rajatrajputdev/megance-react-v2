@@ -314,7 +314,7 @@ $(function () {
 ============================================================================= */
 
 (function () {
-      if (window.innerWidth >= 768) {
+        if (window.innerWidth >= 568) {
    
     const link = document.querySelectorAll('.hover-this');
     const cursor = document.querySelector('.cursor');
@@ -344,7 +344,7 @@ $(function () {
             $(".cursor").removeClass("cursor-active");
         }
     );
-      }
+        }
 
     /* =============================================================================
     -----------------------------  Text Animation  -----------------------------
