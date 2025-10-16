@@ -56,7 +56,7 @@ export default function CheckoutPage() {
   const netAmount = useMemo(() => Math.max(0, amount - discount), [amount, discount]);
   const gst = useMemo(() => Math.round(netAmount * 0.18), [netAmount]);
   // Payable should always include GST for accurate COD collection and display
-  const payable = useMemo(() => netAmount + gst, [netAmount, gst]);
+  const payable = useMemo(() => netAmount, [netAmount]);
 
   const [paying, setPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("online"); // 'online' or 'cod'
