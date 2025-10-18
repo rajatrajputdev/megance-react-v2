@@ -18,15 +18,29 @@ export default function LoginPage() {
   const inApp = useMemo(() => isInAppBrowser(), []);
   const forceRedirect = useMemo(() => preferRedirectAuth(), []);
 
-  const onGoogle = async (mode) => {
+  const goRedirectHandler = () => {
+    const handlerPath = `/auth-redirect?start=google&from=${encodeURIComponent(target)}`;
+    navigate(handlerPath, { replace: true });
+  };
+
+  const onGoogle = async () => {
     setErr("");
+    // On iOS/in-app browsers, go straight to redirect handler page.
+    if (forceRedirect) return goRedirectHandler();
     try {
-      const resultUser = await signInWithGoogle({ postLoginPath: target, mode });
-      // If popup path succeeds we have a user now → navigate immediately.
-      if (resultUser) {
-        navigate(target, { replace: true });
-      }
+      const resultUser = await signInWithGoogle({ postLoginPath: target });
+      if (resultUser) navigate(target, { replace: true });
     } catch (e) {
+      const code = e?.code || "";
+      // If popup fails/blocked, fall back to redirect handler flow.
+      if (
+        code === "auth/popup-blocked" ||
+        code === "auth/popup-closed-by-user" ||
+        code === "auth/cancelled-popup-request" ||
+        code === "auth/operation-not-supported-in-this-environment"
+      ) {
+        return goRedirectHandler();
+      }
       const msg = e?.message || "Unable to sign in with Google";
       setErr(msg);
       showToast("error", msg);
@@ -64,7 +78,7 @@ export default function LoginPage() {
           <h2 className="auth-title">Sign in to Megance</h2>
           <p className="auth-subtext">Use your Google account to continue.</p>
 
-          <button className="google-btn" onClick={() => onGoogle(forceRedirect ? "redirect" : undefined)}>
+          <button className="google-btn" onClick={onGoogle}>
             <span className="google-icon">
               <svg width="18" height="18" viewBox="0 0 533.5 544.3" aria-hidden="true">
                 <path fill="#4285F4" d="M533.5,278.4c0-17.4-1.5-34.1-4.3-50.3H272v95.3h147c-6.3,33.7-25,62.1-53.5,81.2l86.4,67.1 c50.4-46.5,81.6-115,81.6-193.3z"/>
@@ -78,7 +92,7 @@ export default function LoginPage() {
 
           <div className="auth-subtext" style={{ marginTop: 12 }}>
             Trouble signing in?
-            <button className="underline ml-6" onClick={() => onGoogle("redirect")}>
+            <button className="underline ml-6" onClick={goRedirectHandler}>
               Use redirect login
             </button>
           </div>

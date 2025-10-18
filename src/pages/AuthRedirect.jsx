@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
-import { getRedirectResult } from "firebase/auth";
+import { getRedirectResult, GoogleAuthProvider, signInWithRedirect } from "firebase/auth";
 import "./auth-redirect.css"; // ✅ create this for styling
 
 export default function AuthRedirect() {
@@ -13,15 +13,34 @@ export default function AuthRedirect() {
 
     (async () => {
       try {
+        const params = new URLSearchParams(window.location.search);
+        const start = params.get("start");
+        const from = params.get("from") || "/";
+
+        // If explicitly asked to start a provider redirect, do it here.
+        if (start === "google") {
+          try { sessionStorage.setItem("postLoginPath", from); } catch {}
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("start");
+            url.searchParams.set("authReturn", "1");
+            url.searchParams.set("from", from);
+            window.history.replaceState({}, "", url);
+          } catch {}
+          setStatusText("Opening Google…");
+          const provider = new GoogleAuthProvider();
+          try { provider.setCustomParameters({ prompt: "select_account" }); } catch {}
+          await signInWithRedirect(auth, provider);
+          return; // navigation away
+        }
+
         setStatusText("Verifying authentication…");
         try {
           const res = await getRedirectResult(auth);
           if (res?.user) {
-            // Helpful debug for diagnosing issues if needed
             try { console.debug("[AuthRedirect] Signed in:", res.user.uid); } catch {}
           }
         } catch (e) {
-          // Log underlying Firebase error for troubleshooting, but continue
           try { console.error("[AuthRedirect] getRedirectResult error:", e); } catch {}
         }
 
