@@ -83,11 +83,12 @@ export function AuthProvider({ children }) {
       try {
         if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
         const ua = navigator.userAgent || '';
+        const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
         const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const isStandalonePWA = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (navigator && (navigator).standalone === true);
         const isInAppBrowser = /(FBAN|FBAV|Instagram|Line|Twitter|GSA|OkHttp)/i.test(ua);
         const isSmallViewport = (window.innerWidth || 0) <= 820; // treat small screens as mobile
-        return isIOS || isStandalonePWA || isInAppBrowser || isSmallViewport;
+        return isMobileUA || isIOS || isStandalonePWA || isInAppBrowser || isSmallViewport;
       } catch { return false; }
     })();
 

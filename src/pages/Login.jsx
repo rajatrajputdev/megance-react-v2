@@ -45,6 +45,8 @@ export default function LoginPage() {
   const onGoogle = async () => {
     setErr("");
     try {
+      const target = `/setup?from=${encodeURIComponent(from)}`;
+      try { sessionStorage.setItem('postLoginPath', target); } catch {}
       // On phones, explicitly ask users to allow pop-ups so Google can open
       if (isMobile) {
         const ok = window.confirm(
@@ -52,12 +54,10 @@ export default function LoginPage() {
         );
         if (!ok) return;
       }
-      await signInWithGoogle({ postLoginPath: `/setup?from=${encodeURIComponent(from)}` });
+      const resultUser = await signInWithGoogle({ postLoginPath: target });
       // Popup flow returns immediately with user; redirect flow leaves the page.
       // If popup succeeded, navigate now. If redirect chosen, the stored postLoginPath will handle it after return.
-      if (auth.currentUser) {
-        navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
-      }
+      if (resultUser) navigate(target, { replace: true });
     } catch (e) {
       const msg = e?.message || "Unable to sign in with Google";
       setErr(msg);
