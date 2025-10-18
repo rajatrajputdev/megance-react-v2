@@ -8,6 +8,7 @@ import {
   signInWithPopup,
   RecaptchaVerifier,
   linkWithPhoneNumber,
+  signInWithPhoneNumber,
   PhoneAuthProvider,
   updatePhoneNumber,
 } from "firebase/auth";
@@ -30,6 +31,7 @@ export function AuthProvider({ children }) {
   const recaptchaContainerRef = React.useRef(null);
   const recaptchaReadyRef = React.useRef(Promise.resolve());
   const phoneLinkConfirmRef = React.useRef(null);
+  const phoneSigninConfirmRef = React.useRef(null);
   const phoneChangeVerificationIdRef = React.useRef(null);
 
   function normalizePhone(raw) {
@@ -190,6 +192,36 @@ export function AuthProvider({ children }) {
     return res.user;
   };
 
+  // Unauthenticated phone sign-in (login/register with OTP)
+  const startPhoneSignIn = async (phoneNumber) => {
+    if (auth.currentUser) throw new Error("Already signed in");
+    setError(null);
+    try {
+      const e164 = normalizePhone(phoneNumber);
+      if (!e164) {
+        const err = new Error("Invalid phone number");
+        err.code = "auth/invalid-phone-number";
+        throw err;
+      }
+      const verifier = await ensureRecaptcha(true);
+      const confirmation = await signInWithPhoneNumber(auth, e164, verifier);
+      phoneSigninConfirmRef.current = confirmation;
+      await resetRecaptcha();
+      return true;
+    } catch (e) {
+      await resetRecaptcha();
+      throw e;
+    }
+  };
+
+  const confirmPhoneSignIn = async (code) => {
+    setError(null);
+    if (!phoneSigninConfirmRef.current) throw new Error("Start phone sign-in first");
+    const res = await phoneSigninConfirmRef.current.confirm(code);
+    setTimeout(() => { phoneSigninConfirmRef.current = null; }, 0);
+    return res.user;
+  };
+
   // Change existing phone number: verify, then updatePhoneNumber
   const startChangePhone = async (phoneNumber) => {
     if (!auth.currentUser) throw new Error("Sign in first");
@@ -239,6 +271,9 @@ export function AuthProvider({ children }) {
       // phone link/change
       startLinkPhone,
       confirmLinkPhone,
+      // phone sign-in for unauthenticated users
+      startPhoneSignIn,
+      confirmPhoneSignIn,
       startChangePhone,
       confirmChangePhone,
       // common
