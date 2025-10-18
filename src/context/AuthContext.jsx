@@ -69,6 +69,7 @@ export function AuthProvider({ children }) {
   const signInWithGoogle = async (opts = {}) => {
     setError(null);
     const provider = new GoogleAuthProvider();
+    try { provider.setCustomParameters({ prompt: 'select_account' }); } catch {}
     const markRedirectUrl = () => {
       try {
         if (typeof window === 'undefined') return;
@@ -85,7 +86,8 @@ export function AuthProvider({ children }) {
         const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const isStandalonePWA = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (navigator && (navigator).standalone === true);
         const isInAppBrowser = /(FBAN|FBAV|Instagram|Line|Twitter|GSA|OkHttp)/i.test(ua);
-        return isIOS || isStandalonePWA || isInAppBrowser;
+        const isSmallViewport = (window.innerWidth || 0) <= 820; // treat small screens as mobile
+        return isIOS || isStandalonePWA || isInAppBrowser || isSmallViewport;
       } catch { return false; }
     })();
 
@@ -104,8 +106,14 @@ export function AuthProvider({ children }) {
       const cred = await signInWithPopup(auth, provider);
       return cred.user;
     } catch (e) {
-      const code = e || '';
-      if (code === 'auth/operation-not-supported-in-this-environment' || code === 'auth/popup-blocked') {
+      const code = e?.code || '';
+      const shouldRedirect = (
+        code === 'auth/operation-not-supported-in-this-environment' ||
+        code === 'auth/popup-blocked' ||
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/popup-closed-by-user'
+      );
+      if (shouldRedirect) {
         maybeStorePostLogin();
         markRedirectUrl();
         await signInWithRedirect(auth, provider);
