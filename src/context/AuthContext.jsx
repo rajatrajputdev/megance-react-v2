@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { auth, db } from "../firebase.js";
-import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, linkWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber, setPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from "firebase/auth";
+import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, linkWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 
 const AuthContext = createContext(null);
@@ -31,17 +31,6 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    // Ensure session persistence across reloads (mobile-safe):
-    // Try local -> session -> in-memory (as last resort). Session helps on iOS private mode
-    try {
-      setPersistence(auth, browserLocalPersistence).catch(async () => {
-        try {
-          await setPersistence(auth, browserSessionPersistence);
-        } catch (_) {
-          try { await setPersistence(auth, inMemoryPersistence); } catch {}
-        }
-      });
-    } catch {}
     // Proactively resolve any pending redirect result to surface errors early
     try { getRedirectResult(auth).catch(() => {}); } catch {}
     const unsub = onAuthStateChanged(auth, async (u) => {

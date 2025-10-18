@@ -3,7 +3,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAuth } from "firebase/auth";
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,8 +16,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
-auth.useDeviceLanguage();
+const auth = initializeAuth(app, {
+  persistence: [
+    indexedDBLocalPersistence,
+    browserLocalPersistence,
+    browserSessionPersistence,
+    inMemoryPersistence,
+  ],
+});
+try { auth.useDeviceLanguage(); } catch {}
 
 // Derive a safe storage bucket. Some envs may provide
 // "<project>.firebasestorage.app" which is not a valid bucket ID.
