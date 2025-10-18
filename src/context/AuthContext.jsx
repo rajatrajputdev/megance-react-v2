@@ -4,13 +4,14 @@ import {
   onAuthStateChanged,
   signOut,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
+  signInWithPopup,
   RecaptchaVerifier,
   linkWithPhoneNumber,
   PhoneAuthProvider,
   updatePhoneNumber,
 } from "firebase/auth";
+import { preferRedirectAuth } from "../utils/env.js";
 import { doc, onSnapshot } from "firebase/firestore";
 
 const AuthContext = createContext(null);
@@ -80,74 +81,45 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // Google-only sign in
+  // Google sign-in: try popup; fallback to redirect. Force redirect in in-app/ios safari.
   const signInWithGoogle = async (opts = {}) => {
     setError(null);
     const provider = new GoogleAuthProvider();
     try { provider.setCustomParameters({ prompt: "select_account" }); } catch {}
 
-    const markRedirectUrl = () => {
-      try {
-        if (typeof window === "undefined") return;
-        const url = new URL(window.location.href);
-        url.searchParams.set("authReturn", "1");
-        window.history.replaceState({}, "", url);
-      } catch {}
-    };
+    const target = opts?.postLoginPath ? String(opts.postLoginPath) : "/";
+    try { sessionStorage.setItem("postLoginPath", target); } catch {}
 
-    const maybeStorePostLogin = () => {
+    const doRedirect = async () => {
       try {
-        if (opts?.postLoginPath) {
-          sessionStorage.setItem("postLoginPath", String(opts.postLoginPath));
+        if (typeof window !== "undefined") {
+          const url = new URL(window.location.href);
+          url.searchParams.set("authReturn", "1");
+          url.searchParams.set("from", target);
+          window.history.replaceState({}, "", url);
         }
       } catch {}
+      await signInWithRedirect(auth, provider);
+      return null; // control flows to /auth-redirect afterwards
     };
 
-    const preferRedirect = (() => {
-      try {
-        if (typeof window === "undefined" || typeof navigator === "undefined") return false;
-        const ua = navigator.userAgent || "";
-        const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
-        const isIOS =
-          /iPad|iPhone|iPod/.test(ua) ||
-          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-        const isStandalonePWA =
-          (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
-          (navigator && navigator.standalone === true);
-        const isInAppBrowser = /(FBAN|FBAV|Instagram|Line|Twitter|GSA|OkHttp)/i.test(ua);
-        const isSmallViewport = (window.innerWidth || 0) <= 820;
-        return isMobileUA || isIOS || isStandalonePWA || isInAppBrowser || isSmallViewport;
-      } catch {
-        return false;
-      }
-    })();
-
-    if (preferRedirect) {
-      maybeStorePostLogin();
-      markRedirectUrl();
-    // ✅ Force Firebase redirect to clean /auth-redirect route instead of /__/auth
-try { auth.redirectUri = `${window.location.origin}/auth-redirect`; } catch {}
-      await signInWithRedirect(auth, provider);
-      return null; // redirect flow continues in AuthRedirect
+    if (opts?.mode === "redirect" || preferRedirectAuth()) {
+      return doRedirect();
     }
-    
 
-    // Try popup first; if blocked, fallback to redirect
     try {
       const cred = await signInWithPopup(auth, provider);
-      return cred.user; // popup flow returns user immediately
+      return cred?.user || null;
     } catch (e) {
+      // Popup blocked or not allowed → fallback to redirect
       const code = e?.code || "";
-      const shouldRedirect =
-        code === "auth/operation-not-supported-in-this-environment" ||
+      if (
         code === "auth/popup-blocked" ||
+        code === "auth/popup-closed-by-user" ||
         code === "auth/cancelled-popup-request" ||
-        code === "auth/popup-closed-by-user";
-      if (shouldRedirect) {
-        maybeStorePostLogin();
-        markRedirectUrl();
-        await signInWithRedirect(auth, provider);
-        return null;
+        code === "auth/operation-not-supported-in-this-environment"
+      ) {
+        return doRedirect();
       }
       throw e;
     }

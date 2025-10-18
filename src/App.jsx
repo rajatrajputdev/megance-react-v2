@@ -28,6 +28,7 @@ import ErrorBoundary from "./components/general_components/ErrorBoundary.jsx";
 import { ToastProvider } from "./components/general_components/ToastProvider.jsx";
 import RecaptchaHost from "./components/general_components/RecaptchaHost.jsx";
 import ScrollToTop from "./components/general_components/ScrollToTop.jsx";
+import AuthReturnGate from "./components/general_components/AuthReturnGate.jsx";
 import { useEffect } from "react";
 import { loadRazorpay } from "./utils/razorpay";
 
@@ -76,6 +77,8 @@ export default function App() {
           <ErrorBoundary>
           <ToastProvider>
           <RecaptchaHost />
+          {/* Detect Firebase auth redirect completion */}
+          <AuthReturnGate />
           <div id="smooth-wrapper">
             <div id="smooth-content">
               <Routes>

@@ -14,7 +14,16 @@ export default function AuthRedirect() {
     (async () => {
       try {
         setStatusText("Verifying authentication…");
-        await getRedirectResult(auth).catch(() => {});
+        try {
+          const res = await getRedirectResult(auth);
+          if (res?.user) {
+            // Helpful debug for diagnosing issues if needed
+            try { console.debug("[AuthRedirect] Signed in:", res.user.uid); } catch {}
+          }
+        } catch (e) {
+          // Log underlying Firebase error for troubleshooting, but continue
+          try { console.error("[AuthRedirect] getRedirectResult error:", e); } catch {}
+        }
 
         let target = "/";
         try {
@@ -26,7 +35,8 @@ export default function AuthRedirect() {
         setStatusText("Redirecting…");
 
         if (!done) navigate(target, { replace: true });
-      } catch {
+      } catch (e) {
+        try { console.error("[AuthRedirect] unexpected error:", e); } catch {}
         if (!done) navigate("/", { replace: true });
       }
     })();
