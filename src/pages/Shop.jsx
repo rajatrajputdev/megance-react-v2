@@ -9,7 +9,7 @@ import { useToast } from "../components/general_components/ToastProvider.jsx";
 import Intro from "../components/homepage_components/Intro.jsx";
 
 export default function Shop() {
-  
+
   const { addItem } = useCart();
   const location = useLocation();
   const { showToast } = useToast();
@@ -17,14 +17,14 @@ export default function Shop() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-    const [bannerImage, setBannerImage] = useState("/assets/imgs/works/banner-desktop.png");
+  const [bannerImage, setBannerImage] = useState("/assets/imgs/works/3.webp");
 
   useEffect(() => {
     const updateBanner = () => {
       if (window.innerWidth <= 768) {
-        setBannerImage("/assets/imgs/works/3mob.png");
+        setBannerImage("/assets/imgs/works/3mob.webp");
       } else {
-        setBannerImage("/assets/imgs/works/3.png");
+        setBannerImage("/assets/imgs/works/3.webp");
       }
     };
 
@@ -62,12 +62,11 @@ export default function Shop() {
   return (
     <>
       <SEO title="Shop" description="Explore featured Megance products and find your perfect pair." image="/assets/logo.svg" type="website" twitterCard="summary" />
-       {/* <section className="shop-top-banner mt-10" style={{ backgroundImage: "url('/assets/imgs/works/topbanner.png')" }} aria-label="Megance full screen visual" /> */}
-<section
-      className="shop-top-banner mt-50"
-      aria-label="Megance full screen visual"
-      role="img"
-    />
+      <section
+        className="shop-top-banner mt-50"
+        aria-label="Megance full screen visual"
+        role="img"
+      />
       <section className="container page-section shop-page mt-30">
         <div className="row align-items-end">
           <div className="col-lg-8">
@@ -84,64 +83,7 @@ export default function Shop() {
         </div>
       </section>
 
-      {/* (Removed) Shop by Gender cards moved to navbar */}
-
-      {/* Product list first */}
-
-      {/* <section className="container page-section shop-wrap">
-        {error && (
-          <div className="row"><div className="col-12">
-            <div className="inline-hint" role="alert" aria-live="assertive">{error}</div>
-            <button className="butn mt-10" onClick={load}>Retry</button>
-          </div></div>
-        )}
-        <div className="row">
-          {loading && Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="col-sm-6 col-md-4 col-lg-3 mb-30">
-              <div className="shop-card skeleton-card">
-                <div className="skeleton skeleton-image" />
-                <div className="shop-meta">
-                  <div className="skeleton skeleton-line" style={{ width: '60%' }} />
-                  <div className="skeleton skeleton-line" style={{ width: '30%' }} />
-                </div>
-                <div className="shop-actions">
-                  <div className="skeleton skeleton-line" />
-                </div>
-              </div>
-            </div>
-          ))}
-          {!loading && filtered.map((p) => (
-            <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
-              <div className="shop-card">
-                <img
-                  className="shop-card-cover"
-                  src={p.hover || p.image}
-                  alt=""
-                  aria-hidden="true"
-                />
-                <Link to={`/product/${p.id}`} className="shop-image" aria-label={p.name}>
-                  <img className="shop-img shop-img--front" src={p.image} alt="" />
-                  <img className="shop-img shop-img--hover" src={p.hover || p.image} alt="" />
-                </Link>
-                <div className="shop-meta">
-                  <div className="shop-name">{p.name}</div>
-                  <div className="shop-price">
-                    ₹ {p.price}
-                    {Number(p.quantity) === 0 && (
-                      <span className="stock-badge oos" title="Out of stock">Out of stock</span>
-                    )}
-                  </div>
-                </div>
-                <div className="shop-actions">
-                  <Link to={`/product/${p.id}`} className="shop-btn shop-btn--primary">View</Link>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section> */}
-<Intro/>
-      {/* Duo section: text left, image right */}
+      <Intro />
       <section className="shop-duo">
         <div className="container">
           <div className="row align-items-center">
@@ -155,10 +97,10 @@ export default function Shop() {
                 className="duo-img"
                 src={
                   gender === 'men'
-                    ? "/assets/imgs/works/mard1.png"
+                    ? "/assets/imgs/works/mard1.webp"
                     : gender === 'women'
-                      ? "/assets/imgs/works/1.JPG"
-                      : "/assets/imgs/works/default.jpg"
+                      ? "/assets/imgs/works/1.webp"
+                      : "/assets/imgs/works/mard1.webp"
                 }
                 alt="Product lifestyle"
               />
@@ -176,9 +118,9 @@ export default function Shop() {
                 className="duo-img"
                 src={
                   gender === 'men'
-                    ? "/assets/imgs/works/mard2.png"
+                    ? "/assets/imgs/works/mard2.webp"
                     : gender === 'women'
-                      ? "/assets/imgs/works/2.JPG"
+                      ? "/assets/imgs/works/2.webp"
                       : "/assets/imgs/works/default.jpg"
                 }
                 alt="Product lifestyle"
@@ -194,12 +136,12 @@ export default function Shop() {
       </section>
 
       {/* Fullscreen edge-to-edge image */}
-      
-    <section
-      className="shop-hero-full mt-10"
-      style={{ backgroundImage: `url(${bannerImage})` }}
-      aria-label="Megance full screen visual"
-    />
+
+      <section
+        className="shop-hero-full mt-10"
+        style={{ backgroundImage: `url(${bannerImage})` }}
+        aria-label="Megance full screen visual"
+      />
 
       {/* Copy block with padding */}
       <section className="container page-section shop-copy">

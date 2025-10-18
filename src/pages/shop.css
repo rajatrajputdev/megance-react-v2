@@ -118,7 +118,7 @@ efault) */
 padding-top: 40px;
   width: 100%;
   min-height: 35vh;       /* adjust if you want a fixed height (e.g., 520px) */
-  background-image: url('/assets/imgs/works/topbanner.png');
+  background-image: url('/assets/imgs/works/topbanner.webp');
   /* background-size: cover; */
   /* background-position: center center; */
   background-repeat: no-repeat;
@@ -129,6 +129,6 @@ padding-top: 40px;
 @media (max-width: 768px) {
   .shop-top-banner {
     min-height: 150px;     /* tweak for mobile aspect */
-    background-image: url('/assets/imgs/works/shopmob.png');
+    background-image: url('/assets/imgs/works/shopmob.webp');
   }
 }

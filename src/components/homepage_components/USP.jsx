@@ -1,8 +1,8 @@
 export default function USP() {
   const items = [
-    { img: "/assets/imgs/usp/left.png", text: "Premium Craftsmanship" },
-    { img: "/assets/imgs/usp/middle.png", text: "Engineered Comfort" },
-    { img: "/assets/imgs/usp/right.png", text: "Luxury Sneaker Aesthetics" },
+    { img: "/assets/imgs/usp/left.webp", text: "Premium Craftsmanship" },
+    { img: "/assets/imgs/usp/middle.webp", text: "Engineered Comfort" },
+    { img: "/assets/imgs/usp/right.webp", text: "Luxury Sneaker Aesthetics" },
   ];
 
   return (

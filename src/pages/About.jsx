@@ -11,7 +11,7 @@ const About = () => {
         {/* Hero Image Section */}
         <div className="about-hero-image">
           <img
-            src="/assets/imgs/works/aboutusbanner.png"
+            src="/assets/imgs/works/aboutusbanner.webp"
             alt="About Us Hero"
             
           />

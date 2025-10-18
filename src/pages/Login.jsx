@@ -26,6 +26,7 @@ export default function LoginPage() {
   const [otpCode, setOtpCode] = useState("");
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  
 
   const goRedirectHandler = () => {
     const handlerPath = `/auth-redirect?start=google&from=${encodeURIComponent(target)}`;
@@ -108,7 +109,7 @@ export default function LoginPage() {
     <>
       <SEO title="Login" />
       <div className="auth-wrapper">
-        <div className="auth-image" style={{ backgroundImage: `url(/assets/imgs/login/l1.png)` }} />
+        <div className="auth-image"  />
         <div className="auth-card">
           {inApp && (
             <div className="auth-error" style={{ marginBottom: 12 }}>
