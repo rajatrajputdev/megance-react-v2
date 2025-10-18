@@ -1,37 +1,29 @@
-import { useState, useEffect } from "react"; 
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation } from "react-router-dom";
 import SEO from "../components/general_components/SEO.jsx";
-import { fetchSignInMethodsForEmail } from "firebase/auth";
-import { auth } from "../firebase";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
 import "./login-page.css";
 
 export default function LoginPage() {
-  const {
-    user,
-    signInWithGoogle,
-    logout,
-  } = useAuth();
+  const { user, signInWithGoogle, logout } = useAuth();
   const [err, setErr] = useState("");
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
   const from = new URLSearchParams(location.search).get("from") || "/";
   const [isMobile, setIsMobile] = useState(false);
 
   // ✅ Desktop & Mobile image logic
-  const desktopImage = "/assets/imgs/login/l1.png"; // 🔁 Replace later
-  const mobileImage = "/assets/imgs/login/l1mob.png"; // 🔁 Replace later
+  const desktopImage = "/assets/imgs/login/l1.png";
+  const mobileImage = "/assets/imgs/login/l1mob.png";
   const [bgImage, setBgImage] = useState(desktopImage);
 
   useEffect(() => {
     const updateImage = () => {
-      if (window.innerWidth <= 768) {
-        setBgImage(mobileImage);
-      } else {
-        setBgImage(desktopImage);
-      }
+      if (window.innerWidth <= 768) setBgImage(mobileImage);
+      else setBgImage(desktopImage);
     };
     try {
       const ua = navigator.userAgent || "";
@@ -46,18 +38,22 @@ export default function LoginPage() {
     setErr("");
     try {
       const target = `/setup?from=${encodeURIComponent(from)}`;
-      try { sessionStorage.setItem('postLoginPath', target); } catch {}
-      // On phones, explicitly ask users to allow pop-ups so Google can open
+      try { sessionStorage.setItem("postLoginPath", target); } catch {}
+
       if (isMobile) {
         const ok = window.confirm(
           "To continue, allow pop-ups so Google Sign-In can open. Continue?"
         );
         if (!ok) return;
       }
+
       const resultUser = await signInWithGoogle({ postLoginPath: target });
-      // Popup flow returns immediately with user; redirect flow leaves the page.
-      // If popup succeeded, navigate now. If redirect chosen, the stored postLoginPath will handle it after return.
-      if (resultUser) navigate(target, { replace: true });
+
+      // ✅ If popup flow succeeds, we have a user now → navigate immediately.
+      // If redirect flow was chosen, this returns null and /auth-redirect will finish the job.
+      if (resultUser) {
+        navigate(target, { replace: true });
+      }
     } catch (e) {
       const msg = e?.message || "Unable to sign in with Google";
       setErr(msg);
@@ -65,36 +61,15 @@ export default function LoginPage() {
     }
   };
 
-  // After redirect sign-in completes, navigate using stored target if available
-  useEffect(() => {
-    if (!user) return;
-    try {
-      const url = new URL(window.location.href);
-      const authReturn = url.searchParams.get('authReturn');
-      const target = sessionStorage.getItem('postLoginPath');
-      if (target) {
-        sessionStorage.removeItem('postLoginPath');
-        // clean marker param if present
-        if (authReturn) { url.searchParams.delete('authReturn'); window.history.replaceState({}, '', url); }
-        navigate(target, { replace: true });
-        return;
-      }
-      // Fallback: if we detect we returned from auth but no stored target, go to Setup
-      if (authReturn) {
-        url.searchParams.delete('authReturn');
-        window.history.replaceState({}, '', url);
-        navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
-      }
-    } catch {}
-  }, [user, navigate]);
-
   if (user) {
     return (
       <>
         <SEO title="Account" />
         <section className="container page-section text-center">
           <h3>You are logged in as {user.displayName || user.email}</h3>
-          <button className="butn butn-md butn-rounded mt-20" onClick={logout}>Logout</button>
+          <button className="butn butn-md butn-rounded mt-20" onClick={logout}>
+            Logout
+          </button>
         </section>
       </>
     );
@@ -106,8 +81,8 @@ export default function LoginPage() {
       <div className="auth-wrapper">
         <div
           className="auth-image"
-          style={{ backgroundImage: `url(${bgImage})` }} // ✅ Dynamic Image Here
-        ></div>
+          style={{ backgroundImage: `url(${bgImage})` }}
+        />
         <div className="auth-card">
           <h2 className="auth-title">Welcome Back</h2>
           <p className="auth-subtext">Sign in to continue your journey.</p>
@@ -126,7 +101,7 @@ export default function LoginPage() {
 
           {isMobile && (
             <div className="auth-subtext" style={{ marginTop: 10 }}>
-              Tip- On phones, allow pop-ups so Google can open. If blocked, we’ll redirect automatically.
+              Tip — On phones, allow pop-ups so Google can open. If blocked, we’ll redirect automatically.
             </div>
           )}
 

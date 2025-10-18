@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { auth, db } from "../firebase.js";
-import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, linkWithPhoneNumber, PhoneAuthProvider, updatePhoneNumber } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  RecaptchaVerifier,
+  linkWithPhoneNumber,
+  PhoneAuthProvider,
+  updatePhoneNumber,
+} from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 
 const AuthContext = createContext(null);
@@ -9,9 +19,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState(null);
-  const [profile, setProfile] = useState(null); // Firestore user profile doc data
+
+  const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+
   const profileUnsubRef = React.useRef(null);
+
   const recaptchaRef = React.useRef(null);
   const recaptchaContainerRef = React.useRef(null);
   const recaptchaReadyRef = React.useRef(Promise.resolve());
@@ -24,25 +37,26 @@ export function AuthProvider({ children }) {
       if (!s) return "";
       if (s.startsWith("+")) return s;
       const digits = s.replace(/[^\d]/g, "");
-      if (digits.length === 10) return `+91${digits}`; // assume India when 10 digits
+      if (digits.length === 10) return `+91${digits}`;
       if (digits.length >= 11 && digits.length <= 15) return `+${digits}`;
       return "";
-    } catch (_) { return ""; }
+    } catch {
+      return "";
+    }
   }
 
   useEffect(() => {
-    // Proactively resolve any pending redirect result to surface errors early
-    try { getRedirectResult(auth).catch(() => {}); } catch {}
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setInitializing(false);
+
       if (!u) {
         try { if (profileUnsubRef.current) profileUnsubRef.current(); } catch {}
         setProfile(null);
         setProfileLoading(false);
         return;
       }
-      // Fetch profile doc from Firestore
+
       setProfileLoading(true);
       const profRef = doc(db, "users", u.uid);
       try { if (profileUnsubRef.current) profileUnsubRef.current(); } catch {}
@@ -59,6 +73,7 @@ export function AuthProvider({ children }) {
         }
       );
     });
+
     return () => {
       try { if (profileUnsubRef.current) profileUnsubRef.current(); } catch {}
       unsub();
@@ -69,51 +84,65 @@ export function AuthProvider({ children }) {
   const signInWithGoogle = async (opts = {}) => {
     setError(null);
     const provider = new GoogleAuthProvider();
-    try { provider.setCustomParameters({ prompt: 'select_account' }); } catch {}
+    try { provider.setCustomParameters({ prompt: "select_account" }); } catch {}
+
     const markRedirectUrl = () => {
       try {
-        if (typeof window === 'undefined') return;
+        if (typeof window === "undefined") return;
         const url = new URL(window.location.href);
-        url.searchParams.set('authReturn', '1');
-        if (opts?.postLoginPath) url.searchParams.set('from', String(opts.postLoginPath));
-        window.history.replaceState({}, '', url);
+        url.searchParams.set("authReturn", "1");
+        window.history.replaceState({}, "", url);
       } catch {}
     };
-    const preferRedirect = (() => {
-      try {
-        if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-        const ua = navigator.userAgent || '';
-        const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
-        const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const isStandalonePWA = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (navigator && (navigator).standalone === true);
-        const isInAppBrowser = /(FBAN|FBAV|Instagram|Line|Twitter|GSA|OkHttp)/i.test(ua);
-        const isSmallViewport = (window.innerWidth || 0) <= 820; // treat small screens as mobile
-        return isMobileUA || isIOS || isStandalonePWA || isInAppBrowser || isSmallViewport;
-      } catch { return false; }
-    })();
 
     const maybeStorePostLogin = () => {
-      try { if (opts?.postLoginPath) sessionStorage.setItem('postLoginPath', String(opts.postLoginPath)); } catch {}
+      try {
+        if (opts?.postLoginPath) {
+          sessionStorage.setItem("postLoginPath", String(opts.postLoginPath));
+        }
+      } catch {}
     };
+
+    const preferRedirect = (() => {
+      try {
+        if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+        const ua = navigator.userAgent || "";
+        const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+        const isIOS =
+          /iPad|iPhone|iPod/.test(ua) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        const isStandalonePWA =
+          (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+          (navigator && navigator.standalone === true);
+        const isInAppBrowser = /(FBAN|FBAV|Instagram|Line|Twitter|GSA|OkHttp)/i.test(ua);
+        const isSmallViewport = (window.innerWidth || 0) <= 820;
+        return isMobileUA || isIOS || isStandalonePWA || isInAppBrowser || isSmallViewport;
+      } catch {
+        return false;
+      }
+    })();
 
     if (preferRedirect) {
       maybeStorePostLogin();
       markRedirectUrl();
+    // ✅ Force Firebase redirect to clean /auth-redirect route instead of /__/auth
+try { auth.redirectUri = `${window.location.origin}/auth-redirect`; } catch {}
       await signInWithRedirect(auth, provider);
-      return null;
+      return null; // redirect flow continues in AuthRedirect
     }
+    
 
+    // Try popup first; if blocked, fallback to redirect
     try {
       const cred = await signInWithPopup(auth, provider);
-      return cred.user;
+      return cred.user; // popup flow returns user immediately
     } catch (e) {
-      const code = e?.code || '';
-      const shouldRedirect = (
-        code === 'auth/operation-not-supported-in-this-environment' ||
-        code === 'auth/popup-blocked' ||
-        code === 'auth/cancelled-popup-request' ||
-        code === 'auth/popup-closed-by-user'
-      );
+      const code = e?.code || "";
+      const shouldRedirect =
+        code === "auth/operation-not-supported-in-this-environment" ||
+        code === "auth/popup-blocked" ||
+        code === "auth/cancelled-popup-request" ||
+        code === "auth/popup-closed-by-user";
       if (shouldRedirect) {
         maybeStorePostLogin();
         markRedirectUrl();
@@ -124,33 +153,37 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Fully clear any existing reCAPTCHA instance and its DOM container
+  // --- reCAPTCHA helpers (for phone link/change) ---
   const resetRecaptcha = async () => {
-    try { if (recaptchaRef.current?.clear) { await recaptchaRef.current.clear(); } } catch {}
-    // Keep DOM nodes intact to avoid third-party script referencing removed elements
+    try { if (recaptchaRef.current?.clear) await recaptchaRef.current.clear(); } catch {}
     recaptchaRef.current = null;
     recaptchaContainerRef.current = null;
   };
 
-  // Create (or return) an invisible reCAPTCHA. If fresh=true, force a new one.
   const ensureRecaptcha = async (fresh = false) => {
     if (fresh) await resetRecaptcha();
     if (recaptchaRef.current) return recaptchaRef.current;
-    // Wait for any prior init
     await recaptchaReadyRef.current;
     if (recaptchaRef.current) return recaptchaRef.current;
+
     const p = (async () => {
-      const host = typeof document !== 'undefined' ? document.getElementById('global-recaptcha-container') : null;
-      if (!host) throw new Error('reCAPTCHA container missing');
-      const holder = document.createElement('div');
-      holder.setAttribute('data-recaptcha-instance', String(Date.now()));
+      const host =
+        typeof document !== "undefined"
+          ? document.getElementById("global-recaptcha-container")
+          : null;
+      if (!host) throw new Error("reCAPTCHA container missing");
+
+      const holder = document.createElement("div");
+      holder.setAttribute("data-recaptcha-instance", String(Date.now()));
       host.appendChild(holder);
       recaptchaContainerRef.current = holder;
-      const verifier = new RecaptchaVerifier(auth, holder, { size: 'invisible' });
+
+      const verifier = new RecaptchaVerifier(auth, holder, { size: "invisible" });
       await verifier.render();
       recaptchaRef.current = verifier;
       return verifier;
     })();
+
     recaptchaReadyRef.current = p.catch(() => {});
     return p;
   };
@@ -166,7 +199,7 @@ export function AuthProvider({ children }) {
         err.code = "auth/invalid-phone-number";
         throw err;
       }
-      const verifier = await ensureRecaptcha(true); // always use a fresh instance
+      const verifier = await ensureRecaptcha(true);
       const confirmation = await linkWithPhoneNumber(auth.currentUser, e164, verifier);
       phoneLinkConfirmRef.current = confirmation;
       await resetRecaptcha();
@@ -181,8 +214,6 @@ export function AuthProvider({ children }) {
     setError(null);
     if (!phoneLinkConfirmRef.current) throw new Error("Start phone link first");
     const res = await phoneLinkConfirmRef.current.confirm(code);
-    // Leave confirmation around for a moment, then clear.
-    // This allows quick retries if UI re-triggers confirm without resend.
     setTimeout(() => { phoneLinkConfirmRef.current = null; }, 0);
     return res.user;
   };
@@ -198,7 +229,7 @@ export function AuthProvider({ children }) {
         err.code = "auth/invalid-phone-number";
         throw err;
       }
-      const verifier = await ensureRecaptcha(true); // always use a fresh instance
+      const verifier = await ensureRecaptcha(true);
       const provider = new PhoneAuthProvider(auth);
       const verificationId = await provider.verifyPhoneNumber(e164, verifier);
       phoneChangeVerificationIdRef.current = verificationId;
@@ -233,7 +264,7 @@ export function AuthProvider({ children }) {
       profileLoading,
       // google sign-in
       signInWithGoogle,
-      // phone link
+      // phone link/change
       startLinkPhone,
       confirmLinkPhone,
       startChangePhone,

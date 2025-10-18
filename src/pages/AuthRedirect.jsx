@@ -1,41 +1,47 @@
-import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
 import { getRedirectResult } from "firebase/auth";
+import "./auth-redirect.css"; // ✅ create this for styling
 
 export default function AuthRedirect() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [statusText, setStatusText] = useState("Signing you in…");
 
   useEffect(() => {
     let done = false;
+
     (async () => {
       try {
+        setStatusText("Verifying authentication…");
         await getRedirectResult(auth).catch(() => {});
-        // Prefer stored post-login target set before starting redirect
+
         let target = "/";
-        try { target = sessionStorage.getItem('postLoginPath') || "/"; } catch {}
-        try { sessionStorage.removeItem('postLoginPath'); } catch {}
-        // Strip any stub auth params
         try {
-          const url = new URL(window.location.href);
-          if (url.searchParams.has('authReturn')) {
-            url.searchParams.delete('authReturn');
-            window.history.replaceState({}, '', url);
-          }
+          const stored = sessionStorage.getItem("postLoginPath");
+          if (stored) target = stored;
+          sessionStorage.removeItem("postLoginPath");
         } catch {}
+
+        setStatusText("Redirecting…");
+
         if (!done) navigate(target, { replace: true });
       } catch {
         if (!done) navigate("/", { replace: true });
       }
     })();
-    return () => { done = true; };
+
+    return () => {
+      done = true;
+    };
   }, [navigate]);
 
   return (
-    <section className="container page-section text-center" aria-busy="true" aria-live="polite">
-      <p className="opacity-7">Signing you in…</p>
-    </section>
+    <div className="auth-redirect-wrapper">
+      <div className="auth-redirect-content">
+        <img src="/assets/imgs/logo.svg" alt="Megance" className="auth-redirect-logo" />
+        <p className="auth-redirect-status">{statusText}</p>
+      </div>
+    </div>
   );
 }
-

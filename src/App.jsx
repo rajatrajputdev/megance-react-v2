@@ -79,8 +79,7 @@ export default function App() {
           <div id="smooth-wrapper">
             <div id="smooth-content">
               <Routes>
-                <Route path="/__/auth/*" element={<AuthRedirect />} />
-                <Route path="/" element={<Home />} />
+<Route path="/auth-redirect" element={<AuthRedirect />} />                <Route path="/" element={<Home />} />
                 <Route path="/shop" element={<Shop />} />
                 <Route path="/product/:id" element={<ProductPage />} />
                 <Route path="/cart" element={<CartPage />} />

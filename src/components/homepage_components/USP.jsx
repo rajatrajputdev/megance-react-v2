@@ -24,7 +24,7 @@ export default function USP() {
         </div>
       </section>
 
-      <style jsx>{`
+      <style>{`
         .usp-item {
           position: relative;
           overflow: hidden;

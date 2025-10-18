@@ -14,27 +14,37 @@ export default function Intro() {
     let canceled = false;
 
     const fetchOne = async (label) => {
-      let list = await fetchProductsByCategoryName(label, { visibleOnly: true, limit: 1 });
-      if (!Array.isArray(list) || list.length === 0) {
-        list = await fetchProductsByTag(label, { visibleOnly: true, limit: 1 });
+      try {
+        let list = await fetchProductsByCategoryName(label, { visibleOnly: true, limit: 1 });
+        if (!Array.isArray(list) || list.length === 0) {
+          list = await fetchProductsByTag(label, { visibleOnly: true, limit: 1 });
+        }
+        return Array.isArray(list) && list[0] ? list[0] : null;
+      } catch (e) {
+        console.warn('Intro: failed to fetch', label, e?.code || e?.message || e);
+        return null;
       }
-      return Array.isArray(list) && list[0] ? list[0] : null;
     };
 
     (async () => {
-      const labels = [
-        { badge: "TRENDING", key: "trending" },
-        { badge: "NEW ARRIVAL", key: "new-arrival" },
-        { badge: "BESTSELLER", key: "bestseller" },
-        { badge: "FEATURED", key: "featured" },
-      ];
-      const res = [];
-      for (const l of labels) {
-        const p = await fetchOne(l.key);
-        if (canceled) return;
-        if (p) res.push({ badge: l.badge, product: p });
+      try {
+        const labels = [
+          { badge: "TRENDING", key: "trending" },
+          { badge: "NEW ARRIVAL", key: "new-arrival" },
+          { badge: "BESTSELLER", key: "bestseller" },
+          { badge: "FEATURED", key: "featured" },
+        ];
+        const res = [];
+        for (const l of labels) {
+          const p = await fetchOne(l.key);
+          if (canceled) return;
+          if (p) res.push({ badge: l.badge, product: p });
+        }
+        if (!canceled) setSlides(res);
+      } catch (e) {
+        console.warn('Intro: fetch sequence failed', e?.code || e?.message || e);
+        if (!canceled) setSlides([]);
       }
-      if (!canceled) setSlides(res);
     })();
 
     return () => { canceled = true; };
