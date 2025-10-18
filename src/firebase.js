@@ -3,7 +3,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from "firebase/auth";
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence, browserPopupRedirectResolver } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -23,6 +23,7 @@ const auth = initializeAuth(app, {
     browserSessionPersistence,
     inMemoryPersistence,
   ],
+  popupRedirectResolver: browserPopupRedirectResolver,
 });
 try { auth.useDeviceLanguage(); } catch {}
 
