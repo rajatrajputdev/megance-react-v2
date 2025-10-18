@@ -18,6 +18,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = new URLSearchParams(location.search).get("from") || "/";
+  const [isMobile, setIsMobile] = useState(false);
 
   // ✅ Desktop & Mobile image logic
   const desktopImage = "/assets/imgs/login/l1.png"; // 🔁 Replace later
@@ -32,6 +33,10 @@ export default function LoginPage() {
         setBgImage(desktopImage);
       }
     };
+    try {
+      const ua = navigator.userAgent || "";
+      setIsMobile(/Mobi|Android|iPhone|iPad|iPod/i.test(ua));
+    } catch {}
     updateImage();
     window.addEventListener("resize", updateImage);
     return () => window.removeEventListener("resize", updateImage);
@@ -40,6 +45,13 @@ export default function LoginPage() {
   const onGoogle = async () => {
     setErr("");
     try {
+      // On phones, explicitly ask users to allow pop-ups so Google can open
+      if (isMobile) {
+        const ok = window.confirm(
+          "To continue, allow pop-ups so Google Sign-In can open. Continue?"
+        );
+        if (!ok) return;
+      }
       await signInWithGoogle({ postLoginPath: `/setup?from=${encodeURIComponent(from)}` });
       // Popup flow returns immediately with user; redirect flow leaves the page.
       // If popup succeeded, navigate now. If redirect chosen, the stored postLoginPath will handle it after return.
@@ -57,10 +69,21 @@ export default function LoginPage() {
   useEffect(() => {
     if (!user) return;
     try {
+      const url = new URL(window.location.href);
+      const authReturn = url.searchParams.get('authReturn');
       const target = sessionStorage.getItem('postLoginPath');
       if (target) {
         sessionStorage.removeItem('postLoginPath');
+        // clean marker param if present
+        if (authReturn) { url.searchParams.delete('authReturn'); window.history.replaceState({}, '', url); }
         navigate(target, { replace: true });
+        return;
+      }
+      // Fallback: if we detect we returned from auth but no stored target, go to Setup
+      if (authReturn) {
+        url.searchParams.delete('authReturn');
+        window.history.replaceState({}, '', url);
+        navigate(`/setup?from=${encodeURIComponent(from)}`, { replace: true });
       }
     } catch {}
   }, [user, navigate]);
@@ -100,6 +123,12 @@ export default function LoginPage() {
             </span>
             Continue with Google
           </button>
+
+          {isMobile && (
+            <div className="auth-subtext" style={{ marginTop: 10 }}>
+              Tip: On phones, allow pop-ups so Google can open. If blocked, we’ll redirect automatically.
+            </div>
+          )}
 
           {err && <div className="auth-error">{err}</div>}
         </div>

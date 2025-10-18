@@ -71,6 +71,15 @@ export function AuthProvider({ children }) {
   const signInWithGoogle = async (opts = {}) => {
     setError(null);
     const provider = new GoogleAuthProvider();
+    const markRedirectUrl = () => {
+      try {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        url.searchParams.set('authReturn', '1');
+        if (opts?.postLoginPath) url.searchParams.set('from', String(opts.postLoginPath));
+        window.history.replaceState({}, '', url);
+      } catch {}
+    };
     const preferRedirect = (() => {
       try {
         if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
@@ -88,6 +97,7 @@ export function AuthProvider({ children }) {
 
     if (preferRedirect) {
       maybeStorePostLogin();
+      markRedirectUrl();
       await signInWithRedirect(auth, provider);
       return null;
     }
@@ -99,6 +109,7 @@ export function AuthProvider({ children }) {
       const code = e || '';
       if (code === 'auth/operation-not-supported-in-this-environment' || code === 'auth/popup-blocked') {
         maybeStorePostLogin();
+        markRedirectUrl();
         await signInWithRedirect(auth, provider);
         return null;
       }
