@@ -45,6 +45,20 @@ export default function ProductPage() {
   const [qty, setQty] = useState(1);
   const [gender, setGender] = useState("men");
   const [size, setSize] = useState("");
+  const addBtnRef = useRef(null);
+
+  const runAddBtnWiggle = () => {
+    try {
+      const el = addBtnRef.current;
+      if (!el) return;
+      el.classList.remove('btn-wiggle');
+      void el.offsetWidth;
+      el.classList.add('btn-wiggle');
+      setTimeout(() => {
+        try { el.classList.remove('btn-wiggle'); } catch {}
+      }, 420);
+    } catch {}
+  };
 
   // ---- Product/Gender/Size helpers ----
   const hasGenders = useMemo(
@@ -631,6 +645,7 @@ const onMediaMove = (e) => {
               </div>
               <button
                 className="pp-primary-btn"
+                ref={addBtnRef}
                 onClick={() => {
                   if (!size) return;
                   const currentInCart = (() => {
@@ -645,6 +660,7 @@ const onMediaMove = (e) => {
                   const remaining = Math.max(0, max - currentInCart);
                   const clamped = Math.min(remaining, qty);
                   if (clamped <= 0) return;
+                  runAddBtnWiggle();
                   try { haptic(35); } catch {}
                   addItem(cartProduct, clamped);
                   try {
