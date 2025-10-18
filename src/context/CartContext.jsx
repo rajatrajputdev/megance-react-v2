@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { trackAddToCart } from "../utils/analytics.js";
+import { isMobile } from "../utils/env.js";
 
 const CartContext = createContext(null);
 
@@ -42,6 +43,10 @@ export function CartProvider({ children }) {
         },
       ];
     });
+    // Light haptic (Android/Chrome supports Vibrations API; iOS Safari does not)
+    try { if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(35); } catch {}
+    // UI nudge event for badge bump animation (works on all devices)
+    try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('cart:add', { detail: { id: product.id, qty } })); } catch {}
   };
 
   const removeItem = (id) => setItems((prev) => prev.filter((x) => x.id !== id));

@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCart } from "../../context/CartContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import Logo from "./Logo.jsx";
@@ -10,6 +10,19 @@ export default function Navbar() {
   const g = new URLSearchParams(location.search).get('g') || 'all';
   const { count } = useCart();
   const { user, logout } = useAuth();
+  const [bump, setBump] = useState(false);
+
+  // Listen for cart add events to bump the badge
+  useEffect(() => {
+    const onAdd = () => {
+      try { setBump(true); } catch {}
+      const t = setTimeout(() => { try { setBump(false); } catch {} }, 320);
+      return () => clearTimeout(t);
+    };
+    window.addEventListener('cart:add', onAdd);
+    return () => window.removeEventListener('cart:add', onAdd);
+  }, []);
+
   const openMenu = () => {
     try {
       const hm = document.querySelector('.hamenu');
@@ -58,10 +71,21 @@ export default function Navbar() {
             <div className="col-6 d-lg-none">
               <Logo />
             </div>
-            <div className="col-6 d-lg-none text-end">
-              <div className="menu-icon cursor-pointer" onClick={openMenu}>
-                <div className="menu-icon-surface">
-                  <span className="icon ti-align-right"></span>
+            <div className="col-6 d-lg-none">
+              <div className="d-flex align-items-center justify-content-end gap-10">
+                <Link to="/cart" className="mobile-cart-btn" aria-label={`Cart with ${count} items`}>
+                  {/* Shopping cart icon (Feather style) */}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="9" cy="20" r="1"/>
+                    <circle cx="20" cy="20" r="1"/>
+                    <path d="M1 1h4l2.2 11.5a2 2 0 0 0 2 1.5h9.5a2 2 0 0 0 2-1.6L23 6H6"/>
+                  </svg>
+                  {count > 0 && <span className={`badge-count${bump ? ' bump' : ''}`}>{count}</span>}
+                </Link>
+                <div className="menu-icon cursor-pointer" onClick={openMenu}>
+                  <div className="menu-icon-surface">
+                    <span className="icon ti-align-right"></span>
+                  </div>
                 </div>
               </div>
             </div>

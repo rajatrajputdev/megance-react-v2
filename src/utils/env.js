@@ -35,3 +35,14 @@ export function preferRedirectAuth(ua = getUA()) {
   if (isIOS(ua) && isSafari(ua)) return true;
   return false;
 }
+
+// Fire a light haptic vibration when supported.
+export function haptic(duration = 25) {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(duration);
+      return true;
+    }
+  } catch {}
+  return false;
+}

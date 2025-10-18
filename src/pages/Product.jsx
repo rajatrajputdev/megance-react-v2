@@ -2,6 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { db } from "../firebase.js";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useCart } from "../context/CartContext.jsx";
+import { haptic } from "../utils/env.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
@@ -644,6 +645,7 @@ const onMediaMove = (e) => {
                   const remaining = Math.max(0, max - currentInCart);
                   const clamped = Math.min(remaining, qty);
                   if (clamped <= 0) return;
+                  try { haptic(35); } catch {}
                   addItem(cartProduct, clamped);
                   try {
                     showToast("success", "Added to cart");
