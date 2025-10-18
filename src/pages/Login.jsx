@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation } from "react-router-dom";
 import SEO from "../components/general_components/SEO.jsx";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
-import { isInAppBrowser, preferRedirectAuth, isIOS } from "../utils/env.js";
+import { isInAppBrowser, preferRedirectAuth, isIOS, isMobile } from "../utils/env.js";
 import "./login-page.css";
 
 export default function LoginPage() {
@@ -16,8 +16,9 @@ export default function LoginPage() {
   const from = new URLSearchParams(location.search).get("from") || "/";
   const target = useMemo(() => `/setup?from=${encodeURIComponent(from)}`,[from]);
   const inApp = useMemo(() => isInAppBrowser(), []);
+  const mobile = useMemo(() => isMobile(), []);
   const forceRedirect = useMemo(() => preferRedirectAuth(), []);
-  const defaultOtp = useMemo(() => inApp || isIOS(), [inApp]);
+  const defaultOtp = useMemo(() => mobile || inApp || isIOS(), [mobile, inApp]);
 
   const [mode, setMode] = useState(defaultOtp ? "otp" : "google");
   const [phone, setPhone] = useState("");
@@ -115,7 +116,7 @@ export default function LoginPage() {
             </div>
           )}
           <h2 className="auth-title">Sign in to Megance</h2>
-          {mode === "google" ? (
+          {(!mobile && mode === "google") ? (
             <>
           <p className="auth-subtext">Use your Google account to continue.</p>
           <button className="google-btn" onClick={onGoogle}>
@@ -176,10 +177,14 @@ export default function LoginPage() {
                   </div>
                 </div>
               )}
-              <div className="auth-subtext" style={{ marginTop: 12 }}>
-                Prefer Google?
-                <button className="underline ml-6" onClick={() => setMode("google")}>Use Google Sign-in</button>
-              </div>
+              {(!mobile) && (
+                <div className="auth-subtext" style={{ marginTop: 12 }}>
+                  Prefer Google?
+                  <button className="underline ml-6" onClick={() => setMode("google")}>
+                    Use Google Sign-in
+                  </button>
+                </div>
+              )}
             </>
           )}
 

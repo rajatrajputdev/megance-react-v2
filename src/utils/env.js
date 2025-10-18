@@ -21,10 +21,17 @@ export function isSafari(ua = getUA()) {
   return isSafariLike;
 }
 
+export function isMobile(ua = getUA()) {
+  try {
+    if (/(Mobi|Android|iPhone|iPad|iPod)/i.test(ua)) return true;
+    if (typeof window !== "undefined" && window.innerWidth <= 768) return true;
+  } catch {}
+  return false;
+}
+
 export function preferRedirectAuth(ua = getUA()) {
   // On in-app browsers and some iOS Safari contexts, popup is unreliable.
   if (isInAppBrowser(ua)) return true;
   if (isIOS(ua) && isSafari(ua)) return true;
   return false;
 }
-
