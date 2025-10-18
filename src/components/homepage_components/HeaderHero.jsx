@@ -14,7 +14,7 @@ export default function HeaderHero() {
     const bgVid = toAbs(
       isMobile
         ? "/assets/imgs/banner/bannervidmob.mp4"
-        : "/assets/imgs/banner/bannervid1.mp4"
+        : "/assets/imgs/banner/bannervid.mp4"
     );
 
     el.style.backgroundImage = "none";
