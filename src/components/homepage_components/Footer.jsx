@@ -92,7 +92,7 @@ export default function Footer() {
               <li><a href="#faq2">FAQs</a></li>
               <li><Link to="/terms">Shipping</Link></li>
               <li><Link to="/terms">Returns</Link></li>
-              <li><a href="mailto:support@megance.com">Contact (support@megance.com)</a></li>
+              <li><a href="/contact-us">Contact</a></li>
             </ul>
           </div>
           <div className="rh-col">
@@ -108,11 +108,8 @@ export default function Footer() {
             <div className="rh-social-row">
               <a href="https://www.instagram.com/megance_official" target="_blank" rel="noreferrer noopener" aria-label="Instagram"><i className="fab fa-instagram"></i></a>
               <a href="https://www.facebook.com/share/1C2xE3PYgh/" target="_blank" rel="noreferrer noopener" aria-label="Facebook"><i className="fab fa-facebook-f"></i></a>
-              <a href="https://www.instagram.com/megance_official" target="_blank" rel="noreferrer noopener" aria-label="Twitter"><i className="fab fa-x-twitter"></i></a>
+              <a href="https://x.com/meganceofficial" target="_blank" rel="noreferrer noopener" aria-label="Twitter"><i className="fab fa-x-twitter"></i></a>
               <a href="https://pin.it/1gcfbasEq" target="_blank" rel="noreferrer noopener" aria-label="Pinterest"><i className="fab fa-pinterest"></i></a>
-            
-            
-           
             
             </div>
           </div>
