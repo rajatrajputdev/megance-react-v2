@@ -126,7 +126,7 @@ export default function LoginPage() {
 
           {isMobile && (
             <div className="auth-subtext" style={{ marginTop: 10 }}>
-              Tip: On phones, allow pop-ups so Google can open. If blocked, we’ll redirect automatically.
+              Tip- On phones, allow pop-ups so Google can open. If blocked, we’ll redirect automatically.
             </div>
           )}
 
