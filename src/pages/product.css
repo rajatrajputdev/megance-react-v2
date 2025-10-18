@@ -361,3 +361,11 @@
   from { transform: scale(0.9); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+.size_guide img {
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.pill.active {
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+  transform: translateY(-1px);
+}

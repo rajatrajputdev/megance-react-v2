@@ -14,6 +14,7 @@ export default function ProductPage() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showSizeGuide, setShowSizeGuide] = useState(false);
 
   // ---- Firestore live doc ----
   useEffect(() => {
@@ -543,13 +544,37 @@ const onMediaMove = (e) => {
                 </div>
               </div>
             )}
+{/* ✅ Size Guide Toggle Button Styled Like Pills */}
 <div className="mt-20">
+  <div className="filter-pills size-pills">
+    <button
+      type="button"
+      className={`pill${showSizeGuide ? " active" : ""}`}
+      style={{ cursor: "pointer" }}
+      onClick={() => setShowSizeGuide(prev => !prev)}
+    >
+      {showSizeGuide ? "Hide Size Guide" : "Size Guide"}
+    </button>
+  </div>
+
+  {showSizeGuide && (
+    <div className="size_guide mt-10">
+      <img
+        src="/assets/imgs/size.jpeg"
+        alt="Size Chart"
+        style={{ width: "100%", maxWidth: "380px", borderRadius: "8px" }}
+      />
+    </div>
+  )}
+</div>
+
+{/* <div className="mt-20">
                 <div className="filter-pills">
                  <div className="size_guide">
                   <img src="/assets/imgs/size.jpeg" alt="Size Chart" />
                  </div>
                 </div>
-              </div>
+              </div> */}
             {/* Sizes */}
             <div className="mt-20">
               <div className="label-sm">Select Size</div>
