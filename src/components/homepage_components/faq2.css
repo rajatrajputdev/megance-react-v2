@@ -71,3 +71,32 @@
   .faq2-section { padding: 72px 32px; }
   .faq2-grid { grid-template-columns: 0.9fr 1.4fr; gap: 28px; }
 }
+.faq2-collapse {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+
+.faq2-item.is-open .faq2-collapse {
+  max-height: 300px; /* enough to fit content without infinite max-height */
+}
+
+.faq2-arrow {
+  display: inline-block;
+  transition: transform 0.25s ease;
+}
+
+.faq2-item.is-open .faq2-arrow {
+  transform: rotate(180deg);
+}
+.faq2-collapse p {
+  padding: 12px 20px 18px; /* Same as earlier */
+  margin: 0;
+  color: #333;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.faq2-item.is-open .faq2-collapse {
+  max-height: 500px; /* so taller answers don't get clipped */
+  transition: max-height 0.4s cubic-bezier(.25, .8, .25, 1);
+}

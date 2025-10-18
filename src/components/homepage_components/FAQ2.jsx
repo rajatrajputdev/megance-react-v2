@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import "./faq2.css";
 
 export default function FAQ2({ items, title = "FAQs", subtitle }) {
@@ -13,13 +13,11 @@ export default function FAQ2({ items, title = "FAQs", subtitle }) {
     ["How do I care for my suede sneakers to keep them looking new?", "To maintain your premium suede sneakers, avoid harsh cleaning chemicals and use a soft suede brush or suede cleaning spray. Keep them away from moisture to preserve the texture and rich suede finish."],
     ["Are Megance sneakers unisex?", "Yes, Megance suede sneakers are designed to be gender-neutral. Both male and female sneaker enthusiasts can style the Infinity Collection colorways effortlessly."],
     ["What is the best way to style Megance suede sneakers?", "Megance sneakers are crafted for minimal streetwear styling. Pair them with neutral fits, oversized tees, monotone sets, or layered winter outfits for a clean luxury aesthetic."],
-    ];
+  ];
 
-  const toggle = (index) => {
-    const scrollY = window.scrollY; // store current scroll
+  const toggle = useCallback((index) => {
     setOpenIndex((prev) => (prev === index ? null : index));
-    setTimeout(() => window.scrollTo(0, scrollY), 0); // restore after render
-  };
+  }, []);
 
   return (
     <section className="faq2-section">
@@ -34,19 +32,13 @@ export default function FAQ2({ items, title = "FAQs", subtitle }) {
             const isOpen = openIndex === idx;
             return (
               <div className={`faq2-item ${isOpen ? "is-open" : ""}`} key={idx}>
-                <button
-                  className="faq2-question"
-                  onMouseDown={(e) => e.preventDefault()} // prevents jump focus
-                  onClick={() => toggle(idx)}
-                >
+                <button className="faq2-question" onClick={() => toggle(idx)}>
                   <span>{q}</span>
                   <span className="faq2-arrow">▼</span>
                 </button>
 
                 <div className="faq2-collapse">
-                  <div className="faq2-content">
-                    <p>{a}</p>
-                  </div>
+                  <p>{a}</p>
                 </div>
               </div>
             );

@@ -20,38 +20,9 @@ export default function Home() {
         <USP />
         <Marquee bgImage="/assets/imgs/banner/home2.webp" />
         <ZellerSection bgImage="/assets/imgs/banner/home.webp" />
-        {/* <GalleryYellow /> */}
-        {/* <section className="container page-section">
-          <div className="row mb-30 text-center">
-            <div className="col-12">
-              <h3 className="section-title">Featured Products</h3>
-              <p className="mt-10 opacity-7">Add your favourites to the cart</p>
-            </div>
-          </div>
-          <div className="row">
-            {products.slice(0, 4).map((p) => (
-              <div key={p.id} className="col-sm-6 col-md-4 col-lg-3 mb-30">
-                <div className="product-card p-15">
-                  <Link to={`/product/${p.id}`} className="d-block mb-10">
-                    <img src={p.image} alt={p.name} className="img-fluid" />
-                  </Link>
-                  <div className="product-details">
-                    <div className="name">{p.name}</div>
-                    <div className="price">₹ {p.price}</div>
-                  </div>
-                  <div className="d-flex mt-10">
-                    <Link to={`/product/${p.id}`} className="butn butn-md butn-rounded mr-10">View</Link>
-                    <button className="butn butn-md butn-rounded" onClick={() => addItem(p, 1)}>Add</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section> */}
-        {/* <Testimonials /> */}
-        <FAQ2 />
+       <FAQ2 />
       </main>
-      {/* <Newsletter /> */}
+      
       <hr />
       <Footer />
     </>
