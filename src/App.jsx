@@ -16,6 +16,7 @@ import TermsOfUsePage from "./pages/TermsOfUse.jsx";
 import About from "./pages/About.jsx";
 import ReturnsPage from "./pages/Returns.jsx";
 import ReturnSuccess from "./pages/ReturnSuccess.jsx";
+import AuthRedirect from "./pages/AuthRedirect.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import RequireAuth from "./components/general_components/RequireAuth.jsx";
@@ -78,6 +79,7 @@ export default function App() {
           <div id="smooth-wrapper">
             <div id="smooth-content">
               <Routes>
+                <Route path="/__/auth/*" element={<AuthRedirect />} />
                 <Route path="/" element={<Home />} />
                 <Route path="/shop" element={<Shop />} />
                 <Route path="/product/:id" element={<ProductPage />} />
