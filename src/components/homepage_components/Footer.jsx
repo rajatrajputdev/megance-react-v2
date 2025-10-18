@@ -77,7 +77,7 @@ export default function Footer() {
         </div>
 
         {/* Links grid */}
-        <div className="rh-links">
+         <div className="rh-links">
           <div className="rh-col">
             <h6>Shop</h6>
             <ul>

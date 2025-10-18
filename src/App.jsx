@@ -6,6 +6,7 @@ import ProductPage from "./pages/Product.jsx";
 import CartPage from "./pages/Cart.jsx";
 import CheckoutPage from "./pages/Checkout.jsx";
 import LoginPage from "./pages/Login.jsx";
+
 import Account from "./pages/Account.jsx";
 import Setup from "./pages/Setup.jsx";
 import OrderDetails from "./pages/OrderDetails.jsx";
@@ -31,6 +32,7 @@ import ScrollToTop from "./components/general_components/ScrollToTop.jsx";
 import AuthReturnGate from "./components/general_components/AuthReturnGate.jsx";
 import { useEffect } from "react";
 import { loadRazorpay } from "./utils/razorpay";
+import ContactUs from "./pages/ContactUs.jsx";
 
 export default function App() {
   // Optionally preload Razorpay in production to reduce checkout delay
@@ -86,6 +88,7 @@ export default function App() {
                 <Route path="/shop" element={<Shop />} />
                 <Route path="/product/:id" element={<ProductPage />} />
                 <Route path="/cart" element={<CartPage />} />
+                <Route path="/contact-us" element={<ContactUs />} />
                 <Route
                   path="/checkout"
                   element={

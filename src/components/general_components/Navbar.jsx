@@ -131,6 +131,8 @@ export default function Navbar() {
                 ) : (
                   <Link to="/login" className="butn nav-butn mr-10">Login</Link>
                 )}
+                
+                
                 <div className="menu-icon cursor-pointer" onClick={openMenu}>
                   <div className="menu-icon-surface">
                     <span className="icon ti-align-right"></span>
@@ -147,7 +149,7 @@ export default function Navbar() {
         <div className="container-fluid rest d-flex">
           <div className="menu-links">
             <ul className="main-menu rest">
-              <li></li>
+             
               <li>
                 <div className="o-hidden">
                   <NavLink to="/" className="link" onClick={closeMenu}>
@@ -204,6 +206,9 @@ export default function Navbar() {
                   </div>
                 </li>
               )}
+               <li><NavLink to="/contact-us" className="link" onClick={closeMenu}>
+                      <span className="fill-text" data-text="Contact Us">Contact Us</span>
+                    </NavLink></li>
               {/* <li>
                 <div className="o-hidden">
                   <NavLink to="/returns" className="link" onClick={closeMenu}>
