@@ -30,6 +30,7 @@ import { ToastProvider } from "./components/general_components/ToastProvider.jsx
 import RecaptchaHost from "./components/general_components/RecaptchaHost.jsx";
 import ScrollToTop from "./components/general_components/ScrollToTop.jsx";
 import AuthReturnGate from "./components/general_components/AuthReturnGate.jsx";
+import MaintenanceGate from "./components/general_components/MaintenanceGate.jsx";
 import { useEffect } from "react";
 import { loadRazorpay } from "./utils/razorpay";
 import ContactUs from "./pages/ContactUs.jsx";
@@ -61,6 +62,7 @@ export default function App() {
   };
   return (
     <BrowserRouter>
+      <MaintenanceGate>
       <AuthProvider>
         <CartProvider>
           <Loader />
@@ -152,6 +154,7 @@ export default function App() {
           </ErrorBoundary>
         </CartProvider>
       </AuthProvider>
+      </MaintenanceGate>
     </BrowserRouter>
   );
 }
