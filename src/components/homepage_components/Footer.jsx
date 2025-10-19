@@ -89,7 +89,7 @@ export default function Footer() {
           <div className="rh-col">
             <h6>Help</h6>
             <ul>
-              <li><a href="#faq2">FAQs</a></li>
+              <li><Link to="/#faq2">FAQs</Link></li>
               <li><Link to="/terms">Shipping</Link></li>
               <li><Link to="/terms">Returns</Link></li>
               <li><a href="/contact-us">Contact</a></li>

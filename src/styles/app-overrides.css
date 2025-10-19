@@ -1,4 +1,8 @@
 /* Make navbar white at all times (no scroll-triggered transparency) */
+.megance-body, html, :root {
+  /* Neutralize any global smooth-scrolling to avoid conflicts with FLIP corrections */
+  scroll-behavior: auto !important;
+}
 .navbar {
   background-color: #fff !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);

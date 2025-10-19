@@ -75,6 +75,17 @@ export default function FAQ2({ items, title = "FAQs", subtitle }) {
 
     // 1) Measure BEFORE
     const beforeTop = itemEl.getBoundingClientRect().top;
+    // Snapshot scroll position BEFORE any DOM changes
+    let preScrollY = 0;
+    try {
+      if (typeof window !== 'undefined' && window.ScrollSmoother && window.ScrollSmoother.get) {
+        const sm = window.ScrollSmoother.get();
+        if (sm && typeof sm.scrollTop === 'function') preScrollY = sm.scrollTop();
+        else preScrollY = window.scrollY || window.pageYOffset || 0;
+      } else {
+        preScrollY = window.scrollY || window.pageYOffset || 0;
+      }
+    } catch { preScrollY = 0; }
 
     // 2) Compute next state and animate the panel
     const willOpen = openIndex !== index;
@@ -92,20 +103,64 @@ export default function FAQ2({ items, title = "FAQs", subtitle }) {
         const afterTop = itemEl.getBoundingClientRect().top;
         const delta = afterTop - beforeTop;
         if (delta !== 0) {
-          // If GSAP ScrollSmoother exists, pause for a tick to avoid interception
-          const smoother = (typeof window !== 'undefined' && window.ScrollSmoother && window.ScrollSmoother.get) ? window.ScrollSmoother.get() : null;
-          const resume = (smoother && typeof smoother.paused === 'function') ? smoother.paused(false) : null;
-          if (smoother && typeof smoother.paused === 'function') {
-            try { smoother.paused(true); } catch {}
-          }
+          // Prefer GSAP ScrollSmoother correction to avoid any transform jump
+          const smoother = (typeof window !== 'undefined' && window.ScrollSmoother && window.ScrollSmoother.get)
+            ? window.ScrollSmoother.get()
+            : null;
+          const correctTo = (offset) => {
+            withInstantScroll(() => {
+              if (smoother && typeof smoother.scrollTo === 'function') {
+                try { smoother.scrollTo(preScrollY + offset, true); return; } catch {}
+              }
+              try {
+                if (typeof window.scrollTo === 'function') {
+                  window.scrollTo({ top: preScrollY + offset, left: 0, behavior: 'auto' });
+                } else {
+                  window.scrollTo(0, preScrollY + offset);
+                }
+              } catch {
+                try { window.scrollTo(0, preScrollY + offset); } catch {}
+              }
+            });
+          };
 
-          // Instant correction (no smooth to avoid compounding)
-          try { window.scrollBy(0, delta); } catch {}
+          // First correction
+          correctTo(delta);
 
-          // Resume on next frame if we paused
-          if (smoother && typeof smoother.paused === 'function') {
-            requestAnimationFrame(() => { try { smoother.paused(false); } catch {} });
-          }
+          // Also correct after any ScrollTrigger refresh cycle that may run
+          try {
+            const ST = (typeof window !== 'undefined' && window.ScrollTrigger) ? window.ScrollTrigger : null;
+            if (ST && typeof ST.addEventListener === 'function') {
+              let done = false;
+              const onRef = () => {
+                if (done) return;
+                done = true;
+                // slight defer to ensure transforms are applied
+                requestAnimationFrame(() => correctTo(delta));
+                try { ST.removeEventListener('refresh', onRef); } catch {}
+                try { ST.removeEventListener('refreshInit', onRef); } catch {}
+              };
+              ST.addEventListener('refreshInit', onRef);
+              ST.addEventListener('refresh', onRef);
+              // safety timeout removal
+              setTimeout(() => { try { ST.removeEventListener('refresh', onRef); ST.removeEventListener('refreshInit', onRef); } catch {} }, 500);
+            }
+          } catch {}
+
+          // Second-pass correction next frame if any residual drift remains
+          requestAnimationFrame(() => {
+            const afterTop2 = itemEl.getBoundingClientRect().top;
+            const delta2 = afterTop2 - beforeTop;
+            if (Math.abs(delta2) > 1) {
+              correctTo(delta + delta2);
+            }
+          });
+          // safety: final correction after a small delay
+          setTimeout(() => {
+            const afterTop3 = itemEl.getBoundingClientRect().top;
+            const delta3 = afterTop3 - beforeTop;
+            if (Math.abs(delta3) > 1) correctTo(delta + delta3);
+          }, 60);
         }
       });
     });
@@ -132,7 +187,7 @@ export default function FAQ2({ items, title = "FAQs", subtitle }) {
   }, [openIndex]);
 
   return (
-    <section className="faq2-section">
+    <section id="faq2" className="faq2-section">
       <div className="faq2-grid">
         <aside className="faq2-aside">
           <h2 className="faq2-title">{title}</h2>
@@ -149,12 +204,15 @@ export default function FAQ2({ items, title = "FAQs", subtitle }) {
                 ref={(el) => (itemRefs.current[idx] = el)}
               >
                 <button
+                  id={`faq2-q-${idx}`}
                   className="faq2-question"
                   onClick={(e) => {
                     e.preventDefault();
                     toggle(idx);
                   }}
                   type="button"
+                  aria-expanded={isOpen}
+                  aria-controls={`faq2-panel-${idx}`}
                 >
                   <span>{q}</span>
                   <span className="faq2-arrow">▼</span>
@@ -162,7 +220,10 @@ export default function FAQ2({ items, title = "FAQs", subtitle }) {
 
                 <div
                   className="faq2-collapse"
+                  id={`faq2-panel-${idx}`}
                   ref={(el) => (panelRefs.current[idx] = el)}
+                  role="region"
+                  aria-labelledby={`faq2-q-${idx}`}
                 >
                   <div className="faq2-content">
                     <p>{a}</p>
@@ -176,3 +237,14 @@ export default function FAQ2({ items, title = "FAQs", subtitle }) {
     </section>
   );
 }
+  // Utility: run a function with root scroll-behavior forced to 'auto', restore next frame
+  const withInstantScroll = (fn) => {
+    try {
+      const root = document.documentElement;
+      const prev = root.style.scrollBehavior;
+      root.style.scrollBehavior = 'auto';
+      try { fn && fn(); } finally {
+        requestAnimationFrame(() => { try { root.style.scrollBehavior = prev; } catch {} });
+      }
+    } catch { fn && fn(); }
+  };
