@@ -1,102 +1,127 @@
 .faq2-section {
-  width: 100%;
-  margin: 0 auto;
-  padding: 60px 28px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,0.06);
-  border-radius: 14px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.04);
+  width           : 100%;
+  margin          : 0 auto;
+  padding         : 60px 28px;
+  background      : #fff;
+   border       : 1px solid rgba(0, 0, 0, 0.06);
+   border-radius: 14px;
+   box-shadow   : 0 6px 18px rgba(0, 0, 0, 0.04);
+  
 }
 
-.faq2-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-.faq2-aside { text-align: left; }
-.faq2-title { margin: 0; font-weight: 700; color: #111; }
-.faq2-subtitle { margin-top: 8px; color: #666; font-size: 14px; }
 
-.faq2-list { display: grid; gap: 14px; }
+
+/* Do NOT set html { scroll-behavior: smooth } here; it conflicts with instant corrections */
+.faq2-grid {
+  display              : grid;
+  grid-template-columns: 1fr;
+  gap                  : 20px;
+}
+
+.faq2-aside {
+  text-align: left;
+}
+
+.faq2-title {
+  margin     : 0;
+  font-weight: 700;
+  color      : #111;
+}
+
+.faq2-subtitle {
+  margin-top: 8px;
+  color     : #666;
+  font-size : 14px;
+}
+
+.faq2-list {
+  display        : grid;
+  gap            : 14px;
+  overflow-anchor: none;
+}
+
 .faq2-item {
-  background: #fff;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-  overflow-anchor: none; /* prevents scroll jump */
-  transition: box-shadow .3s ease;
+  background     : #fff;
+  border         : 1px solid rgba(0, 0, 0, 0.08);
+  border-radius  : 12px;
+  box-shadow     : 0 2px 10px rgba(0, 0, 0, 0.04);
+  transition     : box-shadow .3s ease;
+  contain        : layout;
+  overflow-anchor: none;
 }
 
 .faq2-item.is-open {
-  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  
 }
 
 .faq2-question {
-  width: 100%;
-  padding: 16px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 0;
-  background: #fff;
-  font-size: 17px;
-  cursor: pointer;
-  text-align: left;
-  color: #0d0d0d;
+   width          : 100%;
+   padding        : 16px 20px;
+   display        : flex;
+   justify-content: space-between;
+   align-items    : center;
+   border         : 0;
+   background     : #fff;
+   font-size      : 17px;
+   cursor         : pointer;
+   text-align     : left;
+   color          : #0d0d0d;
+  
+}
+
+.faq2-question:hover {
+  background: #fafafa;
 }
 
 .faq2-arrow {
-  transition: transform .3s ease;
+  display   : inline-block;
+  transition: transform .25s ease;
 }
 
 .faq2-item.is-open .faq2-arrow {
   transform: rotate(180deg);
 }
 
-/* Smooth collapse */
+
+
+/* Panel: snap height; animate inner content to avoid scroll drift */
 .faq2-collapse {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows .28s ease;
-}
-.faq2-item.is-open .faq2-collapse {
-  grid-template-rows: 1fr;
+  height         : 0;
+  overflow       : hidden;
+  will-change    : auto;
+  overflow-anchor: none;
 }
 
-.faq2-content { overflow: hidden; }
+
+
+/* Inner content animation + padding */
+.faq2-content {
+  opacity   : 0;
+  transform : translateY(-6px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.faq2-item.is-open .faq2-content {
+  opacity  : 1;
+  transform: translateY(0);
+}
+
 .faq2-content p {
-  padding: 12px 20px 18px;
-  margin: 0;
-  color: #333;
-  font-size: 15px;
+  padding    : 12px 20px 18px;
+  margin     : 0;
+  color      : #333;
+  font-size  : 15px;
+  line-height: 1.6;
 }
 
 @media (min-width: 992px) {
-  .faq2-section { padding: 72px 32px; }
-  .faq2-grid { grid-template-columns: 0.9fr 1.4fr; gap: 28px; }
-}
-.faq2-collapse {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.35s ease;
-}
+  .faq2-section {
+    padding: 72px 32px;
+  }
 
-.faq2-item.is-open .faq2-collapse {
-  max-height: 300px; /* enough to fit content without infinite max-height */
-}
-
-.faq2-arrow {
-  display: inline-block;
-  transition: transform 0.25s ease;
-}
-
-.faq2-item.is-open .faq2-arrow {
-  transform: rotate(180deg);
-}
-.faq2-collapse p {
-  padding: 12px 20px 18px; /* Same as earlier */
-  margin: 0;
-  color: #333;
-  font-size: 15px;
-  line-height: 1.6;
-}
-.faq2-item.is-open .faq2-collapse {
-  max-height: 500px; /* so taller answers don't get clipped */
-  transition: max-height 0.4s cubic-bezier(.25, .8, .25, 1);
+  .faq2-grid {
+    grid-template-columns: 0.9fr 1.4fr;
+    gap                  : 28px;
+  }
 }
