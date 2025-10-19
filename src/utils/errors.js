@@ -11,7 +11,9 @@ export function friendlyOtpError(e, phase = 'verify') {
 
   // reCAPTCHA / app credential
   if (code.includes('captcha-check-failed') || code.includes('invalid-app-credential') || code.includes('missing-app-credential')) {
-    return phase === 'send' ? 'Verification failed. Refresh and try again.' : 'Verification failed. Please resend code.';
+    return phase === 'send'
+      ? 'Verification failed. Please try again.'
+      : 'Verification failed. Please resend a new code.';
   }
 
   // Verification code problems

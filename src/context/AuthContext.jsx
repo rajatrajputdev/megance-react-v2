@@ -30,6 +30,15 @@ export function AuthProvider({ children }) {
   const recaptchaRef = React.useRef(null);
   const recaptchaContainerRef = React.useRef(null);
   const recaptchaReadyRef = React.useRef(Promise.resolve());
+  const recaptchaModeRef = React.useRef("invisible"); // 'invisible' | 'visible'
+  const allowVisibleRecaptcha = (() => {
+    try {
+      const v = (import.meta.env?.VITE_ALLOW_VISIBLE_RECAPTCHA ?? 'false');
+      return String(v).toLowerCase() === 'true';
+    } catch {
+      return false;
+    }
+  })();
   const phoneLinkConfirmRef = React.useRef(null);
   const phoneSigninConfirmRef = React.useRef(null);
   const phoneChangeVerificationIdRef = React.useRef(null);
@@ -128,10 +137,18 @@ export function AuthProvider({ children }) {
   };
 
   // --- reCAPTCHA helpers (for phone link/change) ---
+  const setRecaptchaHostVisible = (visible) => {
+    try {
+      const host = typeof document !== "undefined" ? document.getElementById("global-recaptcha-container") : null;
+      if (host) host.classList.toggle("recaptcha-visible", !!visible);
+    } catch {}
+  };
+
   const resetRecaptcha = async () => {
     try { if (recaptchaRef.current?.clear) await recaptchaRef.current.clear(); } catch {}
     recaptchaRef.current = null;
     recaptchaContainerRef.current = null;
+    setRecaptchaHostVisible(false);
   };
 
   const ensureRecaptcha = async (fresh = false) => {
@@ -151,8 +168,10 @@ export function AuthProvider({ children }) {
       holder.setAttribute("data-recaptcha-instance", String(Date.now()));
       host.appendChild(holder);
       recaptchaContainerRef.current = holder;
-
-      const verifier = new RecaptchaVerifier(auth, holder, { size: "invisible" });
+      const wantVisible = allowVisibleRecaptcha && recaptchaModeRef.current === "visible";
+      const mode = wantVisible ? "normal" : "invisible";
+      setRecaptchaHostVisible(wantVisible);
+      const verifier = new RecaptchaVerifier(auth, holder, { size: mode });
       await verifier.render();
       recaptchaRef.current = verifier;
       return verifier;
@@ -160,6 +179,24 @@ export function AuthProvider({ children }) {
 
     recaptchaReadyRef.current = p.catch(() => {});
     return p;
+  };
+
+  const isRecaptchaCredentialError = (e) => {
+    const code = e?.code ? String(e.code) : "";
+    return (
+      code.includes("captcha-check-failed") ||
+      code.includes("invalid-app-credential") ||
+      code.includes("missing-app-credential")
+    );
+  };
+
+  const showVisibleRecaptchaAfterError = async (e) => {
+    if (!isRecaptchaCredentialError(e)) return;
+    if (!allowVisibleRecaptcha) return;
+    try {
+      recaptchaModeRef.current = "visible";
+      await ensureRecaptcha(true);
+    } catch {}
   };
 
   // Phone OTP linking for current user during onboarding/account
@@ -173,13 +210,16 @@ export function AuthProvider({ children }) {
         err.code = "auth/invalid-phone-number";
         throw err;
       }
-      const verifier = await ensureRecaptcha(true);
+      const fresh = recaptchaModeRef.current !== "visible";
+      const verifier = await ensureRecaptcha(fresh);
       const confirmation = await linkWithPhoneNumber(auth.currentUser, e164, verifier);
       phoneLinkConfirmRef.current = confirmation;
       await resetRecaptcha();
+      recaptchaModeRef.current = "invisible";
       return true;
     } catch (e) {
       await resetRecaptcha();
+      await showVisibleRecaptchaAfterError(e);
       throw e;
     }
   };
@@ -203,13 +243,16 @@ export function AuthProvider({ children }) {
         err.code = "auth/invalid-phone-number";
         throw err;
       }
-      const verifier = await ensureRecaptcha(true);
+      const fresh = recaptchaModeRef.current !== "visible";
+      const verifier = await ensureRecaptcha(fresh);
       const confirmation = await signInWithPhoneNumber(auth, e164, verifier);
       phoneSigninConfirmRef.current = confirmation;
       await resetRecaptcha();
+      recaptchaModeRef.current = "invisible";
       return true;
     } catch (e) {
       await resetRecaptcha();
+      await showVisibleRecaptchaAfterError(e);
       throw e;
     }
   };
@@ -233,14 +276,17 @@ export function AuthProvider({ children }) {
         err.code = "auth/invalid-phone-number";
         throw err;
       }
-      const verifier = await ensureRecaptcha(true);
+      const fresh = recaptchaModeRef.current !== "visible";
+      const verifier = await ensureRecaptcha(fresh);
       const provider = new PhoneAuthProvider(auth);
       const verificationId = await provider.verifyPhoneNumber(e164, verifier);
       phoneChangeVerificationIdRef.current = verificationId;
       await resetRecaptcha();
+      recaptchaModeRef.current = "invisible";
       return true;
     } catch (e) {
       await resetRecaptcha();
+      await showVisibleRecaptchaAfterError(e);
       throw e;
     }
   };

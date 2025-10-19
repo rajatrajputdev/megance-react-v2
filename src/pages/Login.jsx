@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation } from "react-router-dom";
 import SEO from "../components/general_components/SEO.jsx";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
+import { friendlyOtpError } from "../utils/errors.js";
 import { isInAppBrowser, preferRedirectAuth, isIOS, isMobile } from "../utils/env.js";
 import "./login-page.css";
 
@@ -61,7 +62,7 @@ export default function LoginPage() {
       await startPhoneSignIn(phone);
       setOtpSent(true);
     } catch (e) {
-      const msg = e?.message || "Failed to send OTP";
+      const msg = friendlyOtpError(e, 'send');
       setErr(msg);
       showToast("error", msg);
     } finally {
