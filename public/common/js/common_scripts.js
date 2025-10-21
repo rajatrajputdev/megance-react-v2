@@ -137,11 +137,20 @@ $(function () {
 
         ScrollTrigger.normalizeScroll(false);
 
-        // create the smooth scroller FIRST!
-        let smoother = ScrollSmoother.create({
-            smooth: 2,
-            effects: true,
-        });
+        // create the smooth scroller FIRST! (with a global/runtime kill-switch)
+        var wantSmoother = true;
+        try {
+            if (window.__DISABLE_SMOOTHER === true) wantSmoother = false;
+            var ls = null; try { ls = localStorage.getItem('disableSmoother'); } catch(_) {}
+            if (ls && (ls === '1' || ls.toLowerCase() === 'true')) wantSmoother = false;
+        } catch(_) {}
+        var smoother = null;
+        if (wantSmoother) {
+            smoother = ScrollSmoother.create({
+                smooth: 2,
+                effects: true,
+            });
+        }
 
         let headings = gsap.utils.toArray(".js-title").reverse();
         headings.forEach((heading, i) => {
@@ -149,9 +158,11 @@ $(function () {
             let mySplitText = new SplitText(heading, { type: "chars" });
             let chars = mySplitText.chars;
 
-            chars.forEach((char, i) => {
-                smoother.effects(char, { lag: (i + headingIndex) * 0.1, speed: 1 });
-            });
+            if (smoother) {
+                chars.forEach((char, i) => {
+                    smoother.effects(char, { lag: (i + headingIndex) * 0.1, speed: 1 });
+                });
+            }
         });
 
         let splitTextLines = gsap.utils.toArray(".js-splittext-lines");

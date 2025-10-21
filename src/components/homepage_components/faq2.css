@@ -8,6 +8,8 @@
    box-shadow   : 0 6px 18px rgba(0, 0, 0, 0.04);
   /* Offset anchor scroll to account for fixed navbar */
   scroll-margin-top: 120px;
+  /* Prevent browser anchor-based scroll adjustments while toggling */
+  overflow-anchor: none;
   
 }
 

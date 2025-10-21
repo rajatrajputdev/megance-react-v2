@@ -116,6 +116,20 @@
 
     <script type="module" src="/src/main.jsx"></script>
 
+    <!-- Disable GSAP ScrollSmoother globally to prevent scroll jumps during interactions -->
+    <script>
+      (function(){
+        try {
+          // Allow runtime override via localStorage; default to disabled
+          var ls = localStorage.getItem('disableSmoother');
+          if (!ls) localStorage.setItem('disableSmoother', 'true');
+          window.__DISABLE_SMOOTHER = true;
+        } catch(_) {
+          window.__DISABLE_SMOOTHER = true;
+        }
+      })();
+    </script>
+
     <!-- Load vendor scripts after React mounts to ensure required nodes exist -->
     <script>
       (function () {

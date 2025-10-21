@@ -8,6 +8,7 @@ import "./returns-page.css";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
 import { supabaseUploadFile } from "../utils/supabase.js";
 import Footer from "../components/homepage_components/Footer.jsx";
+import SmootherPause from "../components/general_components/SmootherPause.jsx";
 
 export default function ReturnsPage() {
   const { user, profile } = useAuth();
@@ -321,6 +322,8 @@ export default function ReturnsPage() {
 
   return (
     <>
+      {/* Pause ScrollSmoother on this page to avoid interaction jumps */}
+      <SmootherPause enabled={true} />
       <SEO title="Returns" description="Initiate a return for your order." image="/assets/logo.svg" type="website" twitterCard="summary" />
       <section className="container page-section white-navbar-page returns-page">
         <div className="row justify-content-center">

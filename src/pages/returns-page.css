@@ -4,6 +4,8 @@
   background: rgba(255, 255, 255, 0.02);
   backdrop-filter: saturate(120%) blur(2px);
   padding: 28px; /* extra breathing room */
+  /* Isolate layout to avoid scroll drift while expanding sections */
+  contain: layout paint;
 }
 
 .returns-page h3 {
@@ -173,6 +175,7 @@
   position: relative;
   margin-top: 18px;
   padding-top: 18px;
+  overflow-anchor: none; /* don't let browser auto-adjust scroll here */
 }
 
 .returns-page .returns-section::before {
