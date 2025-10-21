@@ -46,6 +46,9 @@ const TWILIO_ACCOUNT_SID = defineSecret("TWILIO_ACCOUNT_SID");
 const TWILIO_AUTH_TOKEN = defineSecret("TWILIO_AUTH_TOKEN");
 const TWILIO_WHATSAPP_FROM = defineSecret("TWILIO_WHATSAPP_FROM"); // e.g. whatsapp:+14155238886 or approved sender ID
 const TWILIO_TEMPLATE_SID = defineSecret("TWILIO_TEMPLATE_SID"); // e.g. HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// Refund-specific templates (Content API)
+const TWILIO_RETURNS_USER_TEMPLATE_SID = defineSecret("TWILIO_RETURNS_USER_TEMPLATE_SID");
+const TWILIO_RETURNS_ADMIN_TEMPLATE_SID = defineSecret("TWILIO_RETURNS_ADMIN_TEMPLATE_SID");
 
 // XpressBees shipment creation (use secrets; do NOT hardcode credentials)
 const XPRESSBEES_USERNAME = defineSecret("XPRESSBEES_USERNAME");
@@ -2915,7 +2918,16 @@ exports.getOrderShipmentStatus = onCall(
 );
 
 // Submit a refund request (server authoritative write)
-exports.submitRefundRequest = onCall({ region: REGION }, async (req) => {
+exports.submitRefundRequest = onCall({
+  region: REGION,
+  secrets: [
+    TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN,
+    TWILIO_WHATSAPP_FROM,
+    TWILIO_RETURNS_USER_TEMPLATE_SID,
+    TWILIO_RETURNS_ADMIN_TEMPLATE_SID,
+  ],
+}, async (req) => {
   try {
     const uid = req?.auth?.uid || null;
     if (!uid) throw new HttpsError('unauthenticated', 'Authentication required');
@@ -2988,6 +3000,115 @@ exports.submitRefundRequest = onCall({ region: REGION }, async (req) => {
     const topRef = await db.collection('refundRequests').add(payload);
     await db.collection('users').doc(uid).collection('refundRequests').doc(topRef.id).set({ ...payload, id: topRef.id });
     try { await idxRef.set({ requestId: topRef.id, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
+
+    // Attempt Twilio WhatsApp notifications (user + admin)
+    try {
+      const accountSid = TWILIO_ACCOUNT_SID.value() || process.env.TWILIO_ACCOUNT_SID || '';
+      const authToken = TWILIO_AUTH_TOKEN.value() || process.env.TWILIO_AUTH_TOKEN || '';
+      let from = TWILIO_WHATSAPP_FROM.value() || process.env.TWILIO_WHATSAPP_FROM || '';
+      const contentUser = TWILIO_RETURNS_USER_TEMPLATE_SID.value() || process.env.TWILIO_RETURNS_USER_TEMPLATE_SID || 'HXfd3959918469ad13c2782df181e654d2';
+      const contentAdmin = TWILIO_RETURNS_ADMIN_TEMPLATE_SID.value() || process.env.TWILIO_RETURNS_ADMIN_TEMPLATE_SID || 'HX2c64d4319f6f424396905ea64ff71265';
+      const adminToRaw = process.env.TWILIO_RETURNS_ADMIN_TO || '+919873322412';
+
+      const ensureWhatsAppAddr = (num) => {
+        try {
+          let s = String(num || '').trim();
+          if (!s) return '';
+          if (s.startsWith('whatsapp:')) return s;
+          if (!s.startsWith('+')) {
+            const d = s.replace(/[^\d]/g, '');
+            if (d.length === 10) s = '+91' + d; else if (d) s = '+' + d;
+          }
+          return 'whatsapp:' + s;
+        } catch { return ''; }
+      };
+      const normalizeFrom = (v) => {
+        if (!v) return '';
+        if (v.startsWith('whatsapp:')) return v;
+        let s = String(v).trim();
+        if (!s.startsWith('+')) s = '+' + s.replace(/[^\d]/g, '');
+        return 'whatsapp:' + s;
+      };
+
+      from = normalizeFrom(from);
+      const userTo = ensureWhatsAppAddr(payload.contact?.phone || '');
+      const adminTo = ensureWhatsAppAddr(adminToRaw);
+
+      if (accountSid && authToken && from) {
+        const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+        // Build dynamic variables for your HX templates using numeric placeholders
+        const orderIdLabel = String(payload?.orderRef?.orderId || payload?.orderRef?.id || '');
+        const item = payload?.item || {};
+        const product = (() => {
+          try {
+            const parts = [];
+            if (item.name) parts.push(String(item.name));
+            const meta = [];
+            if (item.size) meta.push(`Size ${item.size}`);
+            if (item.qty) meta.push(`x${item.qty}`);
+            if (meta.length) parts.push(`(${meta.join(' ')})`);
+            return parts.join(' ');
+          } catch { return ''; }
+        })();
+        const reasonText = (() => {
+          const r = payload.reason || {};
+          const labels = [];
+          if (r.wrongSize) labels.push('Wrong Size');
+          if (r.damaged) labels.push('Damaged Product');
+          if (r.differentItem) labels.push('Different Item Received');
+          if (r.qualityIssue) labels.push('Quality Issue');
+          if (r.other && r.otherText) labels.push(`Other: ${String(r.otherText)}`);
+          else if (r.other) labels.push('Other');
+          return labels.join(', ');
+        })();
+        const conditionLabel = (() => {
+          const c = String(payload.condition || '').toLowerCase();
+          if (c === 'unused') return 'Unused & Unworn';
+          if (c === 'tried') return 'Tried Once Indoors';
+          if (c === 'used') return 'Used / Worn';
+          return c || '';
+        })();
+        const submittedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const comments = String(payload.comments || '');
+
+        // Separate variable sets for user/admin templates using {{1}}, {{2}}, ...
+        const userVars = JSON.stringify({
+          1: String(payload.contact?.name || ''),
+          2: orderIdLabel,
+          3: product,
+          4: reasonText,
+          5: conditionLabel,
+        });
+        const adminVars = JSON.stringify({
+          1: orderIdLabel,
+          2: `${String(payload.contact?.name || '')} (${String(payload.contact?.phone || '')})`,
+          3: product,
+          4: reasonText,
+          5: conditionLabel,
+          6: submittedAt,
+          7: comments,
+        });
+
+        const send = async (to, contentSid, variables) => {
+          if (!to || !contentSid) return { ok: false, sid: null, error: 'missing to/contentSid' };
+          const body = new URLSearchParams({ To: to, From: from, ContentSid: contentSid, ContentVariables: variables }).toString();
+          const resp = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: `Basic ${auth}` }, body });
+          if (!resp.ok) { const txt = await resp.text().catch(()=> ''); return { ok: false, sid: null, error: txt || `HTTP ${resp.status}` }; }
+          const msg = await resp.json().catch(()=>({}));
+          return { ok: true, sid: msg?.sid || null };
+        };
+        // Send to user (if they provided a valid phone)
+        try { if (userTo) await send(userTo, contentUser, userVars); } catch (e) { console.warn('[refunds] user WhatsApp send failed', e?.message || e); }
+        // Send to admin
+        try { if (adminTo) await send(adminTo, contentAdmin, adminVars); } catch (e) { console.warn('[refunds] admin WhatsApp send failed', e?.message || e); }
+      } else {
+        console.warn('[refunds] Twilio config missing: skip WhatsApp');
+      }
+    } catch (e) {
+      console.warn('[refunds] Twilio send error', e?.message || e);
+    }
+
     return { ok: true, id: topRef.id };
   } catch (e) {
     if (e instanceof HttpsError) throw e;
