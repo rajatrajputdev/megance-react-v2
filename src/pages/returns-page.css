@@ -135,6 +135,27 @@
   opacity: 1;
 }
 
+.returns-page .view-request-btn {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #000;
+  color: #000;
+  background: transparent;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background .2s ease, color .2s ease, box-shadow .2s ease;
+}
+.returns-page .view-request-btn:hover {
+  background: #000;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(0,0,0,.18);
+}
+
+.returns-page .returns-disabled {
+  opacity: .6;
+}
+
 @media (max-width: 768px) {
   .returns-page .card-like {
     padding: 20px;

@@ -33,6 +33,8 @@ export default function Account() {
   const otpBlockRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [refunds, setRefunds] = useState([]);
+  const [refundsLoading, setRefundsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -46,6 +48,19 @@ export default function Account() {
       setOrders(list);
       setOrdersLoading(false);
     }, () => setOrdersLoading(false));
+    return () => unsub();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "refundRequests"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = [];
+      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+      list.sort((a,b)=>((b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0)));
+      setRefunds(list);
+      setRefundsLoading(false);
+    }, () => setRefundsLoading(false));
     return () => unsub();
   }, [user]);
 
@@ -280,6 +295,35 @@ export default function Account() {
                           <div className="mt-4"></div>
                           <div className="mt-6">
                             <a className="account-secondary-btn account-secondary-btn--sm" href={`/account/orders/${o.id}`}>View</a>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="p-20 card-like glass-surface strong-elevation orders-card mt-20">
+              <h4 className="mb-10">Refund Requests</h4>
+              {refundsLoading ? (
+                <p className="opacity-7">Loading refund requests…</p>
+              ) : refunds.length === 0 ? (
+                <p className="opacity-7">No refund requests yet.</p>
+              ) : (
+                <ul className="orders-list mt-10">
+                  {refunds.map((r) => (
+                    <li key={r.id} className="order-item glass-surface">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                          <div className="fw-600">Request #{r.id.slice(0,6).toUpperCase()}</div>
+                          <div className="small mt-4">Order: #{(r.orderRef?.orderId || r.orderRef?.id || '').slice(0,6).toUpperCase()}</div>
+                          <div className="opacity-7 small">{r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString() : ''}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="badge status">{(r.status || 'requested').toString()}</div>
+                          <div className="mt-6">
+                            <a className="account-secondary-btn account-secondary-btn--sm" href={`/return-success?requestId=${encodeURIComponent(r.id)}&orderId=${encodeURIComponent(r.orderRef?.orderId || r.orderRef?.id || '')}`}>View</a>
                           </div>
                         </div>
                       </div>

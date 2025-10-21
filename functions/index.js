@@ -2913,3 +2913,84 @@ exports.getOrderShipmentStatus = onCall(
     }
   }
 );
+
+// Submit a refund request (server authoritative write)
+exports.submitRefundRequest = onCall({ region: REGION }, async (req) => {
+  try {
+    const uid = req?.auth?.uid || null;
+    if (!uid) throw new HttpsError('unauthenticated', 'Authentication required');
+    const body = (req?.data && typeof req.data === 'object') ? req.data : {};
+
+    // Basic validation
+    const contact = body.contact || {};
+    if (!contact.name || !contact.email || !contact.phone) {
+      throw new HttpsError('invalid-argument', 'Missing contact details');
+    }
+    const orderRef = body.orderRef || {};
+    if (!orderRef.id) throw new HttpsError('invalid-argument', 'Missing order reference');
+
+    // Whitelist shape to avoid storing unexpected fields
+    const images = Array.isArray(body.images) ? body.images.map((x) => ({
+      path: String(x.path || ''),
+      publicUrl: String(x.publicUrl || ''),
+      name: String(x.name || ''),
+      size: Number(x.size || 0),
+      type: String(x.type || ''),
+    })) : [];
+    const payload = {
+      userId: uid,
+      orderRef: { id: String(orderRef.id || ''), orderId: String(orderRef.orderId || orderRef.id || '') },
+      item: body.item || null,
+      contact: { name: String(contact.name), email: String(contact.email), phone: String(contact.phone) },
+      address: String(body.address || ''),
+      deliveryDate: body.deliveryDate || null,
+      reason: body.reason || {},
+      condition: String(body.condition || ''),
+      resolution: String(body.resolution || 'refund'),
+      refundMethod: String(body.refundMethod || 'prepaid'),
+      bank: body.refundMethod === 'cod' ? (body.bank || {}) : null,
+      comments: String(body.comments || ''),
+      images,
+      declarations: body.declarations || {},
+      signature: String(body.signature || ''),
+      requestDate: String(body.requestDate || ''),
+      status: 'requested',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const db = admin.firestore();
+    // Enforce single request per user per order via index doc
+    const idxKey = `${uid}_${payload.orderRef.id}`;
+    const idxRef = db.collection('refundRequestsIndex').doc(idxKey);
+    try {
+      await idxRef.create({ userId: uid, orderId: payload.orderRef.id, requestId: null, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+    } catch (e) {
+      // Index exists → fetch and return existing
+      const idxSnap = await idxRef.get();
+      const idx = idxSnap.exists ? idxSnap.data() : null;
+      if (idx && idx.requestId) return { ok: true, id: idx.requestId, already: true };
+      // Fallback: query existing request
+      const existingSnap = await db
+        .collection('refundRequests')
+        .where('userId', '==', uid)
+        .where('orderRef.id', '==', payload.orderRef.id)
+        .limit(1)
+        .get();
+      if (!existingSnap.empty) {
+        const docRef = existingSnap.docs[0];
+        // Attempt to backfill index
+        try { await idxRef.set({ userId: uid, orderId: payload.orderRef.id, requestId: docRef.id, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
+        return { ok: true, id: docRef.id, already: true };
+      }
+      // If we get here, index existed but no request doc; proceed to create a new request
+    }
+
+    const topRef = await db.collection('refundRequests').add(payload);
+    await db.collection('users').doc(uid).collection('refundRequests').doc(topRef.id).set({ ...payload, id: topRef.id });
+    try { await idxRef.set({ requestId: topRef.id, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch {}
+    return { ok: true, id: topRef.id };
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    throw new HttpsError('internal', e?.message || 'Failed to submit refund request');
+  }
+});

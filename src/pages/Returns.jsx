@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { collection, onSnapshot, orderBy, query, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
-import { db } from "../firebase.js";
+import { collection, onSnapshot, orderBy, query, serverTimestamp, where, limit as qlimit, getDocs } from "firebase/firestore";
+import { app, db } from "../firebase.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import SEO from "../components/general_components/SEO.jsx";
 import "./returns-page.css";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
-import { requestReturn, getOrderShipmentStatus } from "../services/orders.js";
 import { supabaseUploadFile } from "../utils/supabase.js";
 import Footer from "../components/homepage_components/Footer.jsx";
 
@@ -18,9 +17,10 @@ export default function ReturnsPage() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [selectedItemIndex, setSelectedItemIndex] = useState(0);
-  const [liveStatus, setLiveStatus] = useState("");
-  const [liveBusy, setLiveBusy] = useState(false);
+  // Removed live shipment status and booking; simple submit only.
   const location = useLocation();
+  const [existingReq, setExistingReq] = useState(null);
+  const [checkingExisting, setCheckingExisting] = useState(false);
 
   // Prefillable info
   const [form, setForm] = useState({
@@ -85,6 +85,35 @@ export default function ReturnsPage() {
     return arr[selectedItemIndex] || null;
   }, [selectedOrder, selectedItemIndex]);
 
+  // Client-side duplicate guard: check if a refund request already exists for this order
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!user || !selectedOrderId) { setExistingReq(null); return; }
+        setCheckingExisting(true);
+        const qref = query(
+          collection(db, 'users', user.uid, 'refundRequests'),
+          where('orderRef.id', '==', selectedOrderId),
+          qlimit(1)
+        );
+        const snap = await getDocs(qref);
+        if (cancelled) return;
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          setExistingReq({ id: d.id, ...d.data() });
+        } else {
+          setExistingReq(null);
+        }
+      } catch (_) {
+        if (!cancelled) setExistingReq(null);
+      } finally {
+        if (!cancelled) setCheckingExisting(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, selectedOrderId]);
+
   // Prefill when order or item changes
   useEffect(() => {
     const o = selectedOrder;
@@ -106,25 +135,7 @@ export default function ReturnsPage() {
     }));
   }, [selectedOrderId, selectedItemIndex, profile?.name, profile?.email, profile?.phone]);
 
-  // Fetch latest live shipment status for the selected order (XpressBees)
-  useEffect(() => {
-    const run = async () => {
-      try {
-        const o = selectedOrder;
-        if (!o) { setLiveStatus(""); return; }
-        const awb = o?.returnAwb || o?.xbAwb;
-        if (!awb) { setLiveStatus(""); return; }
-        setLiveBusy(true);
-        const res = await getOrderShipmentStatus({ orderId: o.orderId || o.id, prefer: o?.returnAwb ? 'return' : 'forward' });
-        if (res?.ok) setLiveStatus(res.summary || "");
-      } catch {
-        setLiveStatus("");
-      } finally {
-        setLiveBusy(false);
-      }
-    };
-    run();
-  }, [selectedOrder]);
+  // Shipment tracking & booking removed per request.
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   const onReasonChange = (e) => setForm((f) => ({ ...f, reason: { ...f.reason, [e.target.name]: e.target.checked } }));
@@ -218,6 +229,15 @@ export default function ReturnsPage() {
 
   const submit = async () => {
     setTouchedSubmit(true);
+    // Early guard: if a request already exists for this order, do not upload again
+    if (existingReq && existingReq.id) {
+      showToast('info', 'A refund request already exists for this order');
+      try {
+        const oid = selectedOrder?.orderId || selectedOrder?.id || '';
+        navigate(`/return-success?requestId=${encodeURIComponent(existingReq.id)}&orderId=${encodeURIComponent(oid)}`);
+      } catch {}
+      return;
+    }
     const err = validate();
     if (err) { showToast("error", err); return; }
     setSubmitting(true);
@@ -256,81 +276,33 @@ export default function ReturnsPage() {
         createdAt: serverTimestamp(),
         status: 'requested',
       };
-      // Store in a common top-level collection for ops and under user for easy access
-      const topRef = await addDoc(collection(db, "refundRequests"), payload);
-      showToast('info', 'Request saved. Booking pickup…');
-      await addDoc(collection(db, "users", user.uid, "refundRequests"), { ...payload, id: topRef.id });
-      // Also schedule reverse pickup with XpressBees
-      try {
-        const orderDocId = selectedOrder.orderId || selectedOrder.id;
-        const reasonLabel = (() => {
-          if (form.reason.wrongSize) return 'size_issue';
-          if (form.reason.damaged) return 'defective';
-          if (form.reason.differentItem) return 'wrong_item';
-          if (form.reason.qualityIssue) return 'quality';
-          if (form.reason.other) return 'other';
-          return 'other';
-        })();
-        const notes = [form.reason.other ? form.reason.otherText : '', form.comments].filter(Boolean).join(' | ');
-        // Build pickup override from form (address string may embed pin)
-        const pickup = (() => {
-          const out = { name: form.fullName, phone: form.phone, address: form.address };
-          // Prefer existing order billing city/state/zip if present
-          if (selectedOrder?.billing?.city) out.city = selectedOrder.billing.city;
-          if (selectedOrder?.billing?.state) out.state = selectedOrder.billing.state;
-          if (selectedOrder?.billing?.zip) out.zip = selectedOrder.billing.zip;
-          // Fallback: parse pincode from the address text
-          try {
-            if (!out.zip) {
-              const pinMatch = String(form.address || '').match(/\b(\d{6})\b/);
-              if (pinMatch) out.zip = pinMatch[1];
-            }
-          } catch {}
-          return out;
-        })();
-        const rr = await requestReturn(orderDocId, { reason: reasonLabel, notes, pickup });
-        if (rr?.ok || rr?.already) {
-          const awb = rr.awb;
-          showToast("success", `Request submitted & pickup scheduled.${awb ? ` AWB ${awb}` : ''}`);
-          // Optionally update the top-level refund request record with AWB
-          try {
-            const r = doc(db, 'refundRequests', topRef.id);
-            await setDoc(r, { scheduled: true, awb: awb || null, updatedAt: serverTimestamp() }, { merge: true });
-          } catch {}
-          // Reset only after successful booking
-          setForm((f) => ({
-            ...f,
-            reason: { ...f.reason, wrongSize: false, damaged: false, differentItem: false, qualityIssue: false, other: false, otherText: "" },
-            condition: "",
-            images: [],
-            resolution: "refund",
-            refundMethod: "prepaid",
-            bank: { accountHolder: "", bankName: "", accountNumber: "", ifsc: "", upi: "" },
-            comments: "",
-            declarations: { unusedOriginal: false, deductionConsent: false, timelineConsent: false },
-            signature: "",
-            requestDate: new Date().toISOString().slice(0,10),
-          }));
-          setUploadProgress(0);
-          setSubmitting(false);
-          // Navigate to success page with AWB
-          try {
-            const oid = selectedOrder.orderId || selectedOrder.id;
-            navigate(`/return-success?awb=${encodeURIComponent(awb || '')}&orderId=${encodeURIComponent(oid)}`);
-          } catch {}
-          return;
-        } else if (rr?.error) {
-          showToast("error", rr.error);
-        }
-      } catch (e) {
-        showToast("error", e.message || 'Failed to schedule pickup');
-      }
-      // If we reach here, booking didn't succeed, but the request is saved.
-      showToast("error", "Pickup scheduling took longer than expected. We received your request and will arrange pickup.");
-      try {
-        const oid = selectedOrder.orderId || selectedOrder.id;
-        navigate(`/return-success?orderId=${encodeURIComponent(oid)}`);
-      } catch {}
+      // Use server callable to enforce single request per order
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const region = (import.meta.env.VITE_FUNCTIONS_REGION || '').trim() || undefined;
+      const fns = getFunctions(app, region);
+      const call = httpsCallable(fns, 'submitRefundRequest');
+      const res = await call(payload);
+      const requestId = res?.data?.id || null;
+      const already = !!res?.data?.already;
+      showToast('success', 'Return request submitted');
+      // Reset form and go to thank-you
+      setForm((f) => ({
+        ...f,
+        reason: { ...f.reason, wrongSize: false, damaged: false, differentItem: false, qualityIssue: false, other: false, otherText: "" },
+        condition: "",
+        images: [],
+        resolution: "refund",
+        refundMethod: "prepaid",
+        bank: { accountHolder: "", bankName: "", accountNumber: "", ifsc: "", upi: "" },
+        comments: "",
+        declarations: { unusedOriginal: false, deductionConsent: false, timelineConsent: false },
+        signature: "",
+        requestDate: new Date().toISOString().slice(0,10),
+      }));
+      setUploadProgress(0);
+      setSubmitting(false);
+      const oid = selectedOrder.orderId || selectedOrder.id;
+      navigate(`/return-success?requestId=${encodeURIComponent(requestId || '')}&orderId=${encodeURIComponent(oid)}`);
     } catch (e) {
       showToast("error", e.message || "Failed to submit request");
     } finally {
@@ -372,26 +344,25 @@ export default function ReturnsPage() {
                     ))}
                   </select>
                 )}
+                {existingReq && (
+                  <div className="inline-hint mt-6" style={{ color: '#c33' }}>
+                    A refund request already exists for this order.{' '}
+                    <a className="underline" href={`/return-success?requestId=${encodeURIComponent(existingReq.id)}&orderId=${encodeURIComponent(selectedOrder?.orderId || selectedOrder?.id || '')}`}>View request</a>.
+                  </div>
+                )}
+                {existingReq && (
+                  <div className="mt-8">
+                    <a
+                      className="view-request-btn"
+                      href={`/return-success?requestId=${encodeURIComponent(existingReq.id)}&orderId=${encodeURIComponent(selectedOrder?.orderId || selectedOrder?.id || '')}`}
+                    >
+                      View Request
+                    </a>
+                  </div>
+                )}
               </div>
 
-              {/* Shipment info and tracking */}
-              {selectedOrder && (selectedOrder.xbAwb || selectedOrder.returnAwb) && (
-                <div className="returns-section">
-                  <div className="returns-section-title">Shipment & Tracking</div>
-                  <div className="small opacity-7">Shipment</div>
-                  {selectedOrder.xbAwb && (
-                    <div className="small">Forward AWB: <strong>{selectedOrder.xbAwb}</strong> {" "}
-                      <a className="underline ml-6" href={`https://www.xpressbees.com/track?awb=${encodeURIComponent(selectedOrder.xbAwb)}`} target="_blank" rel="noreferrer">Track</a>
-                    </div>
-                  )}
-                  {selectedOrder.returnAwb && (
-                    <div className="small">Return AWB: <strong>{selectedOrder.returnAwb}</strong> {" "}
-                      <a className="underline ml-6" href={`https://www.xpressbees.com/track?awb=${encodeURIComponent(selectedOrder.returnAwb)}`} target="_blank" rel="noreferrer">Track</a>
-                    </div>
-                  )}
-                  <div className="small">Live Status: {liveBusy ? 'Fetching…' : (liveStatus || '—')}</div>
-                </div>
-              )}
+              {/* Shipment & tracking removed for simplified flow */}
 
               {/* Item selection within order */}
               {selectedOrder && (
@@ -406,6 +377,8 @@ export default function ReturnsPage() {
                 </div>
               )}
 
+              {/* Disable form sections when request exists */}
+              <fieldset disabled={!!existingReq} className={existingReq ? 'returns-disabled' : undefined}>
               {/* Contact + Address (read only) */}
               <div className="returns-section">
                 <div className="returns-section-title">Contact & Address</div>
@@ -592,10 +565,11 @@ export default function ReturnsPage() {
                 <div className="mt-10 small opacity-7">Uploading evidence: {uploadProgress}%</div>
               )}
               <div className="d-flex justify-content-end mt-15">
-                <button className="butn butn-md butn-rounded submit-btn" disabled={submitting || loadingOrders || !selectedOrder} onClick={submit} type="button" aria-busy={submitting ? 'true' : 'false'}>
+                <button className="butn butn-md butn-rounded submit-btn" disabled={submitting || loadingOrders || !selectedOrder || !!existingReq} onClick={submit} type="button" aria-busy={submitting ? 'true' : 'false'} title={existingReq ? 'Request already exists' : 'Submit'}>
                   {submitting ? "Submitting…" : "Submit Request"}
                 </button>
               </div>
+              </fieldset>
             </div>
           </div>
         </div>
