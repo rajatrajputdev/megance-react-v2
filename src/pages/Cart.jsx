@@ -255,24 +255,25 @@ export default function CartPage() {
               {/* Benefits */}
               <div className="benefit-cards">
                 <div className="benefit-card glass-surface">
-                  {/* <div className="benefit-img">
-                    <img src="/assets/imgs/cart/free-shipping.jpg" alt="Free shipping" />
-                  </div> */}
+              
                   <div className="benefit-content">
                     <div className="benefit-title">Free Shipping</div>
                     <div className="benefit-text">Enjoy complimentary delivery on all orders.</div>
                   </div>
                 </div>
 
-                {/* <div className="benefit-card glass-surface">
-                  <div className="benefit-img">
-                    <img src="/assets/imgs/cart/bundle-discount.jpg" alt="Bundle discount" />
-                  </div>
+                <div className="benefit-card glass-surface">
                   <div className="benefit-content">
-                    <div className="benefit-title">Bundle & Save</div>
-                    <div className="benefit-text">Buy 2 or more pairs and save more.</div>
+                    <div className="benefit-title">Delivery in 3 - 5 Days</div>
+                    <div className="benefit-text">Enjoy Superfast delivery in 3 to 5 days</div>
                   </div>
-                </div> */}
+                </div> 
+                <div className="benefit-card glass-surface">
+                  <div className="benefit-content">
+                    <div className="benefit-title">5 Days Return policy</div>
+                    <div className="benefit-text">Enjoy a super easy return proves</div>
+                  </div>
+                </div> 
               </div>
             </aside>
           </div>

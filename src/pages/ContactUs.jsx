@@ -12,17 +12,17 @@ export default function ContactUs() {
         <p className="contact-sub">We’re here to help and answer any questions you might have.</p>
 
         <div className="contact-card">
-          <h3>📩 Email Support</h3>
+          <h3>Email Support</h3>
           <p>support@megance.com</p>
         </div>
 
         <div className="contact-card">
-          <h3>📞 WhatsApp / Call</h3>
+          <h3>WhatsApp / Call</h3>
           <p>+91 93119 39989</p>
         </div>
 
         <div className="contact-card">
-          <h3>⏰ Support Hours</h3>
+          <h3>Support Hours</h3>
           <p>Monday – Saturday | 10:00 AM – 6:00 PM IST</p>
         </div>
 

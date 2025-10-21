@@ -71,8 +71,8 @@
   transform: translateY(-1px);
 }
 
-/* Summary (sticky) */
-.summary { position: sticky; top: 20px; height: fit-content; }
+/* Summary (non-sticky, stays in normal flow) */
+.summary { position: relative !important; height: fit-content; }
 .summary-box { padding: 20px; }
 .summary-title { font-weight: 700; margin-bottom: 14px; font-size: 18px; }
 .summary-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
@@ -156,4 +156,72 @@ body.show-cart-drawer .cart-drawer__panel { transform: translateX(0); }
   .item-thumb img { width: 84px; height: 84px; }
   
 .cart-page.container-narrow {  padding: 24px 10px; }
+}
+
+/* ===== FINAL STICKY SUMMARY FIX ===== */
+
+.cart-grid {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 28px;
+  align-items: start;              /* ✅ prevents summary from dropping below items */
+  overflow: visible !important;    /* ✅ allows sticky to work properly */
+}
+
+.cart-page.container-narrow {
+  overflow: visible !important;    /* ✅ ensures sticky isn't clipped by parent */
+}
+
+/* --- Sticky Summary on Desktop --- */
+@media (min-width: 961px) {
+  .summary {
+    position: sticky !important;
+    top: 100px;                    /* ✅ adjust based on navbar height */
+    align-self: start;
+    height: fit-content;
+    z-index: 3;                    /* ✅ prevents being hidden behind other blocks */
+  }
+
+  /* Ensure smooth scroll and proper stacking */
+  html, body {
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
+  /* Spacing below summary to avoid jump when free shipping renders */
+  .benefit-cards {
+    margin-top: 20px;
+    position: relative;
+    z-index: 2;
+  }
+}
+
+/* --- Mobile Behavior --- */
+@media (max-width: 960px) {
+  .cart-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .summary {
+    position: static !important;
+    top: auto !important;
+    z-index: 1;
+  }
+
+  .cart-page.container-narrow {
+    padding: 24px 10px;
+  }
+}
+
+/* --- Optional: subtle sticky animation --- */
+@supports (animation-timeline: scroll()) {
+  @keyframes sticky-fade {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .summary {
+    animation: sticky-fade 0.4s ease-out both;
+  }
 }
