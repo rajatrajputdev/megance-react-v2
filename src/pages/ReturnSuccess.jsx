@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import SEO from "../components/general_components/SEO.jsx";
+import Footer from "../components/homepage_components/Footer.jsx";
 
 export default function ReturnSuccess() {
   const loc = useLocation();
@@ -34,8 +35,8 @@ export default function ReturnSuccess() {
             </div>
           </div>
         </div>
-      </section>
+    </section>
+    <Footer />
     </>
   );
 }
-

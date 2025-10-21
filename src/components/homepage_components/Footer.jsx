@@ -91,7 +91,7 @@ export default function Footer() {
             <ul>
               <li><Link to="/#faq2">FAQs</Link></li>
               <li><Link to="/terms">Shipping</Link></li>
-              <li><Link to="/terms">Returns</Link></li>
+              <li><Link to="/returns">Returns</Link></li>
               <li><a href="/contact-us">Contact</a></li>
             </ul>
           </div>
@@ -123,7 +123,7 @@ export default function Footer() {
           <div className="rh-right">
             <Link to="/terms">Terms</Link>
             <Link to="/privacy">Privacy</Link>
-            <Link to="/terms">Returns</Link>
+            <Link to="/returns">Returns</Link>
           </div>
         </div>
       </div>

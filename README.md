@@ -115,3 +115,12 @@ Coupons
 - Server validates coupons through callable `previewCoupon` (auth required). It enforces active window, minimum amount, global `maxUses`, and per-user limits, and returns `{ ok, code, discount }`.
 - When an order is created, redemption finalizes server-side (in both the Firestore trigger and callable `decrementStockForOrder`). It increments `coupons/{code}.totalUses` and `coupons/{code}/users/{uid}.count`, and annotates the order with `coupon = { code, discount, valid }`.
 - Frontend calls `previewCoupon` on apply and includes `couponCode` in the order payload. The discount shown is the server’s computed value.
+
+Returns uploads (Supabase)
+
+- Returns/Refund form stores request metadata in Firestore (`refundRequests`) and uploads evidence images to Supabase Storage for efficient public delivery.
+- Configure the following env vars in `.env`:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+  - `VITE_SUPABASE_BUCKET` (defaults to `refund-requests`)
+- The form saves the `publicUrl` for each uploaded file into Firestore.

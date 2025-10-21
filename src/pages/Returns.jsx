@@ -4,9 +4,11 @@ import { collection, onSnapshot, orderBy, query, addDoc, serverTimestamp, doc, s
 import { db } from "../firebase.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import SEO from "../components/general_components/SEO.jsx";
+import "./returns-page.css";
 import { useToast } from "../components/general_components/ToastProvider.jsx";
 import { requestReturn, getOrderShipmentStatus } from "../services/orders.js";
-import { supabaseUploadFile, supabaseGetSignedUrl } from "../utils/supabase.js";
+import { supabaseUploadFile } from "../utils/supabase.js";
+import Footer from "../components/homepage_components/Footer.jsx";
 
 export default function ReturnsPage() {
   const { user, profile } = useAuth();
@@ -133,6 +135,24 @@ export default function ReturnsPage() {
   const onBankChange = (e) => setForm((f) => ({ ...f, bank: { ...f.bank, [e.target.name]: e.target.value } }));
   const onDecChange = (e) => setForm((f) => ({ ...f, declarations: { ...f.declarations, [e.target.name]: e.target.checked } }));
 
+  // Filter images: image/* only, up to 5 files, 5MB each
+  const handleFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    let err = "";
+    const filtered = files
+      .filter((f) => {
+        const okType = f.type && f.type.startsWith("image/");
+        const okSize = f.size <= 5 * 1024 * 1024;
+        if (!okType) err = "Only image files are allowed";
+        if (!okSize) err = "Each image must be under 5 MB";
+        return okType && okSize;
+      })
+      .slice(0, 5);
+    if (files.length > 5) err = "You can attach up to 5 images";
+    setFileError(err);
+    setForm((f) => ({ ...f, images: filtered }));
+  };
+
   const onFiles = (e) => {
     const files = Array.from(e.target.files || []);
     setForm((f) => ({ ...f, images: files }));
@@ -147,13 +167,44 @@ export default function ReturnsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [touchedSubmit, setTouchedSubmit] = useState(false);
+  const [fileError, setFileError] = useState("");
+  const [previews, setPreviews] = useState([]);
+
+  const validEmail = (s) => /.+@.+\..+/.test(String(s||"").trim());
+  const validPhone = (s) => {
+    const x = String(s||"").trim();
+    if (!x) return false;
+    if (x.startsWith("+")) return /^\+\d{10,15}$/.test(x);
+    const d = x.replace(/\D/g, "");
+    return d.length === 10; // Allow local 10-digit
+  };
+
+  // Build preview object URLs for selected images; revoke on change/unmount
+  useEffect(() => {
+    const files = Array.from(form.images || []);
+    const urls = files.map((f) => ({ url: URL.createObjectURL(f), name: f.name }));
+    setPreviews(urls);
+    return () => { try { urls.forEach((u) => URL.revokeObjectURL(u.url)); } catch {} };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.images]);
+
+  const removeImage = (idx) => {
+    setForm((f) => {
+      const arr = Array.from(f.images || []);
+      arr.splice(idx, 1);
+      return { ...f, images: arr };
+    });
+  };
   const validate = () => {
     if (!selectedOrder) return "Select an order";
-    if (!form.fullName || !form.email || !form.phone) return "Contact details missing";
+    if (!form.fullName) return "Full name is required";
+    if (!form.email || !validEmail(form.email)) return "Enter a valid email";
+    if (!form.phone || !validPhone(form.phone)) return "Enter a valid phone number";
     // At least one reason
     if (!form.reason.wrongSize && !form.reason.damaged && !form.reason.differentItem && !form.reason.qualityIssue && !form.reason.other) return "Select a reason";
     if (form.reason.other && !form.reason.otherText.trim()) return "Please specify other reason";
     if (!form.condition) return "Select product condition";
+    if (!Array.from(form.images || []).length) return "Attach at least 1 image";
     // resolution fixed to refund
     if (!form.refundMethod) return "Select refund method";
     if (form.refundMethod === 'cod') {
@@ -181,14 +232,8 @@ export default function ReturnsPage() {
         const clean = (f.name || 'file').replace(/[^a-zA-Z0-9_.-]/g, '_');
         const path = `refundRequests/${user.uid}/${Date.now()}_${i}_${clean}`;
         const res = await supabaseUploadFile({ file: f, path });
-        // Try public URL first; fallback to signed url
-        let url = res.publicUrl;
-        try {
-          // quick HEAD check could be added; instead generate signed URL in case bucket is private
-          const signed = await supabaseGetSignedUrl({ path, expiresIn: 60 * 60 * 24 });
-          if (signed) url = signed;
-        } catch {}
-        uploads.push({ path, url, name: f.name, size: f.size, type: f.type });
+        // Save public URL in Firestore
+        uploads.push({ path, publicUrl: res.publicUrl, name: f.name, size: f.size, type: f.type });
         setUploadProgress(Math.round(((i + 1) / total) * 100));
       }
       const payload = {
@@ -293,18 +338,28 @@ export default function ReturnsPage() {
     }
   };
 
+  // Prefill badges detection
+  const billing = selectedOrder?.billing || {};
+  const eq = (a, b) => String(a || '').trim() === String(b || '').trim();
+  const orderAddress = [billing.address, billing.city, billing.state, billing.zip].filter(Boolean).join(', ');
+  const isNamePrefilled = eq(form.fullName, (profile?.name || billing.name || ''));
+  const isEmailPrefilled = eq(form.email, (profile?.email || billing.email || ''));
+  const isPhonePrefilled = eq(form.phone, (profile?.phone || billing.phone || ''));
+  const isAddressPrefilled = eq(form.address, orderAddress);
+
   return (
     <>
       <SEO title="Returns" description="Initiate a return for your order." image="/assets/logo.svg" type="website" twitterCard="summary" />
-      <section className="container page-section white-navbar-page">
+      <section className="container page-section white-navbar-page returns-page">
         <div className="row justify-content-center">
           <div className="col-lg-9">
             <div className="p-20 card-like">
               <h3 className="mb-6">RETURN REQUEST</h3>
-              <p className="opacity-7">Please fill in the details below to initiate a return. No exchanges are offered at this time. Our support team will review your request within 24–48 hours and get in touch via WhatsApp or email.</p>
+              <p className="opacity-7 returns-intro">Please fill in the details below to initiate a return. No exchanges are offered at this time. Our support team will review your request within 24–48 hours and get in touch via WhatsApp or email.</p>
 
               {/* Order selection */}
-              <div className="mt-15">
+              <div className="returns-section">
+                <div className="returns-section-title">Order</div>
                 <label className="fw-600">Select Previous Order</label>
                 {loadingOrders ? (
                   <div className="opacity-7 mt-6">Loading your orders…</div>
@@ -321,7 +376,8 @@ export default function ReturnsPage() {
 
               {/* Shipment info and tracking */}
               {selectedOrder && (selectedOrder.xbAwb || selectedOrder.returnAwb) && (
-                <div className="mt-10">
+                <div className="returns-section">
+                  <div className="returns-section-title">Shipment & Tracking</div>
                   <div className="small opacity-7">Shipment</div>
                   {selectedOrder.xbAwb && (
                     <div className="small">Forward AWB: <strong>{selectedOrder.xbAwb}</strong> {" "}
@@ -339,7 +395,8 @@ export default function ReturnsPage() {
 
               {/* Item selection within order */}
               {selectedOrder && (
-                <div className="mt-10">
+                <div className="returns-section">
+                  <div className="returns-section-title">Item</div>
                   <label className="fw-600">Select Product in Order</label>
                   <select className="form-control mt-6" value={selectedItemIndex} onChange={(e)=>setSelectedItemIndex(Number(e.target.value)||0)}>
                     {(selectedOrder.items||[]).map((it, idx) => (
@@ -350,48 +407,55 @@ export default function ReturnsPage() {
               )}
 
               {/* Contact + Address (read only) */}
-              <div className="row mt-15">
-                <div className="col-md-6 mb-10">
-                  <label>Full Name</label>
-                  <input className="form-control" name="fullName" value={form.fullName} onChange={onChange} />
-                  {touchedSubmit && !form.fullName && <div className="inline-error mt-4">Full name is required</div>}
-                </div>
-                <div className="col-md-6 mb-10">
-                  <label>Order ID</label>
-                  <input className="form-control" value={selectedOrder ? (selectedOrder.orderId || selectedOrder.id) : ""} readOnly />
-                </div>
-                <div className="col-md-6 mb-10">
-                  <label>Registered Email ID</label>
-                  <input className="form-control" name="email" value={form.email} onChange={onChange} />
-                  {touchedSubmit && !form.email && <div className="inline-error mt-4">Email is required</div>}
-                </div>
-                <div className="col-md-6 mb-10">
-                  <label>Phone Number / WhatsApp</label>
-                  <input className="form-control" name="phone" value={form.phone} onChange={onChange} />
-                  {touchedSubmit && !form.phone && <div className="inline-error mt-4">Phone is required</div>}
-                </div>
-                <div className="col-12 mb-10">
-                  <label>Delivery Address (from order)</label>
-                  <textarea className="form-control" value={form.address} readOnly />
-                  <div className="form-hint">Address is fixed as per the original order and cannot be changed.</div>
+              <div className="returns-section">
+                <div className="returns-section-title">Contact & Address</div>
+                <div className="row mt-10">
+                  <div className="col-md-6 mb-10">
+                    <label>Full Name {isNamePrefilled && <small className="prefill-tag">Prefilled</small>}</label>
+                    <input className="form-control" name="fullName" value={form.fullName} onChange={onChange} />
+                    {touchedSubmit && !form.fullName && <div className="inline-error mt-4">Full name is required</div>}
+                  </div>
+                  <div className="col-md-6 mb-10">
+                    <label>Order ID</label>
+                    <input className="form-control" value={selectedOrder ? (selectedOrder.orderId || selectedOrder.id) : ""} readOnly />
+                  </div>
+                  <div className="col-md-6 mb-10">
+                    <label>Registered Email ID {isEmailPrefilled && <small className="prefill-tag">Prefilled</small>}</label>
+                    <input className="form-control" name="email" value={form.email} onChange={onChange} />
+                    {touchedSubmit && !form.email && <div className="inline-error mt-4">Email is required</div>}
+                  </div>
+                  <div className="col-md-6 mb-10">
+                    <label>Phone Number / WhatsApp {isPhonePrefilled && <small className="prefill-tag">Prefilled</small>}</label>
+                    <input className="form-control" name="phone" value={form.phone} onChange={onChange} />
+                    {touchedSubmit && !form.phone && <div className="inline-error mt-4">Phone is required</div>}
+                  </div>
+                  <div className="col-12 mb-10">
+                    <label>Delivery Address (from order) {isAddressPrefilled && <small className="prefill-tag">Prefilled</small>}</label>
+                    <textarea className="form-control" value={form.address} readOnly />
+                    <div className="form-hint">Address is fixed as per the original order and cannot be changed.</div>
+                  </div>
                 </div>
               </div>
 
-              {/* Product + Delivery date */}
-              <div className="row mt-10">
+              {/* Delivery info */}
+              <div className="returns-section">
+                <div className="returns-section-title">Delivery Information</div>
+                <div className="row mt-10">
                 <div className="col-md-8 mb-10">
                   <label>Product Name / Style</label>
                   <input className="form-control" value={form.productDesc} readOnly />
                   <div className="form-hint">e.g., Lisbon Fog – Size 42</div>
                 </div>
-                <div className="col-md-4 mb-10">
-                  <label>Date of Delivery</label>
-                  <input className="form-control" type="date" name="deliveryDate" value={form.deliveryDate} onChange={onChange} />
+                  <div className="col-md-4 mb-10">
+                    <label>Date of Delivery</label>
+                    <input className="form-control" type="date" name="deliveryDate" value={form.deliveryDate} onChange={onChange} />
+                  </div>
                 </div>
               </div>
 
               {/* Reasons */}
-              <div className="mt-10">
+              <div className="returns-section">
+                <div className="returns-section-title">Reason</div>
                 <label className="fw-600">Reason for Return / Refund</label>
                 <div className="mt-6">
                   <label className="checkbox-inline mr-10"><input type="checkbox" name="wrongSize" checked={form.reason.wrongSize} onChange={onReasonChange} /> Wrong Size</label>
@@ -411,7 +475,8 @@ export default function ReturnsPage() {
               </div>
 
               {/* Condition */}
-              <div className="mt-10">
+              <div className="returns-section">
+                <div className="returns-section-title">Condition</div>
                 <label className="fw-600">Product Condition</label>
                 <div className="mt-6">
                   <label className="radio-inline mr-10"><input type="radio" name="condition" value="unused" checked={form.condition === 'unused'} onChange={onCondition} /> Unused & Unworn</label>
@@ -422,13 +487,22 @@ export default function ReturnsPage() {
               </div>
 
               {/* Uploads */}
-              <div className="mt-10">
+              <div className="returns-section">
+                <div className="returns-section-title">Photos</div>
                 <label className="fw-600">Upload Product Images</label>
                 <div className="form-hint">Attach 2–3 clear pictures showing the product and packaging.</div>
-                <input className="form-control mt-6" type="file" multiple accept="image/*" onChange={onFiles} />
+                <input className="form-control mt-6" type="file" multiple accept="image/*" onChange={handleFiles} />
                 {form.images?.length > 0 && (
-                  <div className="mt-6 small">
-                    Selected: {(form.images||[]).map(f=>f.name).join(', ')}
+                  <div className="mt-6">
+                    <div className="small mb-6">Selected images:</div>
+                    <div className="preview-grid">
+                      {previews.map((p, i) => (
+                        <div key={`${p.name}-${i}`} className="preview-item">
+                          <img className="preview-img" src={p.url} alt={p.name} />
+                          <button type="button" className="preview-remove underline" onClick={() => removeImage(i)} aria-label={`Remove ${p.name}`} title="Remove">Remove</button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {submitting && uploadProgress > 0 && (
@@ -437,7 +511,9 @@ export default function ReturnsPage() {
               </div>
 
               {/* Resolution: refund only */}
-              <div className="row mt-10">
+              <div className="returns-section">
+                <div className="returns-section-title">Refund</div>
+                <div className="row mt-10">
                 <div className="col-md-6 mb-10">
                   <label className="fw-600">Refund</label>
                   <div className="mt-6">
@@ -454,11 +530,13 @@ export default function ReturnsPage() {
                   </div>
                   {touchedSubmit && !form.refundMethod && <div className="inline-error mt-6">Select refund method</div>}
                 </div>
+                </div>
               </div>
 
               {/* Bank details for COD */}
               {form.refundMethod === 'cod' && (
-                <div className="mt-10">
+                <div className="returns-section">
+                  <div className="returns-section-title">Bank Details</div>
                   <label className="fw-600">For COD Refunds – Bank / UPI Details</label>
                   <div className="row mt-6">
                     <div className="col-md-6 mb-10"><label>Account Holder Name</label><input className="form-control" name="accountHolder" value={form.bank.accountHolder} onChange={onBankChange} /></div>
@@ -474,13 +552,15 @@ export default function ReturnsPage() {
               )}
 
               {/* Comments */}
-              <div className="mt-10">
+              <div className="returns-section">
+                <div className="returns-section-title">Additional Comments</div>
                 <label>Additional Comments (Optional)</label>
                 <textarea className="form-control" name="comments" value={form.comments} onChange={onChange} rows={3} />
               </div>
 
               {/* Declarations */}
-              <div className="mt-10">
+              <div className="returns-section">
+                <div className="returns-section-title">Declaration</div>
                 <label className="fw-600">Declaration</label>
                 <div className="mt-6">
                   <label className="checkbox-block"><input type="checkbox" name="unusedOriginal" checked={form.declarations.unusedOriginal} onChange={onDecChange} /> I confirm that the product is unused and in its original packaging.</label>
@@ -493,7 +573,9 @@ export default function ReturnsPage() {
               </div>
 
               {/* Signature and date */}
-              <div className="row mt-10">
+              <div className="returns-section">
+                <div className="returns-section-title">Signature</div>
+                <div className="row mt-10">
                 <div className="col-md-8 mb-10">
                   <label>Signature / Digital Consent (type your name)</label>
                   <input className="form-control" name="signature" value={form.signature} onChange={onChange} />
@@ -503,13 +585,14 @@ export default function ReturnsPage() {
                   <label>Date</label>
                   <input className="form-control" type="date" name="requestDate" value={form.requestDate} onChange={onChange} />
                 </div>
+                </div>
               </div>
 
               {uploadProgress > 0 && uploadProgress < 100 && (
                 <div className="mt-10 small opacity-7">Uploading evidence: {uploadProgress}%</div>
               )}
               <div className="d-flex justify-content-end mt-15">
-                <button className="butn butn-md butn-rounded" disabled={submitting || loadingOrders || !selectedOrder} onClick={submit}>
+                <button className="butn butn-md butn-rounded submit-btn" disabled={submitting || loadingOrders || !selectedOrder} onClick={submit} type="button" aria-busy={submitting ? 'true' : 'false'}>
                   {submitting ? "Submitting…" : "Submit Request"}
                 </button>
               </div>
@@ -517,6 +600,7 @@ export default function ReturnsPage() {
           </div>
         </div>
       </section>
+      <Footer />
     </>
   );
 }

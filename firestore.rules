@@ -65,6 +65,21 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Refund Requests
+    // Top-level collection for ops views; client may create their own request document.
+    match /refundRequests/{requestId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Per-user subcollection (mirror) for quick user access
+    match /users/{userId}/refundRequests/{requestId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update, delete: if false;
+    }
+
     // Default: deny
     match /{document=**} {
       allow read, write: if false;
