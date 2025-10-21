@@ -237,36 +237,44 @@ export default function ProductPage() {
 const onMediaMove = (e) => {
   const mediaEl = mediaRef.current;
   const imgEl = imgElRef.current;
-  if (!mediaEl) return;
+  if (!mediaEl || !imgEl) return;
   const rect = mediaEl.getBoundingClientRect();
 
-  const natW = imgEl?.naturalWidth || rect.width;
-  const natH = imgEl?.naturalHeight || rect.height;
-  const scale = Math.min(rect.width / natW, rect.height / natH) || 1;
+  // With object-fit: cover, the image is scaled by the larger factor
+  const natW = imgEl.naturalWidth || rect.width;
+  const natH = imgEl.naturalHeight || rect.height;
+  if (!natW || !natH) return;
+  const scale = Math.max(rect.width / natW, rect.height / natH) || 1;
   const dispW = natW * scale;
   const dispH = natH * scale;
-  const offX = (rect.width - dispW) / 2;
-  const offY = (rect.height - dispH) / 2;
+  const offX = (rect.width - dispW) / 2;  // negative when image spills outside
+  const offY = (rect.height - dispH) / 2; // negative when image spills outside
 
   const clientX = e.touches?.[0]?.clientX ?? e.clientX;
   const clientY = e.touches?.[0]?.clientY ?? e.clientY;
   const cx = clientX - rect.left;
   const cy = clientY - rect.top;
 
-  const minLX = offX;
-  const minLY = offY;
-  const maxLX = offX + dispW - LENS_SIZE;
-  const maxLY = offY + dispH - LENS_SIZE;
+  // Clamp lens within the visible media box, not the (possibly larger) image
+  const minLX = 0;
+  const minLY = 0;
+  const maxLX = rect.width - LENS_SIZE;
+  const maxLY = rect.height - LENS_SIZE;
   const lensX = Math.max(minLX, Math.min(cx - LENS_SIZE / 2, maxLX));
   const lensY = Math.max(minLY, Math.min(cy - LENS_SIZE / 2, maxLY));
   setLensPos({ x: lensX, y: lensY });
 
+  // Background (zoom) image size equals displayed image size times zoom level
   const bgWidth = dispW * ZOOM_LEVEL;
   const bgHeight = dispH * ZOOM_LEVEL;
   setBgSize(`${Math.round(bgWidth)}px ${Math.round(bgHeight)}px`);
 
-  const lensCenterNormX = (lensX - offX + LENS_SIZE / 2) / dispW;
-  const lensCenterNormY = (lensY - offY + LENS_SIZE / 2) / dispH;
+  // Map lens center to the underlying (possibly larger) image coordinates
+  const lensCenterXInImg = lensX + LENS_SIZE / 2 - offX; // subtract negative offset
+  const lensCenterYInImg = lensY + LENS_SIZE / 2 - offY;
+  const lensCenterNormX = Math.max(0, Math.min(1, lensCenterXInImg / dispW));
+  const lensCenterNormY = Math.max(0, Math.min(1, lensCenterYInImg / dispH));
+
   const zoomW = zoomElRef.current?.offsetWidth || 180;
   const zoomH = zoomElRef.current?.offsetHeight || 180;
   const bgX = zoomW / 2 - lensCenterNormX * bgWidth;

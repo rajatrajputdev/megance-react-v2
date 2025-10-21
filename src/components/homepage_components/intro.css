@@ -20,12 +20,11 @@
 
 .intro-media-flat img {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: auto;
-  transform: translate(-50%, -50%);
-  object-fit: contain;
+  height: 100%;
+  object-fit: cover;  /* fill the box */
   transition: opacity 0.35s ease;
 }
 

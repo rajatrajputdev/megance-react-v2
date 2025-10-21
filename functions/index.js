@@ -33,6 +33,20 @@ const MEGANCE_LOGO_URL = process.env.MEGANCE_LOGO_URL ||
 const MEGANCE_WAREHOUSE_ADDRESS = (process.env.MEGANCE_WAREHOUSE_ADDRESS ||
   "A-51, First floor, Meera Bagh, Paschim Vihar, New Delhi 110087").trim();
 
+// Explicit pickup details (hardcoded per request)
+// These values override any env parsing for stable serviceability
+const PICKUP_DETAILS = {
+  warehouse_name: "Megance WH1",
+  name: "Megance",
+  phone: "8882132169",
+  email: "support@megance.com",
+  address: "A-51, First floor, Meera Bagh, Paschim Vihar",
+  city: "NEW DELHI",
+  state: "DELHI",
+  pincode: "110087",
+  gst_number: "07AATCM4525E1ZB",
+};
+
 // Owner email to receive order copies
 const OWNER_EMAIL = "megancetech@gmail.com";
 
@@ -175,25 +189,17 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
   const dh = Number(process.env.XPRESSBEES_DEFAULT_HEIGHT || 10);
 
   // Hardcode pickup (our warehouse) for forward shipments
-  const pickupPhone = phone10(process.env.XPRESSBEES_PICKUP_PHONE || "9999999999");
   const shipPhone = phone10(billing.phone || "");
   const shipPin = pin6(billing.zip || "");
-  const whNameRaw = "Megance Warehouse";
-  const warehouse_name = trunc(whNameRaw, 20) || "MeganceWH1";
-  // Parse the hardcoded warehouse address
-  const whAddrStr = MEGANCE_WAREHOUSE_ADDRESS;
-  const pinMatch = whAddrStr.match(/(\d{6})(?!.*\d)/);
-  const pickupPin = pinMatch ? pin6(pinMatch[1]) : pin6(process.env.XPRESSBEES_PICKUP_PINCODE || "");
-  const whAddrNoPin = whAddrStr.replace(/\d{6}(?!.*\d)/, '').replace(/,\s*$/, '').trim();
-  const { address: pickupAddr1, address_2: pickupAddr2 } = splitAddress(whAddrNoPin);
+  const warehouse_name = trunc(PICKUP_DETAILS.warehouse_name || "Megance WH1", 20);
+  const pickupPhone = phone10(PICKUP_DETAILS.phone || "");
+  const pickupAddr1 = PICKUP_DETAILS.address || "";
+  const pickupAddr2 = "";
+  const pickupPin = pin6(PICKUP_DETAILS.pincode || "");
   const { address: shipAddr1, address_2: shipAddr2 } = splitAddress(
     billing.address || ""
   );
-  const gstNo = (
-    process.env.XPRESSBEES_PICKUP_GST ||
-    process.env.XPRESSBEES_GST_NUMBER ||
-    ""
-  ).trim();
+  const gstNo = (PICKUP_DETAILS.gst_number || process.env.XPRESSBEES_PICKUP_GST || process.env.XPRESSBEES_GST_NUMBER || "").trim();
 
   const order_items = items.map((it) => ({
     name: String(it.name || ""),
@@ -237,11 +243,11 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
     },
     pickup: {
       warehouse_name,
-      name: trunc("Megance", 200),
+      name: trunc(PICKUP_DETAILS.name || "Megance", 200),
       address: pickupAddr1,
       address_2: pickupAddr2,
-      city: trunc("New Delhi", 40),
-      state: trunc("Delhi", 40),
+      city: trunc(PICKUP_DETAILS.city || "NEW DELHI", 40),
+      state: trunc(PICKUP_DETAILS.state || "DELHI", 40),
       pincode: pickupPin,
       phone: pickupPhone,
       ...(gstNo ? { gst_number: gstNo, gst_umber: gstNo } : {}),
@@ -281,26 +287,13 @@ function buildXbReversePayload({ orderLabel, data, pickupOverride }) {
 
   // Consignee is warehouse (where it originally came from)
   // Hardcode consignee (warehouse) for reverse deliveries
-  const whNameRaw = "Megance Warehouse";
-  const warehouse_name = trunc(whNameRaw, 20);
-  // Parse the hardcoded address
-  const whAddrStr = MEGANCE_WAREHOUSE_ADDRESS;
-  const pinMatch = whAddrStr.match(/(\d{6})(?!.*\d)/);
-  const consigneePin = pinMatch ? pin6(pinMatch[1]) : pin6(process.env.XPRESSBEES_PICKUP_PINCODE || "");
-  // Remove pincode from end for cleaner split
-  const whAddrNoPin = whAddrStr.replace(/\d{6}(?!.*\d)/, '').replace(/,\s*$/, '').trim();
-  const { address: consAddr1, address_2: consAddr2 } = splitAddress(whAddrNoPin);
-  // Derive city/state – default to New Delhi / Delhi
-  const cityGuess = (() => {
-    const parts = whAddrNoPin.split(/,\s*/);
-    return parts[parts.length - 1] || 'New Delhi';
-  })();
-  const consigneePhone = phone10(process.env.XPRESSBEES_PICKUP_PHONE || "");
-  const gstNo = (
-    process.env.XPRESSBEES_PICKUP_GST ||
-    process.env.XPRESSBEES_GST_NUMBER ||
-    ""
-  ).trim();
+  const warehouse_name = trunc(PICKUP_DETAILS.warehouse_name || "Megance WH1", 20);
+  const consAddr1 = PICKUP_DETAILS.address || "";
+  const consAddr2 = "";
+  const consigneePin = pin6(PICKUP_DETAILS.pincode || "");
+  const consigneePhone = phone10(PICKUP_DETAILS.phone || "");
+  const cityGuess = PICKUP_DETAILS.city || 'NEW DELHI';
+  const gstNo = (PICKUP_DETAILS.gst_number || process.env.XPRESSBEES_PICKUP_GST || process.env.XPRESSBEES_GST_NUMBER || "").trim();
 
   const order_items = items.map((it) => ({
     name: String(it.name || ""),
@@ -344,12 +337,12 @@ function buildXbReversePayload({ orderLabel, data, pickupOverride }) {
       phone: pPhone,
     },
     consignee: {
-      name: trunc("Megance", 200),
+      name: trunc(PICKUP_DETAILS.name || "Megance", 200),
       company_name: trunc(warehouse_name, 200),
       address: consAddr1,
       address_2: consAddr2,
-      city: trunc(cityGuess || "New Delhi", 40),
-      state: trunc("Delhi", 40),
+      city: trunc(cityGuess || "NEW DELHI", 40),
+      state: trunc(PICKUP_DETAILS.state || "DELHI", 40),
       pincode: consigneePin,
       phone: consigneePhone || "9999999999",
       ...(gstNo ? { gst_number: gstNo, gst_umber: gstNo } : {}),

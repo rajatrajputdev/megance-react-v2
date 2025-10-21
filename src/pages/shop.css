@@ -32,8 +32,8 @@
 }
 .shop-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.12); }
 
-.shop-image { position: relative; display: block; width: 100%; overflow: hidden; border-radius: 0; }
-.shop-image .shop-img { display: block; width: 100%; height: auto; object-fit: contain; transition: transform .25s ease, opacity .25s ease; }
+.shop-image { position: relative; display: block; width: 100%; overflow: hidden; border-radius: 0; aspect-ratio: 3 / 2; }
+.shop-image .shop-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease, opacity .25s ease; }
 .shop-image .shop-img--front { position: relative; opacity: 1; z-index: 1; }
 .shop-image .shop-img--hover { position: absolute; inset: 0; opacity: 0; z-index: 0; }
 .shop-card:hover .shop-image .shop-img--front { opacity: 0; transform: scale(1.02); }

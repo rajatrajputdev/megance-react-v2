@@ -37,7 +37,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover; /* fill the square media box */
   transition: transform .35s ease;
 }
 
