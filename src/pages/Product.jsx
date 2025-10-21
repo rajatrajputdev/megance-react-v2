@@ -636,7 +636,7 @@ const onMediaMove = (e) => {
                   <div className="inline-hint">Only {maxQtyForSize} available</div>
                 )}
 
-                 <span style={{fontWeight:'500', fontSize:"15px"}}>• Delivery in 3 - 5 days &nbsp;&nbsp;• Free Shipping<br/>• 5 Days Return Policy</span>
+                 <span style={{fontWeight:'500', fontSize:"15px"}}>• Delivery in 3 - 7 days &nbsp;&nbsp;• Free Shipping<br/>• 5 Days Return Policy</span>
             </div>
 
             {/* Quantity + Add to cart */}

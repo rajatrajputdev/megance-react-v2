@@ -264,7 +264,7 @@ export default function CartPage() {
 
                 <div className="benefit-card glass-surface">
                   <div className="benefit-content">
-                    <div className="benefit-title">Delivery in 3 - 5 Days</div>
+                    <div className="benefit-title">Delivery in 3 - 7 Days</div>
                     <div className="benefit-text">Enjoy Superfast delivery in 3 to 5 days</div>
                   </div>
                 </div> 
