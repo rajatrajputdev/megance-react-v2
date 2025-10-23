@@ -14,10 +14,8 @@ export default function CartPage() {
   const navigate = useNavigate();
   const isEmpty = items.length === 0;
 
-  // Availability map per cart item id
   const [limits, setLimits] = useState({});
 
-  // Parse cart id (old logic preserved)
   const parseCartId = useCallback(
     (id) => {
       const item = items.find((x) => x.id === id);
@@ -40,7 +38,6 @@ export default function CartPage() {
     [items]
   );
 
-  // Stock loading (grouped fetch; old logic preserved)
   useEffect(() => {
     let disposed = false;
     const load = async () => {
@@ -81,22 +78,19 @@ export default function CartPage() {
     };
   }, [items, parseCartId]);
 
-  // Clamp qty (old logic preserved)
   const clamp = useCallback(
     (id, val) => {
       const lim = limits[id];
-      if (!Number.isFinite(lim)) return Math.max(1, val);
-      return Math.max(1, Math.min(lim, val));
+      if (!Number.isFinite(lim)) return Math.max(0, val); // allow 0 for removal
+      return Math.max(0, Math.min(lim, val));
     },
     [limits]
   );
 
-  // Totals
   const subtotal = amount;
   const shippingFee = 0;
   const total = useMemo(() => Math.max(0, subtotal + shippingFee), [subtotal, shippingFee]);
 
-  // Strict login gating
   const handleCheckout = () => {
     if (user) {
       navigate("/checkout");
@@ -105,7 +99,6 @@ export default function CartPage() {
     }
   };
 
-  // Drawer helpers (CSS-driven)
   const closeDrawer = () => document.body.classList.remove("show-cart-drawer");
 
   useEffect(() => {
@@ -125,15 +118,11 @@ export default function CartPage() {
       />
 
       <section className="cart-page container-narrow">
-        <header className="cart-header" style={{paddingTop:"80px"
-        }}>
+        <header className="cart-header" style={{ paddingTop: "80px" }}>
           <div className="cart-title-wrap">
             <h1 className="cart-title">My Cart ({items.length})</h1>
             <div className="reserve-note">Items in your cart are reserved temporarily</div>
           </div>
-          {/* Continue Shopping (optional)
-          <Link to="/shop" className="link-underline">Continue shopping</Link>
-          */}
         </header>
 
         {isEmpty ? (
@@ -142,15 +131,9 @@ export default function CartPage() {
             <Link to="/shop" className="btn btn-dark mt-10">
               Browse products
             </Link>
-            {/* <div className="mt-10">
-              <Link to="/shop?price=lt3500" className="link-underline">
-                See Under ₹3500
-              </Link>
-            </div> */}
           </div>
         ) : (
           <div className="cart-grid">
-            {/* LEFT: Items */}
             <div className="cart-items">
               {items.map((it) => (
                 <div key={it.id} className="cart-item-card glass-surface">
@@ -163,7 +146,7 @@ export default function CartPage() {
                     ×
                   </button>
 
-                  <div className="item-thumb" style={{height:"100px", width:"150px"}}>
+                  <div className="item-thumb" style={{ height: "100px", width: "150px" }}>
                     <img src={it.image || it.imageUrl || "/assets/logo.svg"} alt={it.name} />
                   </div>
 
@@ -186,22 +169,35 @@ export default function CartPage() {
                     <div className="qty-row">
                       <div className="qty-label">Quantity</div>
                       <div className="qty-control large glow-on-hover">
-                        <button style={{color:"#111"}}
-                          onClick={() => updateQty(it.id, Math.max(1, it.qty - 1))}
+                        <button
+                          style={{ color: "#111" }}
+                          onClick={() => {
+                            const newQty = clamp(it.id, it.qty - 1);
+                            if (newQty <= 0) return removeItem(it.id);
+                            updateQty(it.id, newQty);
+                          }}
                           aria-label="Decrease"
                         >
                           –
                         </button>
+
                         <input
                           type="number"
-                          min={1}
+                          min={0}
                           value={clamp(it.id, it.qty)}
-                          onChange={(e) =>
-                            updateQty(it.id, clamp(it.id, parseInt(e.target.value || 1)))
-                          }
+                          onChange={(e) => {
+                            const newQty = clamp(it.id, parseInt(e.target.value || 0));
+                            if (newQty <= 0) return removeItem(it.id);
+                            updateQty(it.id, newQty);
+                          }}
                         />
-                        <button style={{color:"#111"}}
-                          onClick={() => updateQty(it.id, clamp(it.id, it.qty + 1))}
+
+                        <button
+                          style={{ color: "#111" }}
+                          onClick={() => {
+                            const newQty = clamp(it.id, it.qty + 1);
+                            updateQty(it.id, newQty);
+                          }}
                           aria-label="Increase"
                           disabled={Number.isFinite(limits[it.id]) && it.qty >= limits[it.id]}
                           title={
@@ -226,7 +222,7 @@ export default function CartPage() {
             </div>
 
             {/* RIGHT: Sticky Summary */}
-            <aside className="summary " >
+            <aside className="summary">
               <div className="summary-box glass-surface strong-elevation">
                 <div className="summary-title">Summary</div>
 
@@ -252,154 +248,30 @@ export default function CartPage() {
                 </button>
               </div>
 
-              {/* Benefits */}
               <div className="benefit-cards">
                 <div className="benefit-card glass-surface">
-              
                   <div className="benefit-content">
                     <div className="benefit-title">Free Shipping</div>
                     <div className="benefit-text">Enjoy complimentary delivery on all orders.</div>
                   </div>
                 </div>
-
                 <div className="benefit-card glass-surface">
                   <div className="benefit-content">
                     <div className="benefit-title">Delivery in 3 - 7 Days</div>
                     <div className="benefit-text">Enjoy Superfast delivery in 3 to 7 days</div>
                   </div>
-                </div> 
+                </div>
                 <div className="benefit-card glass-surface">
                   <div className="benefit-content">
                     <div className="benefit-title">5 Days Return policy</div>
                     <div className="benefit-text">Enjoy a super easy return policy</div>
                   </div>
-                </div> 
+                </div>
               </div>
             </aside>
           </div>
         )}
       </section>
-
-      {/* Mini Cart Drawer (light glass 400px) */}
-      <div className="cart-drawer">
-        <div className="cart-drawer__overlay" onClick={closeDrawer} />
-        <div
-          className="cart-drawer__panel glass-drawer"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Cart"
-        >
-          <div className="cart-drawer__header">
-            <div className="cart-drawer__title">My Cart ({items.length})</div>
-            <button className="cart-drawer__close" onClick={closeDrawer} aria-label="Close">
-              ×
-            </button>
-          </div>
-
-          {isEmpty ? (
-            <div className="cart-drawer__empty">
-              <p>Your cart is empty.</p>
-              <Link to="/shop" onClick={closeDrawer} className="btn btn-dark mt-10">
-                Browse products
-              </Link>
-            </div>
-          ) : (
-            <>
-              <div className="cart-drawer__items">
-                {items.map((it) => (
-                  <div key={it.id} className="drawer-item glass-surface">
-                    <div className="drawer-thumb">
-                      <img src={it.image || it.imageUrl || "/assets/logo.svg"} alt={it.name} />
-                    </div>
-                    <div className="drawer-info">
-                      <div className="drawer-top">
-                        <div className="drawer-name">{it.name}</div>
-                        <button
-                          className="drawer-remove"
-                          onClick={() => removeItem(it.id)}
-                          aria-label="Remove"
-                          title="Remove"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="drawer-variant">
-                        {it?.meta?.color && (
-                          <span className="variant-pill glow-on-hover">{it.meta.color}</span>
-                        )}
-                        {it?.meta?.size && (
-                          <span className="variant-pill glow-on-hover">Size {it.meta.size}</span>
-                        )}
-                      </div>
-                      <div className="drawer-bottom">
-                        <div className="qty-control glow-on-hover">
-                          <button
-                            onClick={() => updateQty(it.id, Math.max(1, it.qty - 1))}
-                            aria-label="Decrease"
-                          >
-                            –
-                          </button>
-                          <input
-                            type="number"
-                            min={1}
-                            value={clamp(it.id, it.qty)}
-                            onChange={(e) =>
-                              updateQty(it.id, clamp(it.id, parseInt(e.target.value || 1)))
-                            }
-                          />
-                          <button
-                            onClick={() => updateQty(it.id, clamp(it.id, it.qty + 1))}
-                            aria-label="Increase"
-                            disabled={Number.isFinite(limits[it.id]) && it.qty >= limits[it.id]}
-                            title={
-                              Number.isFinite(limits[it.id]) && it.qty >= limits[it.id]
-                                ? "Reached available stock"
-                                : "Increase"
-                            }
-                          >
-                            +
-                          </button>
-                        </div>
-                        <div className="drawer-price">₹ {it.price}</div>
-                      </div>
-                      {Number.isFinite(limits[it.id]) && (
-                        <div className="drawer-stock-hint">
-                          Only {Math.max(0, limits[it.id] - (it.qty - 0))} left
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="cart-drawer__footer glass-surface">
-                <div className="drawer-line">
-                  <span>Subtotal</span>
-                  <span>₹ {subtotal}</span>
-                </div>
-                <div className="drawer-line">
-                  <span>Shipping</span>
-                  <span className="text-success">FREE</span>
-                </div>
-                <div className="drawer-total">
-                  <span>Total</span>
-                  <span>₹ {total}</span>
-                </div>
-
-                <button
-                  className="drawer-checkout glow-primary"
-                  onClick={() => {
-                    closeDrawer();
-                    handleCheckout();
-                  }}
-                >
-                  Place Order
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
 
       <Footer />
     </>

@@ -180,7 +180,7 @@
   color: #a61717;
   border: 1px solid #f0b7b7;
 }
-.product-page-wrap .inline-hint { color: #c00; font-size: 12px; margin-top: 6px}
+.product-page-wrap .inline-hint { color: #c00; font-size: 12px; margin-top: 6px; }
 
 .product-page-wrap .product-actions .butn[disabled] { opacity: .6; cursor: not-allowed; }
 
@@ -256,7 +256,7 @@
 /* Remove number input spinners */
 .product-page-wrap input[type=number]::-webkit-outer-spin-button,
 .product-page-wrap input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.product-page-wrap input[type=number] { -moz-appearance: textfield; }
+.product-page-wrap input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* ---------- CONTINUOUS SECTIONS ---------- */
 .product-page-wrap .pp-section { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 16px; }
