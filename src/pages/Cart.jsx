@@ -265,13 +265,13 @@ export default function CartPage() {
                 <div className="benefit-card glass-surface">
                   <div className="benefit-content">
                     <div className="benefit-title">Delivery in 3 - 7 Days</div>
-                    <div className="benefit-text">Enjoy Superfast delivery in 3 to 5 days</div>
+                    <div className="benefit-text">Enjoy Superfast delivery in 3 to 7 days</div>
                   </div>
                 </div> 
                 <div className="benefit-card glass-surface">
                   <div className="benefit-content">
                     <div className="benefit-title">5 Days Return policy</div>
-                    <div className="benefit-text">Enjoy a super easy return proves</div>
+                    <div className="benefit-text">Enjoy a super easy return policy</div>
                   </div>
                 </div> 
               </div>

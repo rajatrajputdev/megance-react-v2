@@ -81,7 +81,6 @@ export default function Footer() {
           <div className="rh-col">
             <h6>Shop</h6>
             <ul>
-              <li><Link to="/shop">All</Link></li>
               <li><Link to="/shop?g=men">Men</Link></li>
               <li><Link to="/shop?g=women">Women</Link></li>
             </ul>
@@ -89,7 +88,7 @@ export default function Footer() {
           <div className="rh-col">
             <h6>Help</h6>
             <ul>
-              <li><Link to="/#faq2">FAQs</Link></li>
+              
               <li><Link to="/terms">Shipping</Link></li>
               <li><Link to="/returns">Returns</Link></li>
               <li><a href="/contact-us">Contact</a></li>
@@ -118,12 +117,7 @@ export default function Footer() {
         {/* Sub footer */}
         <div className="rh-sub">
           <div className="rh-left">
-            <span>© {year} Megance</span>
-          </div>
-          <div className="rh-right">
-            <Link to="/terms">Terms</Link>
-            <Link to="/privacy">Privacy</Link>
-            <Link to="/returns">Returns</Link>
+            <span>© {year} Megance Lifestyle (OPC) Private Ltd</span>
           </div>
         </div>
       </div>

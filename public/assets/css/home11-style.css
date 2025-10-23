@@ -810,9 +810,9 @@
 }
 .shop-duo .duo-img {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   max-height: none;
-  object-fit: cover;
+  /* object-fit: cover; */
   border-radius: 0; /* connect edges */
   box-shadow: none; /* connect edges */
   display: block;
