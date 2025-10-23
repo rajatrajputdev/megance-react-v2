@@ -322,13 +322,25 @@ export default function CheckoutPage() {
                     <label>Delivery Address</label>
                     <div className="glass-surface p-15" style={{borderRadius: 10, border: '1px solid rgba(0,0,0,0.08)'}}>
                       <div className="fw-600">{form.name}</div>
-                      <div className="opacity-7" style={{marginTop: 2}}>{form.phone || user?.phoneNumber || ''}</div>
+                      <div className="opacity-7 " style={{marginTop: 2}}>{form.phone || user?.phoneNumber || ''}</div>
                       <div style={{marginTop: 6}}>
                         <div>{form.address}</div>
                         <div>{[form.city, form.state, form.zip].filter(Boolean).join(', ')}</div>
                       </div>
-                      <div className="mt-8 d-flex justify-content-end">
-                        <button type="button" className="underline" onClick={() => setShowAddressEdit(true)}>Edit address</button>
+                      <div className="mt-8 d-flex justify-content-end edit-address-row">
+                        <button
+                          type="button"
+                          className="edit-address-btn"
+                          onClick={() => setShowAddressEdit(true)}
+                          title="Edit delivery address"
+                        >
+                          <span className="edit_icon" aria-hidden="true" style={{display:'inline-flex'}}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M4 20h4l10.5-10.5a2.121 2.121 0 10-3-3L5 17v3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </span>
+                          <span>Edit address</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -367,7 +379,7 @@ export default function CheckoutPage() {
             </div>
           </div>
           <div className="col-lg-5">
-            <div className="p-20 card-like summary-box glass-surface strong-elevation">
+            <div className="pt-10 p-20 card-like summary-box glass-surface strong-elevation">
               <h5>Order Summary</h5>
               <ul className="mt-10 summary-items">
                 {items.map((x) => (
@@ -466,10 +478,10 @@ export default function CheckoutPage() {
               {!canPay && (
                 <p className="inline-hint">Fill all billing details to proceed</p>
               )}
-              <p className="inline-hint mt-6">Prices are inclusive of GST.</p>
-              <p className="inline-hint mt-6">Disclaimer</p>
-              <p className="inline-hint mt-6">There is no Exchange Policy </p>
-              <p className="inline-hint mt-6">In case of Returns, Handling fees of ₹450 will be non-refundable to users </p>
+              <p className="inline-hint">Prices are inclusive of GST.</p>
+              <p className="" style={{fontWeight:"500", fontSize:"15px"}}>Disclaimer</p>
+              <p className="" style={{ fontSize:"12px", marginTop:"-5px"}}>There is no Exchange Policy </p>
+              <p className="" style={{ fontSize:"12px", marginTop:"-5px"}}>In case of Returns, Handling fees of ₹450 will be non-refundable to users </p>
             </div>
           </div>
         </div>

@@ -226,7 +226,7 @@ export default function CartPage() {
             </div>
 
             {/* RIGHT: Sticky Summary */}
-            <aside className="summary">
+            <aside className="summary " >
               <div className="summary-box glass-surface strong-elevation">
                 <div className="summary-title">Summary</div>
 

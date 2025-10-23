@@ -126,7 +126,8 @@ export default function Navbar() {
                 {user ? (
                   <>
                     <Link to="/account" className="butn nav-butn mr-10">Account</Link>
-                    <button className="butn nav-butn mr-10" onClick={logout}>Logout</button>
+                    <Link onClick={logout} className="butn nav-butn mr-10">Logout</Link>
+                    {/* <button className="butn nav-butn mr-10" onClick={logout}>Logout</button> */}
                   </>
                 ) : (
                   <Link to="/login" className="butn nav-butn mr-10">Login</Link>

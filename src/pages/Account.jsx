@@ -273,9 +273,9 @@ export default function Account() {
               {/* Recaptcha host is mounted globally; no per-page container needed */}
             </div>
           </div>
-          <div className="col-lg-5 mt-20 mt-lg-0">
+          <div className="col-lg-5 mt-1 mt-lg-0">
             <div className="p-20 card-like glass-surface strong-elevation orders-card">
-              <h4 className="mb-10">Your Orders</h4>
+              <h4 className="">Your Orders</h4>
               {ordersLoading ? (
                 <p className="opacity-7">Loading orders…</p>
               ) : orders.length === 0 ? (

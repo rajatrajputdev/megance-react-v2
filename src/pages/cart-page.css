@@ -73,7 +73,7 @@
 
 /* Summary (non-sticky, stays in normal flow) */
 .summary { position: relative !important; height: fit-content; }
-.summary-box { padding: 20px; }
+.summary-box { padding: 20px !important; }
 .summary-title { font-weight: 700; margin-bottom: 14px; font-size: 18px; }
 .summary-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
 .summary-total { display: flex; justify-content: space-between; font-weight: 800; margin-top: 10px; font-size: 16px; }

@@ -180,7 +180,7 @@
   color: #a61717;
   border: 1px solid #f0b7b7;
 }
-.product-page-wrap .inline-hint { color: #c00; font-size: 12px; margin-top: 6px; }
+.product-page-wrap .inline-hint { color: #c00; font-size: 12px; margin-top: 6px}
 
 .product-page-wrap .product-actions .butn[disabled] { opacity: .6; cursor: not-allowed; }
 
