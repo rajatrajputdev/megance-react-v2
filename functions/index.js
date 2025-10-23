@@ -28,7 +28,7 @@ const REGION = process.env.FUNCTIONS_REGION || "asia-south2";
 // Company constants for invoices
 const MEGANCE_GSTIN = process.env.MEGANCE_GSTIN || "27AAACB2230M1Z5"; // dummy-format GSTIN
 const MEGANCE_LOGO_URL = process.env.MEGANCE_LOGO_URL ||
-  "https://megance.in/assets/imgs/megance_logo_w.png";
+  "https://megance.com/assets/imgs/megance_logo_w.png";
 // Hardcoded warehouse address for outbound and reverse delivery
 const MEGANCE_WAREHOUSE_ADDRESS = (process.env.MEGANCE_WAREHOUSE_ADDRESS ||
   "A-51, First floor, Meera Bagh, Paschim Vihar, New Delhi 110087").trim();

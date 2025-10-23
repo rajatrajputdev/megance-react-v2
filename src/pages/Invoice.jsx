@@ -92,7 +92,7 @@ export default function InvoicePage() {
               <img src="/assets/imgs/megance_logo_b.svg" alt="Megance" className="brand-logo" />
               <div className="brand-meta">
                 <div className="brand-name">Megance</div>
-                <div className="brand-sub">megance.in</div>
+                <div className="brand-sub">megance.com</div>
               </div>
             </div>
             <div className="invoice-meta">

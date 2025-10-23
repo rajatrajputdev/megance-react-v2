@@ -73,15 +73,7 @@
   <link rel="stylesheet" href="/common/css/common_style.css" />
   <link rel="stylesheet" href="/assets/css/home11-style.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.css" />
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-FMZMPVGJ2E"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { dataLayer.push(arguments); }
-    gtag('js', new Date());
-
-    gtag('config', 'G-FMZMPVGJ2E');
-  </script>
+  
 </head>
 
 <body class="megance-body">
@@ -94,11 +86,9 @@
 
   <script type="module" src="/src/main.jsx"></script>
 
-  <!-- Disable GSAP ScrollSmoother globally to prevent scroll jumps during interactions -->
   <script>
     (function () {
       try {
-        // Allow runtime override via localStorage; default to disabled
         var ls = localStorage.getItem('disableSmoother');
         if (!ls) localStorage.setItem('disableSmoother', 'true');
         window.__DISABLE_SMOOTHER = true;
@@ -108,7 +98,6 @@
     })();
   </script>
 
-  <!-- Load vendor scripts after React mounts to ensure required nodes exist -->
   <script>
     (function () {
       function ready() {
