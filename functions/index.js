@@ -1,4 +1,4 @@
-const {
+﻿const {
   onDocumentCreated,
   onDocumentUpdated,
 } = require("firebase-functions/v2/firestore");
@@ -170,17 +170,18 @@ function buildXbShipmentPayload({ orderId, orderLabel, data, isCOD }) {
   const items = Array.isArray(data.items) ? data.items : [];
   const amount = Math.round(Number(data.amount) || 0);
   const discount = Math.round(Number(data.discount) || 0);
-  const base = Math.max(0, amount - discount);
+  const net = Math.max(0, amount - discount);
+  const base = Math.round(net / 1.18);
   const gst = Number.isFinite(Number(data.gst))
     ? Math.round(Number(data.gst))
-    : Math.round(base * 0.18);
-  const payable = Math.round(Number(data.payable) || base + gst);
+    : Math.max(0, net - base);
+  const payable = Math.round(Number(data.payable) || net);
   // Some courier integrations validate collectable_amount against their computed
   // "order amount" (often derived from items) and may subtract the provided
   // discount again. To avoid "collectable amount should be <= order amount"
   // for COD when GST is added client-side, set invoice/order amount high enough
   // to cover the payable + discount (i.e., base + GST).
-  const invoiceValue = Math.max(0, payable + discount); // equals amount + gst
+  const invoiceValue = Math.max(0, payable + discount); // equals amount
 
   const dwKg = Number(process.env.XPRESSBEES_DEFAULT_WEIGHT || 0.7);
   const grams = kgToGrams(dwKg);
@@ -263,11 +264,12 @@ function buildXbReversePayload({ orderLabel, data, pickupOverride }) {
   const items = Array.isArray(data.items) ? data.items : [];
   const amount = Math.round(Number(data.amount) || 0);
   const discount = Math.round(Number(data.discount) || 0);
-  const base = Math.max(0, amount - discount);
+  const net = Math.max(0, amount - discount);
+  const base = Math.round(net / 1.18);
   const gst = Number.isFinite(Number(data.gst))
     ? Math.round(Number(data.gst))
-    : Math.round(base * 0.18);
-  const payable = Math.round(Number(data.payable) || base + gst);
+    : Math.max(0, net - base);
+  const payable = Math.round(Number(data.payable) || net);
 
   const dwKg = Number(process.env.XPRESSBEES_DEFAULT_WEIGHT || 0.7);
   const grams = kgToGrams(dwKg);
@@ -383,7 +385,7 @@ function currencyINR(n) {
       maximumFractionDigits: 0,
     }).format(Number(n) || 0);
   } catch {
-    return `₹ ${n || 0}`;
+    return `â‚¹ ${n || 0}`;
   }
 }
 
@@ -439,12 +441,20 @@ function renderOrderEmail({ orderId, data, enrichedItems = [] }) {
     .slice(0, 6)
     .toUpperCase()}`;
 
+  // GST (inclusive) calculation: Base = (MRP âˆ’ Discount) / 1.18; GST = (MRP âˆ’ Discount) âˆ’ Base
+  const mrp = Math.max(0, Number(data.amount || 0));
+  const disc = Math.max(0, Number(data.discount || 0));
+  const net = Math.max(0, mrp - disc);
+  const baseExclusive = Math.round(net / 1.18);
+  const gstInclusive = Math.max(0, net - baseExclusive);
+
   const html = `
     <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.6; color:#111">
-      <h2 style="margin:0 0 4px">${title}</h2>
-      <div style="opacity:.7; font-size:13px;">Placed: ${created} · Payment: ${paymentMethod}${
+      <div style="text-align:center;margin-bottom:10px"><img src="/assets/imgs/megancew.png" alt="Megance" style="height:36px;object-fit:contain" /></div>
+      <h2 style="margin:0 0 4px;text-align:center">${title}</h2>
+      <div style="opacity:.7; font-size:13px;">Placed: ${created} Â· Payment: ${paymentMethod}${
     data.paymentId
-      ? ` · <span style=\"opacity:.9\">${data.paymentId}</span>`
+      ? ` Â· <span style=\"opacity:.9\">${data.paymentId}</span>`
       : ""
   }</div>
       <div style="margin:16px 0;">
@@ -474,20 +484,11 @@ function renderOrderEmail({ orderId, data, enrichedItems = [] }) {
               )}</div>`
             : ""
         }
-        <div><strong>GST (18%):</strong> ${currencyINR(
-          typeof data.gst === "number"
-            ? data.gst
-            : Math.round(
-                Math.max(
-                  0,
-                  Number(data.amount || 0) - Number(data.discount || 0)
-                ) * 0.18
-              )
-        )}</div>
-        <div style="font-size:16px;margin-top:4px"><strong>Payable:</strong> ${currencyINR(
-          data.payable || 0
-        )}</div>
+        <div><strong>Base Price:</strong> ${currencyINR(baseExclusive)}</div>
+        <div><strong>GST (18%):</strong> ${currencyINR(gstInclusive)}</div>
+        <div style="font-size:16px;margin-top:4px"><strong>Payable:</strong> ${currencyINR(net)}</div>
       </div>
+      <div style="margin-top:20px; font-size:12px; opacity:.7; text-align:center">This is a system-generated order summary. For support, contact support@megance.com</div>
       <hr style="margin:16px 0; border:none; border-top:1px solid #eee" />
       <div>
         <h3 style="margin:0 0 6px; font-size:16px">Billing</h3>
@@ -531,7 +532,7 @@ function renderOrderEmail({ orderId, data, enrichedItems = [] }) {
   return {
     html,
     text,
-    subject: `${title} – ${currencyINR(data.payable || 0)}`,
+    subject: `${title} - ${currencyINR(net)}`,
   };
 }
 
@@ -804,8 +805,9 @@ exports.fulfillOrder = onRequest({
     const amount = items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.qty) || 0), 0);
     const discount = Math.max(0, Number(body.discount || 0));
     const net = Math.max(0, amount - discount);
-    const gst = Number.isFinite(Number(body.gst)) ? Math.round(Number(body.gst)) : Math.round(net * 0.18);
-    const payable = Math.round(Number(body.payable || (net + gst)));
+    const base = Math.round(net / 1.18);
+    const gst = Number.isFinite(Number(body.gst)) ? Math.round(Number(body.gst)) : Math.max(0, net - base);
+    const payable = Math.round(Number(body.payable || net));
 
     const db = admin.firestore();
     // Create order doc first (authoritative record)
@@ -871,7 +873,7 @@ exports.fulfillOrder = onRequest({
     // Discord log
     try {
       const webhook = (process.env.DISCORD_WEBHOOK_URL || 'https://discordapp.com/api/webhooks/1427366532794810488/A8ixxfB6YTIRjnY4cTMiVVxm9bOq33biY3E3NhYMhjytAmP89_y_S_9s28NTPJ5GxFX1').trim();
-      const content = `Order ${orderLabel} (${paymentMethod==='cod'?'COD':'Prepaid'})\nTwilio: ${twilioResult.ok ? 'OK' : 'ERR'}${twilioResult.sid ? ' sid=' + twilioResult.sid : ''}${twilioResult.error ? ' • ' + twilioResult.error : ''}\nXpressBees: ${xbResult.ok ? 'OK' : 'ERR'}${xbResult.awb ? ' awb=' + xbResult.awb : ''}${xbResult.error ? ' • ' + xbResult.error : ''}`;
+      const content = `Order ${orderLabel} (${paymentMethod==='cod'?'COD':'Prepaid'})\nTwilio: ${twilioResult.ok ? 'OK' : 'ERR'}${twilioResult.sid ? ' sid=' + twilioResult.sid : ''}${twilioResult.error ? ' â€¢ ' + twilioResult.error : ''}\nXpressBees: ${xbResult.ok ? 'OK' : 'ERR'}${xbResult.awb ? ' awb=' + xbResult.awb : ''}${xbResult.error ? ' â€¢ ' + xbResult.error : ''}`;
       await fetch(webhook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content }) });
     } catch {}
 
@@ -1396,10 +1398,10 @@ exports.fulfillOrderOnCreate = onDocumentCreated(
           isCOD ? "COD" : "Prepaid"
         })\nTwilio: ${twilioResult.ok ? "OK" : "ERR"}${
           twilioResult.sid ? " sid=" + twilioResult.sid : ""
-        }${twilioResult.error ? " • " + twilioResult.error : ""}\nXpressBees: ${
+        }${twilioResult.error ? " â€¢ " + twilioResult.error : ""}\nXpressBees: ${
           xbResult.ok ? "OK" : "ERR"
         }${xbResult.awb ? " awb=" + xbResult.awb : ""}${
-          xbResult.error ? " • " + xbResult.error : ""
+          xbResult.error ? " â€¢ " + xbResult.error : ""
         }`;
         await fetch(webhook, {
           method: "POST",
@@ -1433,9 +1435,9 @@ exports.fulfillOrderOnCreate = onDocumentCreated(
   }
 );
 
-// (Removed) createXpressbeesShipmentOnPayment — merged into fulfillOrderOnCreate
+// (Removed) createXpressbeesShipmentOnPayment â€” merged into fulfillOrderOnCreate
 
-// (Removed) createXpressbeesShipment manual endpoint — merged into unified flow
+// (Removed) createXpressbeesShipment manual endpoint â€” merged into unified flow
 
 // Test helper: create a dummy order (triggers shipment). Intended for QA.
 // If env TEST_ENDPOINT_KEY is set, require header 'x-test-key' to match.
@@ -1815,7 +1817,7 @@ exports.getOrderInvoicePdf = onRequest(
   { region: REGION, cors: true },
   async (req, res) => {
     try {
-      const db = admin.firestore();
+      const db = admin.firestore();generateInvoicePdf
       const orderId = String(req.query.orderId || "").trim();
       const token = String(
         req.query.token ||
@@ -1942,7 +1944,7 @@ exports.getOrderInvoicePdf = onRequest(
           .fillColor("#111")
           .text(String(it.name || ""), col1, ty, { width: pageW - 260 });
         doc.text(String(qty), colQty, ty);
-        doc.text(`₹ ${amt.toFixed(2)}`, colAmt, ty);
+        doc.text(`â‚¹ ${amt.toFixed(2)}`, colAmt, ty);
         ty += rowH;
         if (it.description) {
           doc
@@ -1982,20 +1984,20 @@ exports.getOrderInvoicePdf = onRequest(
       };
       // Subtotal should be Total (amount) minus GST
       const displaySubtotal = Math.max(0, payable - tax);
-      line("Subtotal", `₹ ${displaySubtotal.toFixed(2)}`);
-      if (discount > 0) line("Discount", `- ₹ ${discount.toFixed(2)}`);
+      line("Subtotal", `â‚¹ ${displaySubtotal.toFixed(2)}`);
+      if (discount > 0) line("Discount", `- â‚¹ ${discount.toFixed(2)}`);
       const gstPercentDisp = data.gstPercent
         ? `${Number(data.gstPercent)}%`
         : "18%";
-      line(`GST (${gstPercentDisp})`, `₹ ${tax.toFixed(2)}`);
-      line("Shipping", shippingCharge ? `₹ ${shippingCharge.toFixed(2)}` : "Free");
+      line(`GST (${gstPercentDisp})`, `â‚¹ ${tax.toFixed(2)}`);
+      line("Shipping", shippingCharge ? `â‚¹ ${shippingCharge.toFixed(2)}` : "Free");
       // Total accent row
       ty += 2;
       doc
         .roundedRect(headerX, ty - 6, pageW, rowH, 6)
         .fillAndStroke("#111", "#111");
       doc.fillColor("#fff").fontSize(12).text("Total", colQty - 120, ty);
-      doc.text(`₹ ${payable.toFixed(2)}`, rightX, ty);
+      doc.text(`â‚¹ ${payable.toFixed(2)}`, rightX, ty);
       ty += rowH + 8;
 
       // Notes
@@ -2009,6 +2011,8 @@ exports.getOrderInvoicePdf = onRequest(
       doc.fontSize(9).fillColor("#666").text("Shipping is free on all orders.", headerX, ty);
       ty += 12;
       doc.fontSize(9).fillColor("#666").text("Discount is optional and may be 0.", headerX, ty);
+      ty += 12;
+      doc.fontSize(9).fillColor("#666").text("By ordering, you accept all the terms and conditions of megance.com", headerX, ty);
 
       doc.end();
     } catch (e) {
@@ -2146,7 +2150,7 @@ exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
         .fillColor("#111")
         .text(String(it.name || ""), col1, ty, { width: pageW - 260 });
       doc.text(String(qty), colQty, ty);
-      doc.text(`₹ ${amt.toFixed(2)}`, colAmt, ty);
+      doc.text(`â‚¹ ${amt.toFixed(2)}`, colAmt, ty);
       ty += rowH;
       if (it.description) {
         doc
@@ -2183,19 +2187,19 @@ exports.getOrderInvoicePdfCallable = onCall({ region: REGION }, async (req) => {
     };
     // Subtotal should be Total (amount) minus GST
     const displaySubtotal = Math.max(0, payable - tax);
-    line("Subtotal", `₹ ${displaySubtotal.toFixed(2)}`);
-    if (discount > 0) line("Discount", `- ₹ ${discount.toFixed(2)}`);
+    line("Subtotal", `â‚¹ ${displaySubtotal.toFixed(2)}`);
+    if (discount > 0) line("Discount", `- â‚¹ ${discount.toFixed(2)}`);
     const gstPercentDisp = data.gstPercent
       ? `${Number(data.gstPercent)}%`
       : "18%";
-    line(`GST (${gstPercentDisp})`, `₹ ${tax.toFixed(2)}`);
-    line("Shipping", shippingCharge ? `₹ ${shippingCharge.toFixed(2)}` : "Free");
+    line(`GST (${gstPercentDisp})`, `â‚¹ ${tax.toFixed(2)}`);
+    line("Shipping", shippingCharge ? `â‚¹ ${shippingCharge.toFixed(2)}` : "Free");
     ty += 2;
     doc
       .roundedRect(headerX, ty - 6, pageW, rowH, 6)
       .fillAndStroke("#111", "#111");
     doc.fillColor("#fff").fontSize(12).text("Total", colQty - 120, ty);
-    doc.text(`₹ ${payable.toFixed(2)}`, rightX, ty);
+    doc.text(`â‚¹ ${payable.toFixed(2)}`, rightX, ty);
     ty += rowH + 8;
 
     // Notes
@@ -2970,7 +2974,7 @@ exports.submitRefundRequest = onCall({
     try {
       await idxRef.create({ userId: uid, orderId: payload.orderRef.id, requestId: null, createdAt: admin.firestore.FieldValue.serverTimestamp() });
     } catch (e) {
-      // Index exists → fetch and return existing
+      // Index exists â†’ fetch and return existing
       const idxSnap = await idxRef.get();
       const idx = idxSnap.exists ? idxSnap.data() : null;
       if (idx && idx.requestId) return { ok: true, id: idx.requestId, already: true };

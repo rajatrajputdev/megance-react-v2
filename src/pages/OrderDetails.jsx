@@ -20,10 +20,8 @@ export default function OrderDetails() {
 
   useEffect(() => {
     if (!user || !id) return;
-    // Do not show a preloader; keep existing content if present
     setErr("");
 
-    // Prefer user subcollection doc by id
     const subDocRef = doc(db, "users", user.uid, "orders", id);
     const unsub = onSnapshot(subDocRef, async (snap) => {
       if (snap.exists()) {
@@ -31,13 +29,11 @@ export default function OrderDetails() {
         setLoading(false);
         return;
       }
-      // Fallback: try top-level by id and ensure it belongs to user
       try {
         const top = await getDoc(doc(db, "orders", id));
         if (top.exists() && top.data()?.userId === user.uid) {
           setOrder({ id: top.id, ...top.data() });
         } else {
-          // Fallback: query by orderId field in subcollection (newly created orders)
           const q = query(collection(db, "users", user.uid, "orders"), where("orderId", "==", id), limit(1));
           const qs = await getDocs(q);
           if (!qs.empty) {
@@ -59,7 +55,7 @@ export default function OrderDetails() {
     return () => unsub();
   }, [user, id]);
 
-  // Fetch latest live shipment status from XpressBees (forward or return AWB)
+  // Fetch latest live shipment status
   useEffect(() => {
     const run = async () => {
       try {
@@ -67,25 +63,32 @@ export default function OrderDetails() {
         const awb = order?.returnAwb || order?.xbAwb;
         if (!awb) return;
         setLiveBusy(true);
-        const res = await getOrderShipmentStatus({ orderId: order?.orderId || order?.id || id, prefer: order?.returnAwb ? 'return' : 'forward' });
+        const res = await getOrderShipmentStatus({
+          orderId: order?.orderId || order?.id || id,
+          prefer: order?.returnAwb ? "return" : "forward",
+        });
         if (res?.ok) setLiveStatus(res.summary || "");
       } catch {}
       finally { setLiveBusy(false); }
     };
     run();
-    // Refresh when order updates (e.g., after creating return)
   }, [order, id]);
 
+  // ✅ Corrected GST logic
   const totals = useMemo(() => {
-    if (!order) return { items: 0, amount: 0, discount: 0, payable: 0 };
-    const items = Array.isArray(order.items) ? order.items.reduce((a, b) => a + (b.qty || 0), 0) : 0;
-    return {
-      items,
-      amount: order.amount || 0,
-      discount: order.discount || 0,
-      payable: order.payable || 0,
-      gst: typeof order.gst === 'number' ? order.gst : Math.round(Math.max(0, (order.amount || 0) - (order.discount || 0)) * 0.18),
-    };
+    if (!order) return { items: 0, amount: 0, discount: 0, basePrice: 0, gst: 0, payable: 0 };
+    const items = Array.isArray(order.items)
+      ? order.items.reduce((a, b) => a + (b.qty || 0), 0)
+      : 0;
+
+    const mrp = order.amount || 0;
+    const discount = order.discount || 0;
+    const afterDiscount = Math.max(0, mrp - discount);
+    const basePrice = Math.round(afterDiscount / 1.18);
+    const gst = Math.round(afterDiscount - basePrice);
+    const payable = order.payable || afterDiscount;
+
+    return { items, amount: mrp, discount, basePrice, gst, payable };
   }, [order]);
 
   const openInvoicePdf = async () => {
@@ -120,6 +123,7 @@ export default function OrderDetails() {
                 <h3 className="mb-0">Order Details</h3>
                 <Link to="/account" className="underline">Back to Orders</Link>
               </div>
+
               {err ? (
                 <div className="alert error mt-10">{err}</div>
               ) : order ? (
@@ -173,7 +177,7 @@ export default function OrderDetails() {
                   </ul>
 
                   <div className="d-flex justify-content-between mt-10">
-                    <span>Total</span>
+                    <span>MRP</span>
                     <span>₹ {totals.amount}</span>
                   </div>
                   {totals.discount > 0 && (
@@ -183,18 +187,14 @@ export default function OrderDetails() {
                     </div>
                   )}
                   <div className="d-flex justify-content-between">
+                    <span>Base Price (excl. GST)</span>
+                    <span>₹ {totals.basePrice}</span>
+                  </div>
+                  <div className="d-flex justify-content-between">
                     <span>GST (18%)</span>
                     <span>₹ {totals.gst}</span>
                   </div>
-                  {order?.coupon?.code && (
-                    <div className="d-flex justify-content-between" style={{ fontSize: 13 }}>
-                      <span>Coupon</span>
-                      <span>
-                        <strong>{order.coupon.code}</strong>
-                        {order.coupon.valid === false && <span className="inline-error" style={{ marginLeft: 6 }}>invalid</span>}
-                      </span>
-                    </div>
-                  )}
+
                   <div className="d-flex justify-content-between fw-600 mt-6">
                     <span>Payable</span>
                     <span>₹ {totals.payable}</span>
@@ -208,7 +208,7 @@ export default function OrderDetails() {
                       </Link>
                     )}
                     {(order.returnAwb || order.returnRequested) && (
-                      <span className="small ml-10">Return {order.returnAwb ? `AWB: ${order.returnAwb}` : '(requested)'} </span>
+                      <span className="small ml-10">Return {order.returnAwb ? `AWB: ${order.returnAwb}` : '(requested)'}</span>
                     )}
                   </div>
 
