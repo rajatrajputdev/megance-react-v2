@@ -117,7 +117,8 @@ export default function Footer() {
         {/* Sub footer */}
         <div className="rh-sub">
           <div className="rh-left">
-            <span>© {year} Megance Lifestyle (OPC) Private Ltd</span>
+            <span>© {year} MEGANCE LIFESTYLE (OPC) PRIVATE LIMITED
+</span>
           </div>
         </div>
       </div>

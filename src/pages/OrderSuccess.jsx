@@ -24,7 +24,7 @@ export default function OrderSuccess() {
     <section className="container pt-60 pb-60 white-navbar-page">
       <div className="row justify-content-center">
         <div className="col-lg-7">
-          <div className="p-30 card-like text-center">
+          <div className="p-30  mt-50 card-like text-center">
             <div style={{fontSize: 42, lineHeight: 1}}>🎉</div>
             <h2 className="mt-10">Thank you for your order!</h2>
             <p className="mt-10 opacity-7">We’ve received your order and sent a confirmation to your email.</p>

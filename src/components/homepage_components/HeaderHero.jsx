@@ -13,8 +13,8 @@ export default function HeaderHero() {
     const isMobile = window.innerWidth <= 768;
     const bgVid = toAbs(
       isMobile
-        ? "/assets/imgs/banner/bannervidmob.mp4"
-        : "/assets/imgs/banner/bannervid.mp4"
+        ? "/assets/imgs/banner/bannervidmob.webm"
+        : "/assets/imgs/banner/bannervid.webm"
     );
 
     el.style.backgroundImage = "none";

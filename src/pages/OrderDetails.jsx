@@ -201,7 +201,7 @@ export default function OrderDetails() {
                   </div>
 
                   <div className="mt-15">
-                    <button className="butn" onClick={openInvoicePdf}>Download Invoice PDF</button>
+                    <button className="butn " style={{background:"black", color:"white", padding:'.5rem', borderRadius:"10px"}} onClick={openInvoicePdf}>Download Invoice PDF</button>
                     {(!order.returnAwb && !order.returnRequested) && (
                       <Link className="butn ml-10" to={`/returns?orderId=${encodeURIComponent(order?.orderId || order?.id || id)}`}>
                         Request Return / Refund
