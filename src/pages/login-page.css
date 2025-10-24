@@ -152,6 +152,7 @@
 }
 .otp-input:focus,
 .otp-code-input:focus {
+  font-family: "Karla", sans-serif;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
   background: rgba(255, 255, 255, 0.85);
 }
