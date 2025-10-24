@@ -26,14 +26,12 @@ export default function Marquee({ bgImage }) {
       <div className="marquee-container">
         <div className="marquee-content">
           <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
-          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
-          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
-          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
-          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
           <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>
-          <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>
-          <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>
-          <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>
+          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
+          <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
+          <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
+          <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
+          <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>          <span>• Experience Megance &nbsp;&nbsp;&nbsp;</span>
           <span>• Embrace your lifestyle &nbsp;&nbsp;&nbsp;</span>
         </div>
       </div>

@@ -32,7 +32,7 @@ export default function IntroProductCard({ badge, product, onBuy }) {
 
       <div className="intro-text-block">
         <div className="intro-name-flat">{product?.name}</div>
-        <div className="intro-price-flat">₹ {product?.price}</div>
+        <div className="intro-price-flat" style={{fontWeight:"bold"}}>₹ {product?.price}</div>
       </div>
 
       <button
