@@ -4,6 +4,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { useCart } from "../context/CartContext.jsx";
 import { haptic } from "../utils/env.js";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { trackFBViewContent } from "../utils/fbpixel.js";
 import SEO from "../components/general_components/SEO.jsx";
 import Footer from "../components/homepage_components/Footer.jsx";
 import "./product.css";
@@ -184,6 +185,14 @@ export default function ProductPage() {
   const [imgIdx, setImgIdx] = useState(0);
   useEffect(() => {
     setImgIdx(0);
+  }, [product?.id]);
+
+  // Track ViewContent when product loads
+  useEffect(() => {
+    if (!product) return;
+    try {
+      trackFBViewContent({ id: product.id, name: product.name, price: product.price });
+    } catch {}
   }, [product?.id]);
 
   const mainImage = images[imgIdx] || imageSrc;

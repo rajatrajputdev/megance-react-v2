@@ -15,6 +15,7 @@ import { trackEvent } from "../utils/analytics.js";
 import { decrementStockForItems } from "../services/inventory.js";
 import { decrementStockForOrder, createRazorpayOrder, verifyRazorpaySignature } from "../services/orders.js";
 const USE_CLIENT_STOCK_DECREMENT = String(import.meta.env.VITE_USE_CLIENT_STOCK || '').toLowerCase() === 'true';
+import { trackFBInitiateCheckout, trackFBPurchase } from "../utils/fbpixel.js";
 
 export default function CheckoutPage() {
   const { items, amount, clearCart } = useCart();
@@ -80,6 +81,18 @@ export default function CheckoutPage() {
   const phoneOk = Boolean((form.phone || '').trim() || (user?.phoneNumber || ''));
   const canPay = items.length > 0 && form.email && form.name && phoneOk && addressOk && form.city && form.state && form.zip;
 
+  // Track InitiateCheckout once per mount if items exist
+  const icOnce = useRef(false);
+  useEffect(() => {
+    if (icOnce.current) return;
+    if (!items.length) return;
+    try {
+      trackFBInitiateCheckout({ items, value: payable, currency: 'INR' });
+      icOnce.current = true;
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
+
   const createOrderDocs = async (payload) => {
     const orderRef = await addDoc(collection(db, "orders"), payload);
     if (user?.uid) {
@@ -133,6 +146,7 @@ export default function CheckoutPage() {
             payment_type: 'cod',
             items: items.map(({ id, name, price, qty }) => ({ item_id: id, item_name: name, price, quantity: qty })),
           });
+          trackFBPurchase({ items, value: payable, currency: 'INR', transaction_id: oid });
         } catch {}
         clearCart();
         showToast("success", "Order placed with Cash on Delivery");
@@ -216,6 +230,7 @@ export default function CheckoutPage() {
                 payment_type: 'online',
                 items: items.map(({ id, name, price, qty }) => ({ item_id: id, item_name: name, price, quantity: qty })),
               });
+              trackFBPurchase({ items, value: payable, currency: 'INR', transaction_id: oid });
             } catch {}
             clearCart();
             setPaying(false);

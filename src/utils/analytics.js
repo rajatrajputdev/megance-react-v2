@@ -1,5 +1,5 @@
-// Lightweight GA4 integration for Vite + React Router
-const GA_ID = import.meta.env.VITE_GA_MEASUREMENT_ID;
+// Lightweight GA4 integration for Vite + React Router (ID hardcoded as requested)
+const GA_ID = 'G-FMZMPVGJ2E';
 
 function ensureGtag() {
   if (!GA_ID) return false;

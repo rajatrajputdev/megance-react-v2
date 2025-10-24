@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { trackAddToCart } from "../utils/analytics.js";
+import { trackFBAddToCart } from "../utils/fbpixel.js";
 import { isMobile } from "../utils/env.js";
 
 const CartContext = createContext(null);
@@ -29,6 +30,7 @@ export function CartProvider({ children }) {
         const next = [...prev];
         next[idx] = { ...next[idx], qty: next[idx].qty + qty };
         try { trackAddToCart(product, qty); } catch {}
+        try { trackFBAddToCart({ id: product.id, name: product.name, price: product.price, qty }); } catch {}
         return next;
       }
       return [
