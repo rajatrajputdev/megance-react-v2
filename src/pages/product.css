@@ -1,5 +1,3 @@
-/* Product page isolated styles. Scoped to .product-page-wrap to avoid vendor bleed. */
-
 .product-page-wrap {
   background   : #fff;
   border-radius: 14px;
@@ -11,13 +9,13 @@
   margin-bottom: 6px;
   font-size    : 35px;
 }
-
 .shop_title_text {
   font-size  : 32px;
   font-weight: 700;
-
 }
-
+.m_n{
+  margin-top: -120px;
+}
 /* Price typography: use Karla for numeric rupee amount */
 .product-page-wrap .h4.mt-10 {
   font-family: "Karla", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -349,15 +347,12 @@
   border-radius: 12px;
   padding      : 16px;
 }
-
-/* Skeleton loading */
 .skeleton {
   position     : relative;
   overflow     : hidden;
   background   : #eee;
   border-radius: 8px;
 }
-
 .skeleton::after {
   content   : "";
   position  : absolute;
@@ -366,20 +361,20 @@
   background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0) 100%);
   animation : pd-shimmer 1.25s infinite;
 }
-
 @keyframes pd-shimmer {
   100% {
     transform: translateX(100%);
   }
 }
-
 .size_guide {
   width : 300px;
   height: auto;
 
 }
-
 /* Responsive tweaks */
+@media (max-width: 1000px) {  .m_n{margin-top: 0px;}} 
+@media (max-width: 768px) {  .margin_phn {  margin-left: 20px;} 
+}
 @media (max-width: 576px) {
   .margin_phn {
     margin-left: 20px;

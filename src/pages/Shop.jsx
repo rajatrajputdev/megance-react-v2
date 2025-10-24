@@ -127,7 +127,7 @@ export default function Shop() {
               />
             </div>
             <div className="col-lg-6 mb-30 order-lg-2">
-              <h2 className=" shop_title_text ml-30">Built Light. Ready to Move.</h2>
+              <h2 className=" shop_title_text ml-30 m_n">Built Light. Ready to Move.</h2>
               <p className="mt-15 ml-30">City-ready traction meets breathable comfort. Perfect for commutes and weekend wander.</p>
               <p className="mt-10 ml-30 opacity-7 ml-10" >Flexible uppers and locked-in stability keep you confident at pace.</p>
             </div>
