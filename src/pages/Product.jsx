@@ -576,7 +576,7 @@ const onMediaMove = (e) => {
 
   {showSizeGuide && (
     <div className="size_guide mt-10">
-      <img
+      <img loading="lazy"
         src="/assets/imgs/size.jpeg"
         alt="Size Chart"
         style={{ width: "100%", maxWidth: "380px", borderRadius: "8px" }}

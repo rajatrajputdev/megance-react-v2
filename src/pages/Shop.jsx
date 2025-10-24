@@ -78,7 +78,7 @@ export default function Shop() {
             <p className="mt-10 opacity-7">Explore featured products</p>
           </div>
           <div className="col-lg-4 mt-20 d-flex justify-content-lg-end justify-content-start">
-            <Link to="/cart" className="butn butn-md butn-rounded shop-cta">Go to cart</Link>
+            {/* <Link to="/cart" className="butn butn-md butn-rounded shop-cta">Go to cart</Link> */}
           </div>
         </div>
       </section>
@@ -87,9 +87,9 @@ export default function Shop() {
       <section className="shop-duo">
         <div className="container">
           <div className="row align-items-center">
-            <div className="col-lg-6 mb-30">
-              <h2 className="section-title">Engineered For Every Step</h2>
-              <p className="mt-15">From morning runs to late-night strolls, our designs balance cushioning and control so you feel supported all day.</p>
+            <div className="col-lg-6 margin_phn ">
+              <h2 className=" shop_title_text">Engineered For Every Step</h2>
+              <p className="mt-15 mr-20">From morning runs to late-night strolls, <br/> our designs balance cushioning and control so you feel supported all day.</p>
               <p className="mt-10 opacity-7">Dialed-in fit. Breathable comfort. Reliable grip for every surface.</p>
             </div>
             <div className="col-lg-6 mb-30">
@@ -127,9 +127,9 @@ export default function Shop() {
               />
             </div>
             <div className="col-lg-6 mb-30 order-lg-2">
-              <h2 className="section-title ml-10">Built Light. Ready to Move.</h2>
-              <p className="mt-15 ml-10">City-ready traction meets breathable comfort. Perfect for commutes and weekend wander.</p>
-              <p className="mt-10 opacity-7 ml-10" >Flexible uppers and locked-in stability keep you confident at pace.</p>
+              <h2 className=" shop_title_text ml-30">Built Light. Ready to Move.</h2>
+              <p className="mt-15 ml-30">City-ready traction meets breathable comfort. Perfect for commutes and weekend wander.</p>
+              <p className="mt-10 ml-30 opacity-7 ml-10" >Flexible uppers and locked-in stability keep you confident at pace.</p>
             </div>
           </div>
         </div>

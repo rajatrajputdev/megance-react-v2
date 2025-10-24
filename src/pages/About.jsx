@@ -10,7 +10,7 @@ const About = () => {
       <div className="white-navbar-page">
         {/* Hero Image Section */}
         <div className="about-hero-image">
-          <img
+          <img loading="lazy"
             src="/assets/imgs/works/aboutusbanner.webp"
             alt="About Us Hero"
 
@@ -53,63 +53,10 @@ const About = () => {
                   <br /><br />
                   Welcome inside.
                 </p>
-                {/* Add more lorem ipsum paragraphs here */}
               </div>
             </div>
           </div>
         </section>
-
-        {/* Services Section */}
-        {/* <section className="services-section py-5 bg-light">
-          <div className="container">
-            <h2 className="text-center mb-5">Our Services</h2>
-            <div className="row">
-              <div className="col-md-4 mb-4">
-                <div className="service-card text-center">
-                  <img src="https://picsum.photos/400/300?random=1" alt="Service 1" className="img-fluid mb-3" />
-                  <h3>Custom Design</h3>
-                  <p>Create unique and personalized designs tailored to your needs.</p>
-                </div>
-              </div>
-              <div className="col-md-4 mb-4">
-                <div className="service-card text-center">
-                  <img src="https://picsum.photos/400/300?random=2" alt="Service 2" className="img-fluid mb-3" />
-                  <h3>Digital Solutions</h3>
-                  <p>Comprehensive digital solutions for modern businesses.</p>
-                </div>
-              </div>
-              <div className="col-md-4 mb-4">
-                <div className="service-card text-center">
-                  <img src="https://picsum.photos/400/300?random=3" alt="Service 3" className="img-fluid mb-3" />
-                  <h3>Creative Innovation</h3>
-                  <p>Innovative approaches to solve complex challenges.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section> */}
-
-        {/* Our Work Section */}
-        {/* <section className="work-section py-5">
-          <div className="container">
-            <h2 className="text-center mb-5">Our Work</h2>
-            <div className="row">
-              {[1, 2, 3, 4, 5, 6].map((index) => (
-                <div key={index} className="col-md-4 mb-4">
-                  <div className="work-item">
-                    <img
-                      src={`https://picsum.photos/600/400?random=${index + 10}`}
-                      alt={`Work ${index}`}
-                      className="img-fluid"
-                      style={{ width: '100%', height: '300px', objectFit: 'cover' }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section> */}
-
         <Footer />
       </div>
     </>
