@@ -61,4 +61,17 @@
   .hero-buttons {
     justify-content: center;
   }
+  .hero-btn {
+    width: 120px;
+  padding: 7px 22px !important;
+  border: none;
+  font-size: 12px;
+  outline: none;
+  font-weight: 600;
+  letter-spacing: 1px;
+  background: white;
+  color: black;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
 }

@@ -313,7 +313,7 @@ export default function CheckoutPage() {
         </div>
       ) : (
         <div className="row">
-          <div className="col-lg-7 mb-20">
+          <div className="col-lg-7 mb-20 font_karla" >
             <div className="p-20 card-like glass-surface strong-elevation">
               <h5>Billing Details</h5>
               <div className="row mt-10">
@@ -354,7 +354,7 @@ export default function CheckoutPage() {
                               <path d="M4 20h4l10.5-10.5a2.121 2.121 0 10-3-3L5 17v3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           </span>
-                          <span>Edit address</span>
+                          <span style={{fontSize:"12px"}}>Edit address</span>
                         </button>
                       </div>
                     </div>
@@ -402,7 +402,7 @@ export default function CheckoutPage() {
                     <span>
                       {x.name} × {x.qty}
                     </span>
-                    <span>₹ {x.price * x.qty}</span>
+                    <span className="summary_price">₹{x.price * x.qty}</span>
                   </li>
                 ))}
               </ul>
@@ -476,7 +476,7 @@ export default function CheckoutPage() {
                   </button>
                 </div>
               </div>
-              <div className="d-flex justify-content-between fw-600">
+              <div className="d-flex justify-content-between fw-600 ">
                 <span>Subtotal</span>
                 <span>₹ {amount}</span>
               </div>

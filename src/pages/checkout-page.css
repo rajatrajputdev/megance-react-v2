@@ -72,6 +72,13 @@
   transform: translateY(-1px);
 }
 
+.summary_price{
+  margin-left: 10px;
+  padding: 10px;
+}
+.font_karla{
+  font-family: "Karla", sans-serif;
+}
 /* Small labels */
 .checkout-page .label-sm { font-size: 13px; opacity: .85; }
 

@@ -73,6 +73,18 @@
     padding: 0 20px;
     text-align: center;
   }
+  .hero-btn {
+  width: 110px;
+  border: none;
+  outline: none;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 1px;
+  background: white;
+  color: black;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
   .hero-v2-content {
     max-width: 90%;
   }
