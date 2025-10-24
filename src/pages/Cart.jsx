@@ -146,7 +146,7 @@ export default function CartPage() {
                     ×
                   </button>
 
-                  <div className="item-thumb" style={{ height: "100px", width: "150px" }}>
+                  <div className="item-thumb">
                     <img src={it.image || it.imageUrl || "/assets/logo.svg"} alt={it.name} />
                   </div>
 
