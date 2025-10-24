@@ -28,8 +28,8 @@ export default function Shop() {
       }
     };
 
-    updateBanner(); // ✅ Runs immediately on mount
-    window.addEventListener("resize", updateBanner); // ✅ Updates on resize/swipe orientation
+    updateBanner(); 
+    window.addEventListener("resize", updateBanner); 
 
     return () => window.removeEventListener("resize", updateBanner);
   }, []);

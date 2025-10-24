@@ -87,7 +87,7 @@
 .header-ms .caption h1,
 .zeller_content h1,
 .zeller_content p {
-  font-family: "Playfair Display", "Times New Roman", serif !important;
+  font-family: "Playfair Display", serif !important;
 }
 
 /* Remove extra spacing under hero title */

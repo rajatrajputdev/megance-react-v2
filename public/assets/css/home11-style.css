@@ -1,13 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+
 
 :root {
   --bg-color   : #FFFFFF;
   --theme-color: #FFFFFF;
-}
-
-@font-face {
-  font-family: 'Halyard-Display';
-  src        : url("../fonts/Halyard/fonnts.com-Halyard_Display.otf") format("woff2");
 }
 
 * {
@@ -404,44 +399,14 @@
   color      : #7B7878;
 }
 
-.shoes_video_3d {
-  width        : 100%;
-  height       : 100%;
-  border-radius: 10px;
 
-}
-
-.words_3d {
-  text-transform: uppercase;
-  font-weight   : bolder;
-  font-family   : "Nike Futura ND";
-  font-size     : 7rem;
-  margin-top    : -2rem;
-  text-align    : center;
-  line-height   : 1.2;
-  letter-spacing: normal;
-}
 
 .space_dec {
   margin-top: -3rem;
 
 }
 
-@font-face {
-  font-family: 'specialmusical';
-  src        : url('../fonts/Musician.ttf') format('truetype');
-  font-weight: normal;
-  font-style : normal;
-}
 
-.words_3d_special {
-  text-align : center;
-  margin-top : -6.2rem;
-  color      : red;
-  font-weight: 900;
-  font-family: 'specialmusical', serif;
-  font-size  : 14rem;
-}
 
 .hero-ms .exp {
   position: relative;
@@ -609,7 +574,7 @@
 }
 
 .works_heading {
-  font-family: 'NIKE Futura ND', sans-serif;
+  font-family: 'Playfair Display', sans-serif;
   color: #fff;
 }
 
@@ -1167,8 +1132,7 @@ hr {
 }
 
 body {
-  font-family     : "Inter", sans-serif;
-  font-family     : "Halyard-Display", sans-serif;
+  font-family      : "Playfair Display", sans-serif;
   font-size       : 18px;
   line-height     : 28px;
   font-weight     : 400;
@@ -1182,37 +1146,77 @@ h3,
 h4,
 h5,
 h6 {
+  font-family: "Playfair Display", sans-serif !important;
   font-weight: 400;
   line-height: 1.2;
   margin     : 0;
 }
 
+/* Desktop (default) */
 h1 {
   font-size: 64px;
 }
-
 h2 {
   font-size: 54px;
 }
-
 h3 {
   font-size: 44px;
 }
-
 h4 {
   font-size: 36px;
 }
-
 h5 {
   font-size: 32px;
 }
-
 h6 {
   font-size: 24px;
 }
 
+@media (max-width: 768px) {
+  h1 {
+    font-size: 36px;
+  }
+  h2 {
+    font-size: 30px;
+  }
+  h3 {
+    font-size: 26px;
+  }
+  h4 {
+    font-size: 22px;
+  }
+  h5 {
+    font-size: 20px;
+  }
+  h6 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 30px;
+  }
+  h2 {
+    font-size: 26px;
+  }
+  h3 {
+    font-size: 22px;
+  }
+  h4 {
+    font-size: 20px;
+  }
+  h5 {
+    font-size: 18px;
+  }
+  h6 {
+    font-size: 16px;
+  }
+}
+
+
 p {
-  font-family: "Inter", sans-serif;
+  font-family: "Karla", sans-serif;
   font-size  : 16px;
   font-weight: 300;
   margin     : 0;
