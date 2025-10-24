@@ -115,7 +115,7 @@ export default function OrderDetails() {
   return (
     <>
       <SEO title="Order Details" description="Your Megance order details." image="/assets/logo.svg" type="website" twitterCard="summary" />
-      <section className="container page-section white-navbar-page">
+      <section className="container page-section white-navbar-page order-details-page">
         <div className="row justify-content-center">
           <div className="col-lg-8">
             <div className="p-20 card-like">

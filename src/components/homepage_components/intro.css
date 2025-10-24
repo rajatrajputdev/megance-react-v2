@@ -68,6 +68,7 @@
 .intro-price-flat {
   font-size: 15px;
   color: #444;
+  font-family: "Karla", sans-serif !important;
 }
 
 /* ===== Buy Now button (replaces +) ===== */

@@ -95,10 +95,10 @@
 }
 .full-video-wrapper {
   position: relative;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
-  background-color: black; /* to fill gaps */
+  background-color: #000; /* to fill gaps */
 }
 
 .faq-video {
@@ -108,5 +108,23 @@
   min-width: 100%;
   min-height: 100%;
   transform: translate(-50%, -50%);
-  object-fit: contain; /* ensures full video is visible */
+  object-fit: contain; /* keep entire video visible on wide screens */
+}
+
+/* Mobile: avoid cropping by letting video size itself naturally */
+@media (max-width: 768px) {
+  .full-video-wrapper {
+    width: 100%;
+    height: auto;         /* let content define height */
+    overflow: visible;    /* no cropping */
+  }
+  .faq-video {
+    position: static;     /* normal flow */
+    transform: none;
+    width: 100%;
+    height: auto;
+    max-height: 100svh;   /* safe viewport height on mobile */
+    object-fit: contain;  /* show full video (may letterbox) */
+    display: block;
+  }
 }

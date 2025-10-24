@@ -9,6 +9,11 @@
 
 .product-page-wrap .section-title { margin-bottom: 6px; }
 
+/* Price typography: use Karla for numeric rupee amount */
+.product-page-wrap .h4.mt-10 {
+  font-family: "Karla", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
 /* ---------- MEDIA STAGE (SQUARE + ZOOM + THUMBS) ---------- */
 .product-page-wrap .pd-stage {
   display: grid;

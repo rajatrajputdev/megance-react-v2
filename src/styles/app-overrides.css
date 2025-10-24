@@ -185,6 +185,12 @@
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.08);
 }
 
+/* Price text helper: force Karla for rupee amounts */
+.price-text {
+  font-family: "Karla", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Recaptcha holder (container element only; the Google badge may still appear) */
 .recaptcha-holder { position: fixed; width: 1px; height: 1px; overflow: hidden; left: -9999px; top: -9999px; }
 .recaptcha-holder.recaptcha-visible {
@@ -198,6 +204,17 @@
 
 /* Orders list */
 .orders-list { list-style: none; padding: 0; margin: 0; }
+
+/* Order details page: right-hand amounts in Karla */
+.order-details-page .d-flex.justify-content-between > span:last-child,
+.order-details-page ul li > span:last-child {
+  font-family: "Karla", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Account orders card: amount on the right in Karla */
+.orders-card .text-right .fw-600 {
+  font-family: "Karla", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
 .order-item { border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: #fff; }
 .badge.status { border-radius: 999px; border: 1px solid #ddd; padding: 3px 10px; font-size: 12px; }
 .badge.status-ordered { background: #eef4ff; border-color: #cfe1ff; color: #194b9b; }

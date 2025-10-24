@@ -67,7 +67,7 @@
 
 .shop-meta { margin-top: 8px; display: flex; align-items: baseline; justify-content: space-between; }
 .shop-name { font-weight: 600; color: #111; font-size: 15px; }
-.shop-price { color: #444; font-size: 14px; }
+.shop-price { color: #444; font-size: 14px; font-family: "Karla", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif; }
 
 /* Out of stock badge on list cards */
 .stock-badge.oos {
