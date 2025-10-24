@@ -155,7 +155,7 @@ export default function LoginPage() {
                       onChange={(e) => setPhone(e.target.value)}
                     />
                     <button className="frosted-btn full-width mt-10" disabled={sendingOtp || !phone} onClick={onSendOtp}>
-                      {sendingOtp ? "Sending…" : "Send OTP"}
+                      {sendingOtp ? "Sent OTP" : "Send OTP"}
                     </button>
                   </>
                 )}
