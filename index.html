@@ -1,13 +1,10 @@
 <!DOCTYPE html>
-<html lang="zxx">
-
+<html lang="en">
 <head>
-  <!-- Metas -->
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <meta name="description"
-    content="Megance — Elevate every turn with bold, sleek footwear engineered for comfort and performance." />
+  <meta name="description" content="Megance — Elevate every turn with bold, sleek footwear engineered for comfort and performance." />
   <meta name="keywords" content="Megance, sneakers, footwear, running shoes, lifestyle shoes, India" />
   <meta name="author" content="Megance" />
   <meta name="robots" content="index,follow" />
@@ -19,74 +16,89 @@
   <link rel="canonical" href="https://megance.com/?v=launch2" />
   <meta property="og:url" content="https://megance.com/?v=launch2" />
 
-  <!-- Open Graph -->
   <meta property="og:locale" content="en_IN" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Megance" />
   <meta property="og:title" content="MEGANCE" />
-  <meta property="og:description"
-    content="Elevate every turn with bold, sleek footwear engineered for comfort and performance." />
-  <meta property="og:url" content="/" />
+  <meta property="og:description" content="Elevate every turn with bold, sleek footwear engineered for comfort and performance." />
   <meta property="og:image" content="/assets/logo.svg" />
   <meta property="og:image:alt" content="Megance logo" />
 
-
-  <!-- Twitter -->
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="MEGANCE" />
-  <meta name="twitter:description"
-    content="Elevate every turn with bold, sleek footwear engineered for comfort and performance." />
+  <meta name="twitter:description" content="Elevate every turn with bold, sleek footwear engineered for comfort and performance." />
   <meta name="twitter:image" content="/assets/imgs/megance_logo_w.png" />
 
   <title>MEGANCE</title>
 
-  <!-- Icons & Favicons -->
   <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
   <link rel="icon" href="/assets/imgs/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="/assets/imgs/megance_logo_w.png" />
   <link rel="mask-icon" href="/assets/logo.svg" color="#0b0b0b" />
   <link rel="preload" href="/assets/logo.svg" as="image" type="image/svg+xml" />
 
-  <!-- Facebook Pixel (noscript fallback) -->
-  <!-- Set your Pixel ID via VITE_FB_PIXEL_ID or window.FB_PIXEL_ID in app code -->
-
-
-  <!-- Structured Data -->
   <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "Megance",   
-        "url": "/",
-        "logo": "/assets/logo.svg"
-      }
-    </script>
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Megance",
+      "url": "https://megance.com",
+      "logo": "/assets/logo.svg"
+    }
+  </script>
 
-  <!-- Google Fonts -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,200..800;1,200..800&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Karla:wght@200..800&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
 
-  <!-- Styles -->
   <link rel="stylesheet" href="/common/css/plugins.css" />
   <link rel="stylesheet" href="/common/css/common_style.css" />
   <link rel="stylesheet" href="/assets/css/home11-style.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.css" />
-  
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-2E"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-2E');
+  </script>
+  <!-- Meta Pixel -->
+  <script>
+    !(function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)})(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '822965333633898'); 
+    fbq('track', 'PageView');
+  </script>
 </head>
 
 <body class="megance-body">
+
+  <!-- ✅ Move Meta Pixel noscript fallback here -->
   <noscript>
-    <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T3RHBL3X" height="0" width="0"
-      style="display: none; visibility: hidden"></iframe>
+    <img height="1" width="1" style="display:none"
+         src="https://www.facebook.com/tr?id=822965333633898&ev=PageView&noscript=1"/>
   </noscript>
 
-  <div id="root"></div>
+  <!-- GTM noscript -->
+  <noscript>
+    <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T3RHBL3X" height="0" width="0"
+      style="display:none;visibility:hidden"></iframe>
+  </noscript>
 
+
+  <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 
   <script>
-    (function () {
+    (function() {
       try {
         var ls = localStorage.getItem('disableSmoother');
         if (!ls) localStorage.setItem('disableSmoother', 'true');
@@ -98,7 +110,7 @@
   </script>
 
   <script>
-    (function () {
+    (function() {
       function ready() {
         const hasCursor = !!document.querySelector(".cursor");
         const hasProgress = !!document.querySelector(".progress-wrap path");
@@ -106,8 +118,8 @@
         return hasRoot && hasCursor && hasProgress;
       }
       function loadScript(src) {
-        return new Promise(function (resolve, reject) {
-          var s = document.createElement("script");
+        return new Promise((resolve, reject) => {
+          const s = document.createElement("script");
           s.src = src;
           s.onload = resolve;
           s.onerror = reject;
@@ -115,41 +127,29 @@
         });
       }
       async function boot() {
-        // Wait until React has mounted App and inserted required elements
         for (let i = 0; i < 60 && !ready(); i++) {
-          await new Promise((r) => setTimeout(r, 50));
+          await new Promise(r => setTimeout(r, 50));
         }
-        // Load in order
         await loadScript("/common/js/lib/jquery-3.6.0.min.js");
         await loadScript("/common/js/lib/jquery-migrate-3.4.0.min.js");
         await loadScript("/common/js/lib/plugins.js");
-        // Silence GSAP warnings for missing targets used by vendor scripts
         try {
           if (window.gsap && window.gsap.config)
             window.gsap.config({ nullTargetWarn: false });
-        } catch (_) { }
-        await loadScript(
-          "https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"
-        );
+        } catch (_) {}
+        await loadScript("https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js");
         await loadScript("/common/js/gsap_lib/ScrollSmoother.min.js");
-        await loadScript(
-          "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"
-        );
+        await loadScript("https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js");
         await loadScript("/common/js/gsap_lib/SplitText.min.js");
         await loadScript("/common/js/common_scripts.js");
         try {
           window.dispatchEvent(
-            new CustomEvent("vendors:ready", {
-              detail: { swiper: !!window.Swiper },
-            })
+            new CustomEvent("vendors:ready", { detail: { swiper: !!window.Swiper } })
           );
-        } catch (e) {
-          // ignore
-        }
+        } catch (e) {}
       }
       boot();
     })();
   </script>
 </body>
-
 </html>
